@@ -25,6 +25,9 @@ use std::{
 
 const TIMEOUT: Duration = Duration::from_secs(20);
 
+#[path = "live/identity.rs"]
+mod identity;
+
 #[path = "live/plugins.rs"]
 mod plugins;
 
