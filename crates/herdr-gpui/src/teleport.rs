@@ -35,7 +35,7 @@ pub(crate) use {
     marks::{Mark, Marks},
     snapshot::{
         Envelope, HostSnapshot, PaneInfoResult, ProcessInfo, ProcessInfoResult, SnapshotResult,
-        WorkspaceCreated, WorktreeCreated,
+        TabCreated, WorkspaceCreated, WorktreeCreated,
     },
     ui::{Follow, Teleport},
 };
@@ -56,4 +56,4 @@ pub(crate) fn host_for(target: &herdr_client::ConnectTarget) -> error::Result<Ho
 // Host scripts need /bin/sh; Teleport is not offered on other clients.
 #[cfg(all(test, any(target_os = "linux", target_os = "macos")))]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-mod live_tests;
+pub(crate) mod live_tests;

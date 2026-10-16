@@ -3,6 +3,7 @@
 
 mod about;
 mod actions;
+mod agent_actions;
 mod agent_notes;
 mod agent_skill;
 mod app;

@@ -471,6 +471,13 @@ impl HerdrWindow {
         true
     }
 
+    /// The workspace menu's space: the boot it was opened in, its ID, and
+    /// its name.
+    pub(crate) fn menu_space(&self) -> Option<(&str, &str, &str)> {
+        let target = self.menu.target.as_ref()?;
+        Some((&target.boot_id, &target.id, &target.label))
+    }
+
     /// The actions this workspace offers, in the order the popover shows them
     /// and arrow keys walk them: the tile grid row by row (work, then moving
     /// or leaving), the plain rows, and the destructive action last.
@@ -485,6 +492,9 @@ impl HerdrWindow {
         }
         if let Some(label) = self.fan_out_item() {
             items.push((WorkspaceMenuAction::FanOut, label));
+        }
+        if self.start_agent_available() {
+            items.push((WorkspaceMenuAction::StartAgent, "Start agent..."));
         }
         items.push((Dialog(WorkspaceAction::Rename), "Rename"));
         if self.teleport_mark().is_some() {
@@ -726,6 +736,7 @@ impl HerdrWindow {
             WorkspaceMenuAction::ClearTeleported => self.clear_teleport_mark(window, cx),
             WorkspaceMenuAction::Checkpoints => self.open_checkpoints(window, cx),
             WorkspaceMenuAction::FanOut => self.open_fan_out(window, cx),
+            WorkspaceMenuAction::StartAgent => self.open_start_agent(window, cx),
             WorkspaceMenuAction::Script(kind) => self.run_workspace_script(kind, window, cx),
             WorkspaceMenuAction::Orchestrator => {
                 if let Some(target) = &self.menu.target {

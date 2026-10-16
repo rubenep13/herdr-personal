@@ -16,4 +16,7 @@ mod ui;
 
 #[cfg(any(unix, test))]
 pub(crate) use plan::MAX_LANES;
-pub(crate) use state::{FanOut, Origin};
+pub(crate) use {
+    job::installed,
+    state::{FanOut, Origin},
+};

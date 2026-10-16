@@ -105,6 +105,8 @@ pub(crate) struct HerdrWindow {
     /// stored session. Until then the daemon's `ui.agent_panel_sort` decides,
     /// including after a config reload, as upstream's manual override does.
     pub(crate) agent_sort_modified: bool,
+    /// Starting an agent in a space: the choice, and the start in flight.
+    pub(crate) agent_start: crate::agent_actions::AgentStart,
     /// The App Updates dialog's own notes cache, so scrolling and redraws do not
     /// re-parse the release body.
     pub(crate) app_update_notes: crate::release_notes::Prepared,

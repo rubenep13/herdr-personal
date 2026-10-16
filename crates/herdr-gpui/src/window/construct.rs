@@ -129,6 +129,7 @@ impl HerdrWindow {
             active: window.is_window_active(),
             agent_sort: preferences::AgentSort::default(),
             agent_sort_modified: false,
+            agent_start: Default::default(),
             app_update_notes: Default::default(),
             app_update_notes_scroll: ScrollHandle::new(),
             arrival: None,

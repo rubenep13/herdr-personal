@@ -20,14 +20,16 @@ use std::{
     time::{Duration, Instant},
 };
 
-struct Daemon {
-    dir: PathBuf,
+/// One isolated daemon, shared with other opt-in live tests that script a
+/// host the same way.
+pub(crate) struct Daemon {
+    pub(crate) dir: PathBuf,
     child: Option<Child>,
-    host: Host,
+    pub(crate) host: Host,
 }
 
 impl Daemon {
-    fn start(binary: &Path, name: &str) -> Self {
+    pub(crate) fn start(binary: &Path, name: &str) -> Self {
         let parent = std::env::var_os("HERDR_TEST_TMPDIR")
             .map(PathBuf::from)
             .unwrap_or_else(std::env::temp_dir);
@@ -96,7 +98,7 @@ impl Daemon {
         daemon
     }
 
-    fn herdr(&self, args: &[&str]) -> serde_json::Value {
+    pub(crate) fn herdr(&self, args: &[&str]) -> serde_json::Value {
         self.host
             .herdr(Step::Review, args, &AtomicBool::new(false))
             .unwrap()

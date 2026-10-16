@@ -222,6 +222,19 @@ export PATH
         Ok(output)
     }
 
+    /// [`Host::capture`] within bounds the caller chooses, for work with a
+    /// smaller output budget or a deadline of its own.
+    pub(crate) fn capture_limited(
+        &self,
+        body: &str,
+        limits: ScriptLimits,
+        cancelled: &AtomicBool,
+    ) -> herdr_client::Result<Vec<u8>> {
+        let mut output = Vec::new();
+        self.stream(body, &[][..], &mut output, limits, cancelled)?;
+        Ok(output)
+    }
+
     /// The script line running `herdr_cli` with `args`, each quoted.
     pub(crate) fn herdr_line(args: &[&str]) -> String {
         let command = args

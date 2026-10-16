@@ -71,6 +71,8 @@ pub(crate) enum Page {
     RenameTab,
     /// Local sessions and remote devices, with the state of each.
     Sessions,
+    /// Personal fork: choosing an agent to start in the workspace menu's space.
+    StartAgent,
     Tab,
     /// Moving a linked worktree to another host.
     Teleport,
@@ -124,6 +126,8 @@ pub(crate) enum WorkspaceMenuAction {
     Script(crate::worktree_scripts::ScriptKind),
     /// Open the repository's orchestrator tab.
     Orchestrator,
+    /// Personal fork: start an installed agent in a new tab of the space.
+    StartAgent,
 }
 
 impl Page {
@@ -191,6 +195,7 @@ impl WorkspaceMenuAction {
             Self::Orchestrator => "icons/github.svg",
             Self::Script(crate::worktree_scripts::ScriptKind::Setup) => "icons/refresh.svg",
             Self::Script(_) => "icons/play.svg",
+            Self::StartAgent => "icons/play.svg",
             Self::PullRequest => return None,
         })
     }
