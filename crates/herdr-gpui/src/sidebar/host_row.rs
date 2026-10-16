@@ -205,6 +205,11 @@ impl HerdrWindow {
                                     this.endpoints.iter_mut().find(|e| e.id == collapse_id)
                                 {
                                     endpoint.collapsed = !endpoint.collapsed;
+                                    let collapsed = endpoint.collapsed;
+                                    // Folds are kept across restarts, by endpoint ID.
+                                    crate::sidebar::tree::storage::TreeState::update(cx, |tree| {
+                                        (tree.set_host_collapsed(&collapse_id, collapsed), ())
+                                    });
                                 }
                                 cx.notify();
                             })),

@@ -19,6 +19,9 @@ pub(in crate::sidebar) enum Heading {
     Spaces,
     /// The Devices layout's tree, which a query narrows in place.
     DeviceTree,
+    /// The Tree layout's hosts, spaces, and agents, narrowed in place through
+    /// the same field.
+    Tree,
 }
 
 impl Heading {
@@ -26,6 +29,7 @@ impl Heading {
         match self {
             Self::Spaces => "spaces",
             Self::DeviceTree => "devices",
+            Self::Tree => "tree",
         }
     }
 
@@ -33,6 +37,7 @@ impl Heading {
         match self {
             Self::Spaces => "Devices, worktrees, branches, notes",
             Self::DeviceTree => "Search devices and agents",
+            Self::Tree => "Search hosts, spaces, and agents",
         }
     }
 
@@ -40,6 +45,7 @@ impl Heading {
         match self {
             Self::Spaces => "sidebar-search",
             Self::DeviceTree => "device-tree-search",
+            Self::Tree => "tree-search",
         }
     }
 }
@@ -48,7 +54,7 @@ impl HerdrWindow {
     fn heading_input(&self, heading: Heading) -> Option<&Entity<SearchInput>> {
         match heading {
             Heading::Spaces => Some(&self.sidebar_search.input),
-            Heading::DeviceTree => self
+            Heading::DeviceTree | Heading::Tree => self
                 .devices_overview
                 .tree_search
                 .as_ref()
@@ -105,7 +111,7 @@ impl HerdrWindow {
             })
             .on_key_down(cx.listener(move |this, event, window, cx| match heading {
                 Heading::Spaces => this.sidebar_search_key(event, window, cx),
-                Heading::DeviceTree => this.device_tree_key(event, window, cx),
+                Heading::DeviceTree | Heading::Tree => this.device_tree_key(event, window, cx),
             }))
             .when(open, |field| field.child(magnifier()))
             .child(

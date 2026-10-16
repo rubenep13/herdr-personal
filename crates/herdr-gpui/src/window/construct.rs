@@ -86,6 +86,8 @@ impl HerdrWindow {
         // Another window, or an agent, may open or close a tab.
         let browser_tabs = cx.observe_global::<crate::browser::Store>(|_, cx| cx.notify());
         let worktree_notes = Self::observe_worktree_notes(window, cx);
+        let sidebar_tree =
+            cx.observe_global::<sidebar::tree::storage::TreeState>(|_, cx| cx.notify());
         let prefix_interceptor = Self::intercept_prefix(window, cx);
         let activation = cx.observe_window_activation(window, |this, window, cx| {
             this.active = window.is_window_active();
@@ -120,6 +122,7 @@ impl HerdrWindow {
             _poll: poll,
             _prefix_interceptor: prefix_interceptor,
             _sidebar_invalidation: sidebar_invalidation,
+            _sidebar_tree: sidebar_tree,
             _window_closed: window_closed,
             _worktree_notes: worktree_notes,
             activation_deadline: None,
@@ -286,6 +289,8 @@ impl HerdrWindow {
         })
         .detach();
         Self::close_orchestrator_windows_on_release(cx);
+        this.endpoints[0].collapsed =
+            sidebar::tree::storage::TreeState::host_collapsed(cx, endpoint::LOCAL);
         #[cfg(feature = "integration-test")]
         if sidebar_test {
             this._poll = Task::ready(());

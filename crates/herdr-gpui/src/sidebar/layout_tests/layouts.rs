@@ -426,7 +426,8 @@ fn every_layout_looks_different(cx: &mut gpui::TestAppContext) {
     let mut seen: Vec<(LayoutMode, Vec<Pixels>)> = Vec::new();
     for mode in LayoutMode::ALL
         .into_iter()
-        .filter(|mode| mode.lists_workspaces())
+        // Tree draws Normal's rows; only its structure differs.
+        .filter(|mode| mode.lists_workspaces() && !mode.nests_agents())
     {
         // A fresh window per layout: debug bounds outlive their elements.
         let (_, cx) = cx.add_window_view(|window, cx| {

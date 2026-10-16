@@ -91,6 +91,10 @@ fn catalog_has_all_native_commands_and_gpui_shortcuts() {
         (AgentNumber(7), &[]),
         (AgentNumber(8), &[]),
         (AgentNumber(9), &[]),
+        (MoveSpaceUp, &[]),
+        (MoveSpaceDown, &[]),
+        (MoveAgentUp, &[]),
+        (MoveAgentDown, &[]),
         (ToggleSidebar, &["cmd-b"]),
         (ToggleStatusBar, &[]),
         (ToggleZenMode, &["ctrl-cmd-z"]),
@@ -218,6 +222,10 @@ fn gui_commands_never_send_daemon_requests() {
         Command::PreviousAgent,
         Command::NextAgent,
         Command::AgentNumber(1),
+        Command::MoveSpaceUp,
+        Command::MoveSpaceDown,
+        Command::MoveAgentUp,
+        Command::MoveAgentDown,
         Command::ReloadConfig,
     ] {
         assert!(request(command, &s).is_none(), "{command:?}");

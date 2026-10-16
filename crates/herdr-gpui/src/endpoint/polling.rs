@@ -62,8 +62,20 @@ impl HerdrWindow {
         // OSC 52 writes are drained per endpoint so they are written once and
         // never linger in a live state that a later poll would re-read.
         let mut clipboard_writes = std::collections::VecDeque::new();
+        // Snapshots that moved on, for the tree to forget what no longer applies.
+        let mut snapshots = Vec::new();
         for (index, endpoint) in self.endpoints.iter_mut().enumerate() {
             let updated = endpoint.poll(Instant::now());
+            if updated == Redraw::Window
+                && endpoint.live.status.is_connected()
+                && let Some(snapshot) = &endpoint.live.snapshot
+            {
+                let key = crate::sidebar::tree::EndpointKey::new(
+                    &endpoint.id,
+                    &endpoint.connection.target,
+                );
+                snapshots.push((key, snapshot.clone()));
+            }
             clipboard_writes.append(&mut endpoint.live.clipboard_writes);
             // Bells are a presentation effect: only the selected endpoint's
             // ring, as the TUI drops them from inactive endpoints.
@@ -99,6 +111,7 @@ impl HerdrWindow {
                 changed = Redraw::Window;
             }
         }
+        crate::sidebar::tree::storage::TreeState::reconcile(cx, &snapshots);
         crate::palette::LastSeen::trim(
             self.endpoints
                 .iter_mut()

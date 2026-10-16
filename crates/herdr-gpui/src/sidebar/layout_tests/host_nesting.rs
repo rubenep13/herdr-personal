@@ -93,7 +93,8 @@ fn nested_worktree_rows_fit_a_narrow_sidebar(cx: &mut gpui::TestAppContext) {
     cx.run_until_parked();
     for mode in crate::config::LayoutMode::ALL
         .into_iter()
-        .filter(|mode| mode.lists_workspaces())
+        // Tree lists spaces in the user's order, with no worktree children.
+        .filter(|mode| mode.lists_workspaces() && !mode.nests_agents())
     {
         view.update(cx, |fixture, cx| {
             fixture.0.update(cx, |view, cx| {

@@ -57,7 +57,7 @@ fn priority_paints_every_hosts_agents_in_one_order(cx: &mut gpui::TestAppContext
         cx.update(|_, cx| {
             let stepped: Vec<_> = view
                 .read(cx)
-                .sidebar_agents()
+                .sidebar_agents(cx)
                 .into_iter()
                 .map(|(host, _)| host)
                 .collect();

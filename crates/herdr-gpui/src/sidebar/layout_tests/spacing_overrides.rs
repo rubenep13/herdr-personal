@@ -61,7 +61,8 @@ fn left(cx: &mut gpui::VisualTestContext, selector: &'static str) -> f32 {
 fn indent_override_sets_every_nesting_level(cx: &mut gpui::TestAppContext) {
     for mode in crate::config::LayoutMode::ALL
         .into_iter()
-        .filter(|mode| mode.lists_workspaces())
+        // Tree lists spaces in the user's order, with no worktree children.
+        .filter(|mode| mode.lists_workspaces() && !mode.nests_agents())
     {
         let flat = draw(
             cx,

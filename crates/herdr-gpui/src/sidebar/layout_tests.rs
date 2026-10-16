@@ -82,6 +82,8 @@ mod superset_dots;
 #[cfg(test)]
 mod text_width;
 #[cfg(test)]
+mod tree_layout;
+#[cfg(test)]
 mod update_notes;
 #[cfg(test)]
 mod update_notes_scrollbar;
@@ -651,6 +653,8 @@ pub(crate) fn fixture_window(window: &mut Window, cx: &mut Context<HerdrWindow>)
         browser: crate::browser::Browser::new(cx),
         _browser_tabs: cx.observe_global::<crate::browser::Store>(|_, cx| cx.notify()),
         _worktree_notes: HerdrWindow::observe_worktree_notes(window, cx),
+        _sidebar_tree: cx
+            .observe_global::<crate::sidebar::tree::storage::TreeState>(|_, cx| cx.notify()),
         prefix_armed: false,
         resize_mode: false,
         server_keys: None,

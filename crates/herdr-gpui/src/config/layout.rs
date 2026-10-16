@@ -47,6 +47,9 @@ pub enum LayoutMode {
     Minimal,
     /// Each device with its agents under it, and a search over them.
     Devices,
+    /// Personal fork: each device's spaces with their agents nested under
+    /// them, in the user's own order, and a search that keeps ancestors.
+    Tree,
 }
 
 impl Default for LayoutMode {
@@ -68,10 +71,11 @@ impl LayoutMode {
         "orca",
         "minimal",
         "devices",
+        "tree",
     ];
 
     /// Every named layout, in the order menus list them.
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 11] = [
         Self::new(Density::Normal, Style::Flat),
         Self::new(Density::Compact, Style::Flat),
         Self::new(Density::Comfortable, Style::Flat),
@@ -82,6 +86,7 @@ impl LayoutMode {
         Self::Orca,
         Self::Minimal,
         Self::Devices,
+        Self::Tree,
     ];
 
     pub const fn new(density: Density, style: Style) -> Self {
@@ -93,7 +98,7 @@ impl LayoutMode {
     pub const fn density(self) -> Density {
         match self {
             Self::Classic { density, .. } => density,
-            Self::Superset | Self::Minimal | Self::Devices => Density::Normal,
+            Self::Superset | Self::Minimal | Self::Devices | Self::Tree => Density::Normal,
             Self::Orca => Density::Comfortable,
         }
     }
@@ -102,7 +107,7 @@ impl LayoutMode {
     pub const fn style(self) -> Style {
         match self {
             Self::Classic { style, .. } => style,
-            Self::Superset | Self::Minimal | Self::Devices => Style::Flat,
+            Self::Superset | Self::Minimal | Self::Devices | Self::Tree => Style::Flat,
             Self::Orca => Style::Rounded,
         }
     }
@@ -120,6 +125,12 @@ impl LayoutMode {
         !matches!(self, Self::Devices)
     }
 
+    /// Whether the spaces list nests each space's agents under it, in place
+    /// of the separate agents panel.
+    pub const fn nests_agents(self) -> bool {
+        matches!(self, Self::Tree)
+    }
+
     /// The config value that selects it.
     pub const fn name(self) -> &'static str {
         match self {
@@ -135,6 +146,7 @@ impl LayoutMode {
             Self::Orca => "orca",
             Self::Minimal => "minimal",
             Self::Devices => "devices",
+            Self::Tree => "tree",
         }
     }
 
@@ -153,6 +165,7 @@ impl LayoutMode {
             Self::Orca => "Orca",
             Self::Minimal => "Minimal",
             Self::Devices => "Devices",
+            Self::Tree => "Tree",
         }
     }
 }

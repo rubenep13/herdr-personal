@@ -182,10 +182,11 @@ impl HerdrWindow {
         }
     }
 
-    /// Gives the Devices layout its search field while it is in use, in the
-    /// sidebar's face, and drops it, with what it held, otherwise.
+    /// Gives the Devices and Tree layouts their search field while one is in
+    /// use, in the sidebar's face, and drops it, with what it held, otherwise.
     fn sync_tree_search(&mut self, cx: &mut Context<Self>) {
-        if self.config.layout.mode != crate::config::LayoutMode::Devices {
+        let mode = self.config.layout.mode;
+        if mode.lists_workspaces() && !mode.nests_agents() {
             self.devices_overview.tree_search = None;
             return;
         }

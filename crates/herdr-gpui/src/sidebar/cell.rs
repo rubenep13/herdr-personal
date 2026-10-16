@@ -217,5 +217,7 @@ pub(super) fn layout_for(mode: LayoutMode) -> &'static dyn RowLayout {
         LayoutMode::Minimal => &super::layouts::Minimal,
         // Herdr's own rows, nested under each device's header.
         LayoutMode::Devices => &super::layouts::Herdr,
+        // Herdr's own rows, with agents nested under their space.
+        LayoutMode::Tree => &super::layouts::Herdr,
     }
 }

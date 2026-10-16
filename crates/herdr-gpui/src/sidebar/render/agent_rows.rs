@@ -129,14 +129,27 @@ impl HerdrWindow {
         let menu_endpoint = endpoint_id.clone();
         let menu_pane = id.clone();
         let menu_open = selected && self.pane_menu_target() == Some(id.as_str());
+        // Under the tree the space is the row's parent, so the agent leads
+        // and its tab, when it has one worth naming, and state follow.
+        let detail = self.config.layout.mode.nests_agents().then(|| {
+            let state = state_label(agent, status_text(agent.agent_status));
+            match agent_place(agent, snapshot).and_then(|(_, tab)| tab) {
+                Some(tab) => format!("{tab} \u{00b7} {state}"),
+                None => state.into_owned(),
+            }
+        });
+        let (name, place) = match &detail {
+            Some(detail) => (detail.as_str(), Some((agent_name(agent), None))),
+            None => (agent_name(agent), agent_place(agent, snapshot)),
+        };
         Cell::new(
             rows,
             RowData::Agent(AgentRow {
                 key: format!("agent-{id}"),
-                name: agent_name(agent),
+                name,
                 icon: crate::icons::AgentIcon::from_identity(agent.agent.as_deref()),
                 status: agent.agent_status,
-                place: agent_place(agent, snapshot),
+                place,
                 status_text: self
                     .config
                     .sidebar_layout

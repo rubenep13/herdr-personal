@@ -128,7 +128,10 @@ keep_selection_after_copy = true
 # "comfortable-rounded") for inset rows with rounded, bordered highlights.
 # "superset" (single-line rows), "orca" (cards), and "minimal" (status and name
 # only) draw rows with a design of their own. "devices" lists each device with
-# its agents under it, and a search over them. View > Layout lists them all.
+# its agents under it, and a search over them. "tree" (personal fork) nests
+# each space's agents under it, in an order and folds of your own that never
+# reorder Herdr's workspaces; new installs start with it through their
+# overrides file. View > Layout lists them all.
 layout = "normal"
 
 [palette]

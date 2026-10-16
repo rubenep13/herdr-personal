@@ -92,6 +92,8 @@ pub(crate) struct HerdrWindow {
     pub(crate) _poll: Task<()>,
     pub(crate) _prefix_interceptor: Subscription,
     pub(crate) _sidebar_invalidation: Subscription,
+    /// Another window may reorder or fold the tree this one shows.
+    pub(crate) _sidebar_tree: Subscription,
     /// Lists again the tabs carried off to a window that closed.
     pub(crate) _window_closed: Subscription,
     /// Another window may edit a note this one shows.

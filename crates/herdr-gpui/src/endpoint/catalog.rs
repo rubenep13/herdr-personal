@@ -331,12 +331,15 @@ impl HerdrWindow {
             {
                 previous.remove(index)
             } else {
-                Endpoint::new(
+                let mut endpoint = Endpoint::new(
                     device.id,
                     device.label.clone(),
                     device.target.clone(),
                     device.enabled,
-                )
+                );
+                endpoint.collapsed =
+                    crate::sidebar::tree::storage::TreeState::host_collapsed(cx, &endpoint.id);
+                endpoint
             };
             let changed =
                 endpoint.enabled != device.enabled || entry_changed(&endpoint, &device.target);

@@ -343,6 +343,12 @@ pub(crate) fn run() -> std::process::ExitCode {
     } else {
         crate::worktree_notes::Notes::default()
     };
+    // Nor with the user's own sidebar tree order.
+    let sidebar_tree = if mode == LaunchMode::Normal {
+        crate::sidebar::tree::storage::TreeState::load()
+    } else {
+        crate::sidebar::tree::storage::TreeState::default()
+    };
     // Nor with which palette rows the user chooses.
     let palette_frecency = if mode == LaunchMode::Normal {
         crate::palette::Frecency::load()
@@ -365,6 +371,7 @@ pub(crate) fn run() -> std::process::ExitCode {
             browser_tabs.install(cx);
             group_layouts.install(cx);
             worktree_notes.install(cx);
+            sidebar_tree.install(cx);
             palette_frecency.install(cx);
             dispatch_history.install(cx);
             agent_skill.install_global(cx);

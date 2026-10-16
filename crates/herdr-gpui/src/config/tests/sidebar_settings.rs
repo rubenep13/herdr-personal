@@ -281,8 +281,10 @@ fn the_deprecated_sidebar_gap_defaults_to_flush_and_accepts_its_band() -> anyhow
 }
 
 #[test]
-fn only_new_installs_start_with_the_rounded_comfortable_layout() -> anyhow::Result<()> {
-    let rounded = LayoutMode::new(Density::Comfortable, Style::Rounded);
+fn only_new_installs_start_with_the_tree_layout() -> anyhow::Result<()> {
+    // Personal fork: the seeded overrides pick the tree, not upstream's
+    // rounded comfortable layout.
+    let rounded = LayoutMode::Tree;
     let daemon = Path::new("absent.toml");
     // The managed defaults keep the flat layout for everyone else.
     assert_eq!(

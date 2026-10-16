@@ -855,6 +855,8 @@ pub enum Error {
     TooManyKeystrokes(&'static str),
     #[error("pane_keys must list at most {0} keystrokes")]
     TooManyPaneKeys(usize),
+    #[error(transparent)]
+    Tree(#[from] crate::sidebar::tree::Error),
     #[error("SSH ended before the tunnel opened ({0}).")]
     TunnelExited(std::process::ExitStatus),
     #[error("No free local port for an SSH tunnel.")]

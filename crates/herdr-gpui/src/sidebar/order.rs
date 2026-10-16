@@ -2,8 +2,13 @@
 //! next, and numbered shortcuts step through, as Herdr's TUI steps through
 //! its own sidebar: every listed host's rows, top to bottom.
 
-use super::{agents::panel_agents, visible_workspace_entries};
+use super::{
+    agents::panel_agents,
+    tree::{Entry, TreeRow},
+    visible_workspace_entries,
+};
 use crate::{HerdrWindow, controls::Command, state::LiveState};
+use gpui::App;
 use herdr_client::protocol::{ClientShellAgent, ClientShellSnapshot};
 
 /// A listed row: its host, by endpoint index, and the workspace or agent
@@ -32,9 +37,30 @@ impl HerdrWindow {
             .filter_map(|(index, live)| live.snapshot.as_deref().map(|snapshot| (index, snapshot)))
     }
 
+    /// The rows the Tree layout draws for `agents` or spaces, each named by
+    /// its ID in the snapshot it came from. A fold hides its rows here too.
+    fn tree_steps(&self, agents: bool, cx: &App) -> Vec<Row<'_>> {
+        let rows = self.tree_rows("", cx);
+        let listed: Vec<_> = self.listed_hosts().collect();
+        rows.iter()
+            .filter_map(|row: &TreeRow| {
+                let (_, snapshot) = listed.iter().find(|(index, _)| *index == row.host)?;
+                let id = match row.entry {
+                    Entry::Space(index) if !agents => &snapshot.workspaces.get(index)?.workspace_id,
+                    Entry::Agent(index) if agents => &snapshot.agents.get(index)?.pane_id,
+                    _ => return None,
+                };
+                Some((row.host, id.as_str()))
+            })
+            .collect()
+    }
+
     /// The workspace rows the sidebar shows: a folded group or host hides
     /// its rows here too.
-    pub(crate) fn sidebar_workspaces(&self) -> Vec<Row<'_>> {
+    pub(crate) fn sidebar_workspaces(&self, cx: &App) -> Vec<Row<'_>> {
+        if self.config.layout.mode.nests_agents() {
+            return self.tree_steps(false, cx);
+        }
         let multi = self.endpoints.len() > 1;
         self.listed_hosts()
             .filter(|(index, _)| !(multi && self.endpoints[*index].collapsed))
@@ -59,7 +85,10 @@ impl HerdrWindow {
 
     /// The agent panel's rows, whether or not the panel is shown, as Herdr
     /// steps through its agents either way.
-    pub(crate) fn sidebar_agents(&self) -> Vec<Row<'_>> {
+    pub(crate) fn sidebar_agents(&self, cx: &App) -> Vec<Row<'_>> {
+        if self.config.layout.mode.nests_agents() {
+            return self.tree_steps(true, cx);
+        }
         self.panel_agents()
             .into_iter()
             .map(|(index, agent)| (index, agent.pane_id.as_str()))

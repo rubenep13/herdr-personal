@@ -94,7 +94,8 @@ const MANAGED_HEADER: &str = "# DO NOT EDIT -- WILL BE OVERWRITTEN";
 /// Seeds the overrides file on first launch only. Existing overrides and
 /// migrated personal configs are never rewritten, so settings placed here
 /// reach new installs without changing what current users see.
-const LOCAL_CONFIG: &str = "# Herdr UI overrides. Saved changes reload automatically.\n# Unset keys inherit config-gpui.toml; tables merge key by key.\n\n# New installs start with the roomy rounded sidebar. Remove this line for\n# the managed default, or pick another layout listed in config-gpui.toml.\nlayout = \"comfortable-rounded\"\n";
+/// Personal fork: new installs start with the Tree sidebar this client is for.
+const LOCAL_CONFIG: &str = "# Herdr UI overrides. Saved changes reload automatically.\n# Unset keys inherit config-gpui.toml; tables merge key by key.\n\n# New installs start with the personal Tree sidebar. Remove this line for\n# the managed default, or pick another layout listed in config-gpui.toml.\nlayout = \"tree\"\n";
 
 /// Shared logical-pixel radii for native-style chrome, independent of the
 /// terminal grid. Small badges/keycaps retain a tighter curve than controls.

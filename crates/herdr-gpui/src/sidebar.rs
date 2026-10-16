@@ -18,6 +18,7 @@ mod row;
 mod search;
 mod sticky;
 mod tokens;
+pub(crate) mod tree;
 mod view;
 mod wash;
 mod workspaces;

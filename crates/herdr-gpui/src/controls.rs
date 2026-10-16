@@ -102,6 +102,12 @@ pub enum Command {
     PreviousAgent,
     NextAgent,
     AgentNumber(u8),
+    /// Personal fork: move the focused space or agent among its siblings in
+    /// the Tree layout's own order. The daemon's order is untouched.
+    MoveSpaceUp,
+    MoveSpaceDown,
+    MoveAgentUp,
+    MoveAgentDown,
     ReloadConfig,
 }
 
@@ -514,6 +520,26 @@ pub const COMMANDS: &[CommandInfo] = &[
         label: "Focus Agent 9",
     },
     CommandInfo {
+        command: Command::MoveSpaceUp,
+        name: "move_space_up",
+        label: "Move Space Up",
+    },
+    CommandInfo {
+        command: Command::MoveSpaceDown,
+        name: "move_space_down",
+        label: "Move Space Down",
+    },
+    CommandInfo {
+        command: Command::MoveAgentUp,
+        name: "move_agent_up",
+        label: "Move Agent Up",
+    },
+    CommandInfo {
+        command: Command::MoveAgentDown,
+        name: "move_agent_down",
+        label: "Move Agent Down",
+    },
+    CommandInfo {
         command: Command::ToggleSidebar,
         name: "toggle_sidebar",
         label: "Toggle Sidebar",
@@ -852,6 +878,10 @@ pub fn request(command: Command, snapshot: &ClientShellSnapshot) -> Option<(Meth
         | Command::PreviousAgent
         | Command::NextAgent
         | Command::AgentNumber(_)
+        | Command::MoveSpaceUp
+        | Command::MoveSpaceDown
+        | Command::MoveAgentUp
+        | Command::MoveAgentDown
         | Command::ReloadConfig => return None,
     })
 }

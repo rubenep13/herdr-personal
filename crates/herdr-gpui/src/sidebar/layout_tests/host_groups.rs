@@ -119,7 +119,8 @@ fn duplicate_repository_parents_lead_one_group_in_every_layout_and_host(
 ) {
     for mode in crate::config::LayoutMode::ALL
         .into_iter()
-        .filter(|mode| mode.lists_workspaces())
+        // Tree lists spaces in the user's order, with no repository groups.
+        .filter(|mode| mode.lists_workspaces() && !mode.nests_agents())
     {
         let (_view, cx) = cx.add_window_view(|window, cx| {
             let mut view = fixture_window(window, cx);

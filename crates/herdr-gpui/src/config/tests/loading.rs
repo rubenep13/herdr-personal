@@ -7,10 +7,10 @@ fn startup_reads_settings_without_writes_or_waiting_for_maintenance() -> anyhow:
     let path = temp.0.join("config-gpui.toml");
     let daemon = temp.0.join("absent.toml");
     // A fresh install's first frame already shows the layout its seeded
-    // overrides will hold, without writing them yet.
+    // overrides will hold, without writing them yet: the personal fork's tree.
     assert_eq!(
         Config::load_startup_path(&path, &daemon)?.layout.mode,
-        LayoutMode::new(Density::Comfortable, Style::Rounded)
+        LayoutMode::Tree
     );
     assert_eq!(fs::read_dir(&temp.0)?.count(), 0);
     let legacy = "layout = 'compact'\ntheme = 'Nord'\n[terminal]\nsize = 18\n";

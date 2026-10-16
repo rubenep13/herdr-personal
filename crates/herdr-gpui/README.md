@@ -3462,7 +3462,11 @@ Ctrl+Shift+U is left unbound for
   `switch_workspace` counts the selected host's rows, `focus_agent` counts the
   agent panel's, `last_pane` returns to the pane focused before this one,
   `move_tab_previous`/`_next` wrap a tab at either end to the other, and
-  `[keys.indexed]` combos bind the digits 1-9. On macOS, the prefix, its
+  `[keys.indexed]` combos bind the digits 1-9. In the personal fork's Tree
+  layout the steps follow the tree as drawn, folds included, and the unbound
+  `move_space_up`/`_down` and `move_agent_up`/`_down` move the focused space
+  or agent one place among its siblings in this client's own order, never
+  Herdr's. On macOS, the prefix, its
   chords, and custom command shortcuts recognize a shifted key such as
   Shift+1 by the active keyboard layout, so
   `switch_workspace = "prefix+shift+1..9"` works on any layout that types

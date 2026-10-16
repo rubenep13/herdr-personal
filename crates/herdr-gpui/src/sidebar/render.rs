@@ -26,6 +26,7 @@ use gpui::{prelude::*, *};
 
 mod agent_rows;
 mod device_tree;
+pub(crate) mod tree;
 
 impl HerdrWindow {
     pub(crate) fn render_sidebar(
@@ -57,9 +58,11 @@ impl HerdrWindow {
         // narrows that tree in place, so the sidebar's search, whose results
         // replace the list, gives way to it; one setting hides either.
         let devices = !self.config.layout.mode.lists_workspaces();
+        // The Tree layout narrows in place too, keeping each match's parents.
+        let nested = self.config.layout.mode.nests_agents();
         // A hidden field keeps whatever it held, but never filters the list.
-        let searchable = self.config.show_sidebar_search && !devices;
-        let tree_search = self.config.show_sidebar_search && devices;
+        let searchable = self.config.show_sidebar_search && !devices && !nested;
+        let tree_search = self.config.show_sidebar_search && (devices || nested);
         let search = (searchable && self.sidebar_search.query().is_some()).then(|| {
             self.sidebar_search_results(self.sidebar_search_hits(cx), indicators, look, cx)
         });
@@ -83,7 +86,7 @@ impl HerdrWindow {
         agents = agents.track_scroll(&self.sidebar_scroll[1]);
         let multi = self.endpoints.len() > 1;
         let headed = multi || devices;
-        let agents_panel = self.config.show_agents && !devices;
+        let agents_panel = self.config.show_agents && !devices && !nested;
         let query = if tree_search {
             self.device_tree_query(cx)
         } else {
@@ -108,9 +111,17 @@ impl HerdrWindow {
         // A lifted device folds the list to its headers.
         let device_plan = headed.then(|| self.device_plan(devices, &query)).flatten();
         let mut sliding = device_plan.as_ref().is_some_and(|plan| plan.sliding);
+        let personal = nested.then(|| self.tree_layout(&query, cx));
+        if let Some(notice) = personal.as_ref().and_then(|_| self.tree_notice(look, cx)) {
+            spaces = spaces.child(notice);
+            space_rows += 1;
+        }
         for (endpoint_index, endpoint) in self.displayed_devices() {
             if !self.device_visible(&endpoint.id)
                 || (devices && !self.device_listed(endpoint_index, &query))
+                || personal
+                    .as_ref()
+                    .is_some_and(|tree| !tree.lists(endpoint_index))
             {
                 continue;
             }
@@ -168,7 +179,18 @@ impl HerdrWindow {
             } else {
                 &endpoint.collapsed_repos
             };
-            let entries = visible_workspace_entries(&snapshot.workspaces, collapsed_repos);
+            let entries = match &personal {
+                Some(tree) => tree.entries(endpoint_index),
+                None => visible_workspace_entries(&snapshot.workspaces, collapsed_repos),
+            };
+            if let Some(filter) = personal
+                .as_ref()
+                .and_then(|_| self.tree_filter(&endpoint_id, snapshot, &row_cx))
+                .filter(|_| !(multi && endpoint.collapsed))
+            {
+                spaces = spaces.child(filter);
+                space_rows += 1;
+            }
             let drag = self
                 .workspace_drag
                 .as_ref()
@@ -211,7 +233,7 @@ impl HerdrWindow {
             // the linked worktrees under it. Reset per host.
             let mut previous_indented = None;
             for (position, (index, indented, group)) in entries.into_iter().enumerate() {
-                if multi && endpoint.collapsed {
+                if multi && endpoint.collapsed && query.is_empty() {
                     break;
                 }
                 let workspace = &snapshot.workspaces[index];
@@ -251,29 +273,39 @@ impl HerdrWindow {
                     (true, false) => RowTree::Child,
                     (true, true) => RowTree::LastChild,
                 };
-                let fold = group.map(|key| Fold {
-                    id: SharedString::from(format!("collapse-{endpoint_id}-{id}")).into(),
-                    index,
-                    collapsed: collapsed_repos.contains(&key),
-                    toggle: Box::new(cx.listener(move |this, _, _, cx| {
-                        let collapsed = if collapse_endpoint == crate::endpoint::LOCAL {
-                            &mut this.collapsed_repos
-                        } else if let Some(endpoint) = this
-                            .endpoints
-                            .iter_mut()
-                            .find(|e| e.id == collapse_endpoint)
-                        {
-                            &mut endpoint.collapsed_repos
-                        } else {
-                            return;
-                        };
-                        if !collapsed.remove(&key) {
-                            collapsed.insert(key.clone());
-                        }
-                        cx.notify();
-                    })),
+                let tree_fold = personal
+                    .as_ref()
+                    .and_then(|tree| self.tree_fold(tree, endpoint_index, index, cx));
+                let fold = tree_fold.or_else(|| {
+                    group.map(|key| Fold {
+                        id: SharedString::from(format!("collapse-{endpoint_id}-{id}")).into(),
+                        index,
+                        collapsed: collapsed_repos.contains(&key),
+                        toggle: Box::new(cx.listener(move |this, _, _, cx| {
+                            let collapsed = if collapse_endpoint == crate::endpoint::LOCAL {
+                                &mut this.collapsed_repos
+                            } else if let Some(endpoint) = this
+                                .endpoints
+                                .iter_mut()
+                                .find(|e| e.id == collapse_endpoint)
+                            {
+                                &mut endpoint.collapsed_repos
+                            } else {
+                                return;
+                            };
+                            if !collapsed.remove(&key) {
+                                collapsed.insert(key.clone());
+                            }
+                            cx.notify();
+                        })),
+                    })
                 });
-                let label = workspace_label(workspace, indented);
+                let counted = personal.as_ref().and_then(|tree| {
+                    tree.label(endpoint_index, index, workspace_label(workspace, false))
+                });
+                let label = counted
+                    .as_deref()
+                    .unwrap_or_else(|| workspace_label(workspace, indented));
                 let shown_status = if self.config.usage.inline {
                     displayed_workspace_status(&snapshot.workspaces, workspace, collapsed_repos)
                 } else {
@@ -505,8 +537,12 @@ impl HerdrWindow {
                     }))
                 })
                 // Holding a press lifts the row for reordering. Another
-                // endpoint's rows would have to select it first.
-                .when(selected, |row| {
+                // endpoint's rows would have to select it first. The tree's
+                // order is the user's own, never the daemon's.
+                .when_some(personal.as_ref(), |row, tree| {
+                    self.tree_space_drag(row, tree, (endpoint_index, index), label, cx)
+                })
+                .when(selected && personal.is_none(), |row| {
                     row.on_mouse_down(
                         MouseButton::Left,
                         cx.listener(move |this, event: &MouseDownEvent, _, cx| {
@@ -553,6 +589,16 @@ impl HerdrWindow {
                 } else {
                     spaces.child(element)
                 };
+                if let Some(tree) = &personal {
+                    let at = (endpoint_index, index);
+                    let (list, added, focused) =
+                        self.append_tree_agents(spaces, tree, at, snapshot, &row_cx, look, cx);
+                    spaces = list;
+                    if let Some(row) = focused {
+                        highlighted[0] = Some(space_rows + row);
+                    }
+                    space_rows += added;
+                }
             }
             // Agent rows come after every host: the panel interleaves them.
             // Only a host the panel lists can make the view a filtered one.
@@ -669,11 +715,19 @@ impl HerdrWindow {
                     .child(
                         searchable
                             .then_some(super::search::Heading::Spaces)
-                            .or(tree_search.then_some(super::search::Heading::DeviceTree))
+                            .or(tree_search.then_some(if nested {
+                                super::search::Heading::Tree
+                            } else {
+                                super::search::Heading::DeviceTree
+                            }))
                             .and_then(|heading| self.search_heading(heading, look, window, cx))
                             .unwrap_or_else(|| {
                                 header(
-                                    if devices { "devices" } else { "spaces" },
+                                    match (devices, nested) {
+                                        (true, _) => "devices",
+                                        (_, true) => "tree",
+                                        _ => "spaces",
+                                    },
                                     font,
                                     theme,
                                     look,

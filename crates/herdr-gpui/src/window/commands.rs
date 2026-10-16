@@ -510,6 +510,15 @@ impl HerdrWindow {
                 window.focus(&self.focus, cx);
                 return;
             }
+            Command::MoveSpaceUp
+            | Command::MoveSpaceDown
+            | Command::MoveAgentUp
+            | Command::MoveAgentDown => {
+                let agent = matches!(command, Command::MoveAgentUp | Command::MoveAgentDown);
+                let up = matches!(command, Command::MoveSpaceUp | Command::MoveAgentUp);
+                self.move_tree_node(agent, up, cx);
+                return;
+            }
             Command::MoveTabPrevious | Command::MoveTabNext if !self.live.supports_tab_move => {
                 self.local_error = Some("Moving tabs needs a newer Herdr daemon.".into());
                 cx.notify();
@@ -542,9 +551,9 @@ impl HerdrWindow {
             Command::PreviousAgent | Command::NextAgent | Command::AgentNumber(_)
         );
         let rows = if agents {
-            self.sidebar_agents()
+            self.sidebar_agents(cx)
         } else {
-            self.sidebar_workspaces()
+            self.sidebar_workspaces(cx)
         };
         let selected = self.selected_endpoint;
         let focused = self.live.snapshot.as_ref().and_then(|snapshot| {
