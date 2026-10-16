@@ -10,7 +10,7 @@ use futures_lite::future::block_on;
 use oo7::{Keyring, zbus};
 use secrecy::{ExposeSecret, SecretString};
 
-const SERVICE: &str = "dev.herdr.gpui.github";
+const SERVICE: &str = "dev.ruben.herdr-personal.github";
 const LABEL: &str = "Herdr UI GitHub sign-in";
 
 // `oo7::Error` is several times larger than the crate's other variants.
@@ -225,8 +225,11 @@ mod tests {
             [("service", SERVICE), ("account", "github.com/host/0123")]
         );
         assert_eq!(
-            attributes("dev.herdr.gpui.coder", "coder"),
-            [("service", "dev.herdr.gpui.coder"), ("account", "coder")]
+            attributes("dev.ruben.herdr-personal.coder", "coder"),
+            [
+                ("service", "dev.ruben.herdr-personal.coder"),
+                ("account", "coder")
+            ]
         );
     }
 }

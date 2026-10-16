@@ -26,10 +26,10 @@ use std::collections::VecDeque;
 
 /// Every token of a request starts with this, so other plugins' tokens and
 /// lists of reported values can tell them apart. A request is one token,
-/// `herdr-gpui-ID`, whose value is its action and then, after a space, the
-/// asking pane; an address follows in tokens `herdr-gpui-ID_0` onward, each
+/// `hp-dev-ID`, whose value is its action and then, after a space, the
+/// asking pane; an address follows in tokens `hp-dev-ID_0` onward, each
 /// at most 80 characters, the most Herdr keeps in one value.
-const PREFIX: &str = "herdr-gpui-";
+const PREFIX: &str = "hp-dev-";
 const PART: char = '_';
 const URL_CHUNKS: usize = 12;
 /// Herdr's bound on a token's name, which holds the prefix, the ID, and a

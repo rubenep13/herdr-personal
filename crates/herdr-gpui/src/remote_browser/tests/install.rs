@@ -30,7 +30,9 @@ fn run(script: &str, home: &Path, input: &str) {
 #[test]
 fn the_shim_is_written_executable_and_a_users_own_file_is_kept() {
     let home = tempfile::tempdir().unwrap();
-    let shim = home.path().join(".local/state/herdr/gpui/bin/herdr-gpui");
+    let shim = home
+        .path()
+        .join(".local/state/herdr-personal-dev/bin/herdr-personal-dev");
     run(SHIM_SCRIPT, home.path(), SHIM);
     assert_eq!(std::fs::read_to_string(&shim).unwrap(), SHIM);
     let mode = std::fs::metadata(&shim).unwrap().permissions().mode();
@@ -57,11 +59,13 @@ fn the_shim_is_written_executable_and_a_users_own_file_is_kept() {
 fn the_skill_goes_only_into_agent_directories_the_host_has() {
     let home = tempfile::tempdir().unwrap();
     let skill = crate::agent_skill::text_naming(SHIM_COMMAND);
-    assert!(skill.contains("~/.local/state/herdr/gpui/bin/herdr-gpui browser open"));
+    assert!(
+        skill.contains("~/.local/state/herdr-personal-dev/bin/herdr-personal-dev browser open")
+    );
     let file = |root: &str| {
         home.path()
             .join(root)
-            .join("skills/herdr-gpui-browser/SKILL.md")
+            .join("skills/herdr-personal-dev-browser/SKILL.md")
     };
 
     // No agent directory: nothing is written.
@@ -89,20 +93,20 @@ fn removing_takes_off_only_what_the_app_wrote() {
     run(SKILL_SCRIPT, home.path(), &skill);
     let own = home
         .path()
-        .join(".agents/skills/herdr-gpui-browser/SKILL.md");
+        .join(".agents/skills/herdr-personal-dev-browser/SKILL.md");
     std::fs::write(&own, "my own skill").unwrap();
 
     run(REMOVE_SCRIPT, home.path(), "");
     assert!(
         !home
             .path()
-            .join(".local/state/herdr/gpui/bin/herdr-gpui")
+            .join(".local/state/herdr-personal-dev/bin/herdr-personal-dev")
             .exists()
     );
     assert!(
         !home
             .path()
-            .join(".claude/skills/herdr-gpui-browser")
+            .join(".claude/skills/herdr-personal-dev-browser")
             .exists()
     );
     assert_eq!(std::fs::read_to_string(&own).unwrap(), "my own skill");

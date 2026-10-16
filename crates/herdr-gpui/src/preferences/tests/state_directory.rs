@@ -17,7 +17,7 @@ fn explicit_state_home_wins() {
             ("USERPROFILE", "profile"),
             ("HOME", "home"),
         ]),
-        Some(PathBuf::from("state").join("herdr").join("gpui"))
+        Some(PathBuf::from("state").join("herdr-personal-dev"))
     );
 }
 
@@ -27,7 +27,7 @@ fn empty_variables_are_ignored_and_missing_roots_disable_storage() {
     assert_eq!(directory(&[("XDG_STATE_HOME", ""), ("HOME", "")]), None);
     assert_eq!(
         directory(&[("XDG_STATE_HOME", ""), ("HOME", "home")]),
-        Some(PathBuf::from("home").join(".local/state/herdr/gpui"))
+        Some(PathBuf::from("home").join(".local/state/herdr-personal-dev"))
     );
 }
 
@@ -41,7 +41,7 @@ fn windows_existing_home_state_keeps_its_location() {
             ("LOCALAPPDATA", "local"),
             ("USERPROFILE", "profile"),
         ]),
-        Some(PathBuf::from("home").join(".local/state/herdr/gpui"))
+        Some(PathBuf::from("home").join(".local/state/herdr-personal-dev"))
     );
 }
 
@@ -54,10 +54,10 @@ fn windows_logs_and_preferences_work_without_xdg_or_home() {
             ("LOCALAPPDATA", "local"),
             ("USERPROFILE", "profile")
         ]),
-        Some(PathBuf::from("local").join("herdr/gpui"))
+        Some(PathBuf::from("local").join("herdr-personal-dev"))
     );
     assert_eq!(
         directory(&[("LOCALAPPDATA", ""), ("USERPROFILE", "profile")]),
-        Some(PathBuf::from("profile").join("AppData/Local/herdr/gpui"))
+        Some(PathBuf::from("profile").join("AppData/Local/herdr-personal-dev"))
     );
 }

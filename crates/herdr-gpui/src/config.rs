@@ -630,7 +630,9 @@ fn daemon_clipboard_toast(table: &toml::Table) -> ClipboardToast {
 
 impl Config {
     pub fn path() -> Result<PathBuf> {
-        Ok(config_root()?.join("herdr/config-gpui.toml"))
+        Ok(config_root()?
+            .join(crate::constants::APP_NAMESPACE)
+            .join("config-gpui.toml"))
     }
 
     pub fn local_path() -> Result<PathBuf> {

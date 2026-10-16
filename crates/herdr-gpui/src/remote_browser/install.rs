@@ -15,14 +15,14 @@ use std::{collections::HashSet, sync::atomic::AtomicBool, time::Duration};
 
 pub(super) const SHIM: &str = include_str!("herdr-gpui.sh");
 /// Where agents on the host run the shim from; their shell expands `~`.
-pub(super) const SHIM_COMMAND: &str = "~/.local/state/herdr/gpui/bin/herdr-gpui";
+pub(super) const SHIM_COMMAND: &str = "~/.local/state/herdr-personal-dev/bin/herdr-personal-dev";
 
 /// Writes standard input to the shim's path unless the user has a file of
 /// their own there.
 pub(super) const SHIM_SCRIPT: &str = r#"set -eu
-dir="$HOME/.local/state/herdr/gpui/bin"
-file="$dir/herdr-gpui"
-if [ -e "$file" ] && ! grep -q herdr-gpui-managed-shim "$file"; then exit 0; fi
+dir="$HOME/.local/state/herdr-personal-dev/bin"
+file="$dir/herdr-personal-dev"
+if [ -e "$file" ] && ! grep -q herdr-personal-dev-managed-shim "$file"; then exit 0; fi
 mkdir -p "$dir"
 tmp="$file.new.$$"
 trap 'rm -f "$tmp"' EXIT
@@ -36,9 +36,9 @@ pub(super) const SKILL_SCRIPT: &str = r#"set -eu
 text=$(cat)
 for root in "$HOME/.claude" "$HOME/.agents"; do
     [ -d "$root" ] || continue
-    dir="$root/skills/herdr-gpui-browser"
+    dir="$root/skills/herdr-personal-dev-browser"
     file="$dir/SKILL.md"
-    if [ -e "$file" ] && ! grep -q herdr-gpui-managed-skill "$file"; then continue; fi
+    if [ -e "$file" ] && ! grep -q herdr-personal-dev-managed-skill "$file"; then continue; fi
     mkdir -p "$dir"
     printf '%s\n' "$text" >"$file.new.$$"
     mv -f "$file.new.$$" "$file"
@@ -50,10 +50,10 @@ pub(super) const REMOVE_SCRIPT: &str = r#"set -u
 remove() {
     if [ -f "$1" ] && grep -q "$2" "$1"; then rm -f "$1"; fi
 }
-remove "$HOME/.local/state/herdr/gpui/bin/herdr-gpui" herdr-gpui-managed-shim
+remove "$HOME/.local/state/herdr-personal-dev/bin/herdr-personal-dev" herdr-personal-dev-managed-shim
 for root in "$HOME/.claude" "$HOME/.agents"; do
-    dir="$root/skills/herdr-gpui-browser"
-    remove "$dir/SKILL.md" herdr-gpui-managed-skill
+    dir="$root/skills/herdr-personal-dev-browser"
+    remove "$dir/SKILL.md" herdr-personal-dev-managed-skill
     rmdir "$dir" 2>/dev/null || :
 done"#;
 

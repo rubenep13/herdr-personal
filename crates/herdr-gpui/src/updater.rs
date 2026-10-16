@@ -227,6 +227,13 @@ impl Updater {
     pub(super) fn start(channel: UpdateChannel) -> Self {
         let mut updater = Self::default();
         updater.channel = channel;
+        // Personal fork: upstream's release identity can never authorize an update.
+        if !crate::constants::UPDATES_ENABLED {
+            updater.state = State::Disabled(
+                "App updates are disabled in Herdr Personal development builds.".into(),
+            );
+            return updater;
+        }
         let Some(key) = option_env!("HERDR_UPDATE_PUBLIC_KEY") else {
             return updater;
         };
@@ -688,6 +695,9 @@ fn worker(
 }
 
 pub(super) fn run_helper(args: &[OsString]) -> Option<ExitCode> {
+    if !crate::constants::UPDATES_ENABLED {
+        return None;
+    }
     #[cfg(target_os = "linux")]
     if let Some(code) = linux::run_helper(args) {
         return Some(code);

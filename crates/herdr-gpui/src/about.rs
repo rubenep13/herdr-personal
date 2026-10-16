@@ -12,7 +12,7 @@ const AUTHOR: &str = "Fabien Penso";
 const AUTHOR_URL: &str = "https://pen.so";
 const TWITTER_URL: &str = "https://x.com/fabienpenso";
 const LICENSE: &str = "· Apache-2.0";
-const SUMMARY: &str = "Native client for an existing local Herdr daemon.";
+const SUMMARY: &str = "Personal fork of penso/herdr-gpui for an existing Herdr daemon.";
 const UNAFFILIATED: &str = "An independent project, not affiliated with or endorsed by herdr.dev.";
 
 static ICON: LazyLock<Arc<Image>> = LazyLock::new(|| {
@@ -56,7 +56,7 @@ impl HerdrWindow {
                     .text_size(px(font.size * 1.8))
                     .line_height(px(font.size * 2.2))
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child("Herdr"),
+                    .child(crate::constants::WINDOW_TITLE),
             )
             .child(
                 div()
@@ -88,7 +88,7 @@ impl HerdrWindow {
                     .pt(px(10.))
                     .child(self.about_link("about-homepage", "Website", HOMEPAGE))
                     .child(self.about_link("about-website", "herdr.dev", WEBSITE))
-                    .child(self.about_link("about-repository", "GitHub", REPOSITORY)),
+                    .child(self.about_link("about-repository", "Upstream", REPOSITORY)),
             )
             .child(
                 div()
@@ -214,7 +214,7 @@ mod tests {
     fn about_leads_the_application_menu() {
         let menus = crate::menus(Default::default());
         let application = menus.first().unwrap();
-        assert_eq!(application.name.as_ref(), "Herdr");
+        assert_eq!(application.name.as_ref(), crate::constants::WINDOW_TITLE);
         let MenuItem::Action { name, action, .. } = application.items.first().unwrap() else {
             panic!("the application menu must start with an action");
         };

@@ -13,14 +13,14 @@ run *args:
     # Network access (Bonjour, SSH hosts on the LAN) only for an app it
     # launched, and denies a binary started from a shell without asking.
     # Output still reaches this terminal; Ctrl-C quits the app.
-    app="$PWD/target/release/Herdr.app"
+    app="$PWD/target/release/Herdr Personal Dev.app"
     out=/dev/null
     if [ -t 0 ]; then out=$(tty); fi
     env_args=()
     while IFS= read -r variable; do
         env_args+=(--env "$variable")
     done < <(env | grep -E '^(RUST_LOG|RUST_BACKTRACE|HERDR_[A-Z0-9_]*)=' || true)
-    trap 'pkill -f "^$app/Contents/MacOS/Herdr" || true' INT TERM
+    trap 'pkill -f "^$app/Contents/MacOS/herdr-personal-dev" || true' INT TERM
     open -n -W --stdout "$out" --stderr "$out" ${env_args[@]+"${env_args[@]}"} "$app" --args {{args}}
 
 run-debug *args:
@@ -30,7 +30,7 @@ run-debug *args:
         exec cargo run --locked -p herdr-gpui -- {{args}}
     fi
     {{just_executable()}} bundle debug
-    exec target/debug/Herdr.app/Contents/MacOS/Herdr {{args}}
+    exec "target/debug/Herdr Personal Dev.app/Contents/MacOS/herdr-personal-dev" {{args}}
 
 format:
     cargo fmt --all
@@ -78,7 +78,7 @@ test-sidebar:
 # Native hover/scroll CPU scene budget in milliseconds, calibrated for this machine.
 test-perf budget="30":
     cargo build --locked --release -p herdr-gpui --features integration-test
-    HERDR_PERF_P95_MS="{{budget}}" target/release/herdr-gpui --performance-test
+    HERDR_PERF_P95_MS="{{budget}}" target/release/herdr-personal-dev --performance-test
 
 # Compare UI variants written as GPUI code in `file` (the built-in demo when
 # empty) in a native window. "Send to agent" types the notes into the calling
@@ -98,7 +98,7 @@ mockup file="" feedback="" capture="":
     args=(--mockup)
     if [ -n "$feedback" ]; then args+=(--feedback "$feedback"); fi
     if [ -n "$capture" ]; then args+=(--capture "$capture"); fi
-    exec target/debug/herdr-gpui "${args[@]}"
+    exec target/debug/herdr-personal-dev "${args[@]}"
 
 build-release:
     cargo build --locked --release -p herdr-gpui
@@ -106,14 +106,14 @@ build-release:
 # Compile and install the release executable into Cargo's bin directory.
 [unix]
 install:
-    cargo install --locked --force --path crates/herdr-gpui --bin herdr-gpui
+    cargo install --locked --force --path crates/herdr-gpui --bin herdr-personal-dev
 
 # Only installation bypasses the POSIX shell used by the other recipes.
 [windows]
 [extension(".cmd")]
 install:
     #!cmd.exe /c
-    cargo install --locked --force --path crates/herdr-gpui --bin herdr-gpui
+    cargo install --locked --force --path crates/herdr-gpui --bin herdr-personal-dev
 
 # Regenerate circular Linux artwork on any platform (Python standard library).
 icons-linux:
@@ -133,22 +133,17 @@ bundle profile="release" features="":
         debug) flags= ;;
         *) echo "Unknown profile: {{profile}} (release or debug)" >&2; exit 2 ;;
     esac
-    app=target/{{profile}}/Herdr.app
+    app="target/{{profile}}/Herdr Personal Dev.app"
     cargo build --locked $flags --target-dir target -p herdr-gpui --features "{{features}}"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-    cp target/{{profile}}/herdr-gpui "$app/Contents/MacOS/Herdr"
-    cp assets/macos/Info.plist "$app/Contents/Info.plist"
-    # LaunchServices and the Dock cache icons by bundle ID, so every worktree
-    # build sharing the release ID competed with the installed app's icon.
-    plutil -replace CFBundleIdentifier -string so.pen.herdr-gpui.dev "$app/Contents/Info.plist"
-    icons=$(python3 scripts/release/build-icon.py macos "$app/Contents/MacOS/Herdr")
-    cp "${icons%$'\n'*}" "$app/Contents/Resources/Herdr.icns"
-    cp "${icons##*$'\n'}" "$app/Contents/Resources/Assets.car"
+    cp target/{{profile}}/herdr-personal-dev "$app/Contents/MacOS/herdr-personal-dev"
+    cp assets/personal/Info.plist "$app/Contents/Info.plist"
+    cp assets/personal/HerdrPersonal.icns "$app/Contents/Resources/HerdrPersonal.icns"
     plutil -lint "$app/Contents/Info.plist"
     # The linker's ad-hoc signature names the bare executable and binds no
     # Info.plist, so services that trust the bundle ID refuse the app:
     # notification authorization fails without a prompt. Ad-hoc sign the
-    # assembled bundle so its identity is so.pen.herdr-gpui.dev.
+    # assembled bundle so its identity is dev.ruben.herdr-personal.
     codesign --force --sign - "$app"
 
 # Link the actual optimized application and exercise its CLI without a desktop.

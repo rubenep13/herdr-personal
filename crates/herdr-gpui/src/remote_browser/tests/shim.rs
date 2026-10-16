@@ -20,7 +20,7 @@ impl Host {
             std::fs::write(&path, text).unwrap();
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
         };
-        write("herdr-gpui", SHIM);
+        write("herdr-personal-dev", SHIM);
         write(
             "herdr",
             "#!/bin/sh\nfor arg in \"$@\"; do printf '%s\\n' \"$arg\"; done >\"$0.args\"\nexit \"${FAKE_HERDR_STATUS:-0}\"\n",
@@ -35,7 +35,7 @@ impl Host {
     fn run(&self, args: &[&str], env: &[(&str, &str)]) -> Output {
         let mut command = Command::new("/bin/sh");
         command
-            .arg(self.dir.path().join("herdr-gpui"))
+            .arg(self.dir.path().join("herdr-personal-dev"))
             .args(args)
             .env_clear()
             .env("PATH", "/usr/bin:/bin")
@@ -92,7 +92,7 @@ fn an_open_reaches_the_window_as_typed() {
     let args = host.args().unwrap();
     assert!(
         args.windows(2)
-            .any(|pair| pair == ["--source", "herdr-gpui"])
+            .any(|pair| pair == ["--source", "herdr-personal-dev"])
     );
     assert!(args.windows(2).any(|pair| pair == ["--ttl-ms", "30000"]));
     let request = request(&host);
@@ -212,7 +212,7 @@ fn help_lists_what_works_from_a_host() {
         let output = host.run(args, &[]);
         assert!(output.status.success());
         let text = String::from_utf8(output.stdout).unwrap();
-        assert!(text.contains("herdr-gpui browser open"), "{args:?}");
+        assert!(text.contains("herdr-personal-dev browser open"), "{args:?}");
     }
     assert!(Path::new(&host.herdr()).exists());
 }

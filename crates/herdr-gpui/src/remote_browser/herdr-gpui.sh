@@ -1,7 +1,7 @@
 #!/bin/sh
-# herdr-gpui-managed-shim v1: Herdr UI keeps this file up to date. Edit a copy under another name to keep your changes.
+# herdr-personal-dev-managed-shim v1: Herdr UI keeps this file up to date. Edit a copy under another name to keep your changes.
 #
-# Herdr UI's `herdr-gpui` command for an agent on an SSH host. Herdr UI runs
+# Herdr UI's `herdr-personal-dev` command for an agent on an SSH host. Herdr UI runs
 # on the user's own machine, which this host cannot reach, so a request is
 # left as metadata on the caller's Herdr workspace, for a short while; a Herdr
 # UI window connected to this host opens the page in that workspace.
@@ -19,8 +19,8 @@ json=0
 
 usage() {
     cat <<'EOF'
-Usage: herdr-gpui browser open [--no-focus] [--tab] URL
-       herdr-gpui browser reload
+Usage: herdr-personal-dev browser open [--no-focus] [--tab] URL
+       herdr-personal-dev browser reload
 
 Run on an SSH host, this asks the Herdr UI window connected to this host to
 open URL in a browser tab of your workspace (HERDR_WORKSPACE_ID).
@@ -79,12 +79,12 @@ send() {
     workspace=${HERDR_WORKSPACE_ID:-}
     [ -n "$workspace" ] || fail 5 not_found "Not running in a Herdr pane: HERDR_WORKSPACE_ID is not set."
     herdr=${HERDR_BIN_PATH:-herdr}
-    key="herdr-gpui-$(date +%s)-$$"
+    key="hp-dev-$(date +%s)-$$"
     header=$action
     if [ -n "${HERDR_PANE_ID:-}" ]; then
         header="$header $HERDR_PANE_ID"
     fi
-    set -- --source herdr-gpui --ttl-ms "$TTL_MS" --token "$key=$header"
+    set -- --source herdr-personal-dev --ttl-ms "$TTL_MS" --token "$key=$header"
     rest=$url
     i=0
     while [ -n "$rest" ] && [ "$i" -lt "$CHUNKS" ]; do

@@ -30,7 +30,7 @@ pub(crate) const KEYRING_NOTICE: &str =
     "Credentials are saved in your desktop keyring (Secret Service). It may ask you to unlock it.";
 
 #[cfg(target_os = "macos")]
-const SERVICE: &str = "dev.herdr.gpui.github";
+const SERVICE: &str = "dev.ruben.herdr-personal.github";
 
 /// Which saved GitHub sign-in a credential belongs to. Each one is a separate
 /// entry in the same store, so signing one out never touches another.

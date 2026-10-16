@@ -228,7 +228,7 @@ pub(crate) fn run() -> std::process::ExitCode {
         }
         Err(error) => {
             eprintln!(
-                "{error}\nUsage: herdr-gpui [--socket CLIENT_SOCKET | --session NAME [--dev]]\n       herdr-gpui browser open URL [--workspace ID] [--no-focus]\n       herdr-gpui COMMAND ... (see herdr-gpui --help)"
+                "{error}\nUsage: herdr-personal-dev [--socket CLIENT_SOCKET | --session NAME [--dev]]\n       herdr-personal-dev browser open URL [--workspace ID] [--no-focus]\n       herdr-personal-dev COMMAND ... (see herdr-personal-dev --help)"
             );
             return std::process::ExitCode::from(2);
         }
@@ -247,7 +247,7 @@ pub(crate) fn run() -> std::process::ExitCode {
     }
     if mode == LaunchMode::Help {
         println!(
-            "herdr-gpui [--socket CLIENT_SOCKET | --session NAME [--dev]]\nConnects to Local and saved SSH hosts; never installs remote software.\nStarts the local Herdr daemon if needed; never stops it.\nExplicit --socket and --dev targets are attach-only; --socket isolates the GUI to one existing daemon."
+            "herdr-personal-dev [--socket CLIENT_SOCKET | --session NAME [--dev]]\nConnects to Local and saved SSH hosts; never installs remote software.\nStarts the local Herdr daemon if needed; never stops it.\nExplicit --socket and --dev targets are attach-only; --socket isolates the GUI to one existing daemon."
         );
         println!(
             "  --build-info        Print the executable's build identity without starting the GUI"

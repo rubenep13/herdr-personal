@@ -13,7 +13,7 @@ fn valid(key: &str) -> bool {
 }
 
 const ENTRY: Entry = Entry {
-    service: "dev.herdr.gpui.boat",
+    service: "dev.ruben.herdr-personal.boat",
     account: "api-key",
     label: "Herdr GPUI Boat API key",
     file: c"boat-api-key",

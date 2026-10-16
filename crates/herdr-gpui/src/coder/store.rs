@@ -8,7 +8,7 @@ use secrecy::{ExposeSecret, SecretString};
 use std::time::SystemTime;
 
 const ENTRY: Entry = Entry {
-    service: "dev.herdr.gpui.coder",
+    service: "dev.ruben.herdr-personal.coder",
     account: "coder",
     label: "Herdr UI Coder sign-in",
     file: c"coder-credentials",
@@ -23,7 +23,7 @@ const ENTRY: Entry = Entry {
 /// The OAuth client secret typed into Settings. Coder requires a confidential
 /// client, so the secret is a credential like the sign-in, kept the same way.
 const CLIENT_SECRET: Entry = Entry {
-    service: "dev.herdr.gpui.coder",
+    service: "dev.ruben.herdr-personal.coder",
     account: "oauth-client-secret",
     label: "Herdr UI Coder OAuth client secret",
     file: c"coder-client-secret",

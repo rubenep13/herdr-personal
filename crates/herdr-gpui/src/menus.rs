@@ -61,7 +61,7 @@ fn layout_menu(current: LayoutMode) -> MenuItem {
 pub(crate) fn menus(layout: Layout) -> Vec<Menu> {
     vec![
         Menu {
-            name: "Herdr".into(),
+            name: crate::constants::WINDOW_TITLE.into(),
             disabled: false,
             items: vec![
                 MenuItem::action(

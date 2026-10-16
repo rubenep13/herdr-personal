@@ -47,7 +47,7 @@ fn bar_uses_every_shared_heading_and_stays_with_sidebar_hidden(cx: &mut TestAppC
     });
     draw(cx);
     for selector in [
-        "application-menu-Herdr",
+        "application-menu-Herdr Personal Dev",
         "application-menu-File",
         "application-menu-Edit",
         "application-menu-View",

@@ -10,6 +10,8 @@ mod sandbox;
 mod clipboard_guard;
 
 use sandbox::{Sandbox, daemon_binary, stop_children};
+#[path = "live_gui/identity.rs"]
+mod identity;
 use std::{
     ffi::OsString,
     fs,
@@ -26,7 +28,15 @@ struct Isolated {
 }
 
 fn gui_command(sandbox: &Sandbox, mut env: impl FnMut(&str) -> Option<OsString>) -> Command {
-    let mut command = sandbox.command(env!("CARGO_BIN_EXE_herdr-gpui"), "gui.log");
+    // An explicit baseline artifact can be compared without rebuilding or
+    // replacing the current client. The sandbox and cleanup remain identical.
+    let binary = env("HERDR_TEST_CLIENT_BINARY")
+        .unwrap_or_else(|| env!("CARGO_BIN_EXE_herdr-personal-dev").into());
+    assert!(
+        Path::new(&binary).is_absolute(),
+        "GUI test binary must be absolute"
+    );
+    let mut command = sandbox.command(binary, "gui.log");
     // Only the GUI needs desktop transport; keep HOME, XDG and daemon paths private.
     for name in ["DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY"] {
         if let Some(mut value) = env(name) {
@@ -359,6 +369,7 @@ fn gui_desktop_environment_preserves_sandbox_isolation() {
             "XAUTHORITY" => Some("/desktop/auth".into()),
             "WAYLAND_DISPLAY" => display.map(Into::into),
             "XDG_RUNTIME_DIR" => runtime.map(Into::into),
+            "HERDR_TEST_CLIENT_BINARY" => None,
             _ => panic!("must not inherit {name}"),
         });
         let mut expected_env = base.clone();

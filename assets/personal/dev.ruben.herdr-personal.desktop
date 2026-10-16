@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Herdr Personal Dev
+Comment=Personal native client for an existing Herdr daemon
+Exec=herdr-personal-dev
+Icon=dev.ruben.herdr-personal
+Terminal=false
+Categories=Development;TerminalEmulator;
+StartupWMClass=dev.ruben.herdr-personal

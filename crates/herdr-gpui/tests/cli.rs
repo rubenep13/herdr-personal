@@ -14,7 +14,7 @@ fn cli(args: &[&str]) -> Output {
 /// Runs with `state` as the only state directory, and without the variables
 /// a Herdr pane would set, so no running app or daemon is ever reached.
 fn cli_in(args: &[&str], state: Option<&std::path::Path>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr-gpui"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr-personal-dev"));
     if let Some(state) = state {
         command
             .env("XDG_STATE_HOME", state)
@@ -51,7 +51,7 @@ fn usage_error(args: &[&str], message: &str) {
     assert!(output.stdout.is_empty(), "{args:?}: {output:?}");
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains(message), "{args:?}: {stderr}");
-    assert!(stderr.contains("Usage: herdr-gpui"), "{stderr}");
+    assert!(stderr.contains("Usage: herdr-personal-dev"), "{stderr}");
 }
 
 #[test]
@@ -171,12 +171,12 @@ fn browser_commands_answer_without_a_window() {
     assert!(output.status.success(), "{output:?}");
     let skill = String::from_utf8(output.stdout).unwrap();
     assert!(
-        skill.starts_with("---\nname: herdr-gpui-browser\n"),
+        skill.starts_with("---\nname: herdr-personal-dev-browser\n"),
         "{skill}"
     );
     // The skill names this very executable, which need not be on PATH. The
     // path may be shell-quoted, as Windows paths always are.
-    let exe = std::path::Path::new(env!("CARGO_BIN_EXE_herdr-gpui"));
+    let exe = std::path::Path::new(env!("CARGO_BIN_EXE_herdr-personal-dev"));
     let name = exe.file_name().unwrap().to_str().unwrap();
     let command = skill
         .lines()
@@ -187,7 +187,10 @@ fn browser_commands_answer_without_a_window() {
             || command.contains(&format!("{name}' browser open")),
         "{command}"
     );
-    assert!(!command.starts_with("herdr-gpui browser"), "{command}");
+    assert!(
+        !command.starts_with("herdr-personal-dev browser"),
+        "{command}"
+    );
 
     usage_error(&["browser", "open"], "browser open requires one URL");
     usage_error(&["browser", "eval"], "Unknown browser command: eval");
@@ -286,7 +289,10 @@ fn control_commands_list_and_explain_themselves_without_the_app() {
     let output = cli(&["notes", "--help"]);
     assert!(output.status.success(), "{output:?}");
     let usage = String::from_utf8(output.stdout).unwrap();
-    assert!(usage.contains("herdr-gpui notes set TEXT"), "{usage}");
+    assert!(
+        usage.contains("herdr-personal-dev notes set TEXT"),
+        "{usage}"
+    );
     assert!(usage.contains("Exit status:"), "{usage}");
     let output = cli(&["commands", "--json"]);
     assert!(output.status.success(), "{output:?}");

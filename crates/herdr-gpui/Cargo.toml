@@ -1,10 +1,15 @@
 [package]
+autobins               = false
 edition.workspace      = true
 license.workspace      = true
 name                   = "herdr-gpui"
 publish.workspace      = true
 rust-version.workspace = true
 version.workspace      = true
+
+[[bin]]
+name = "herdr-personal-dev"
+path = "src/main.rs"
 
 [lints]
 workspace = true

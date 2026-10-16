@@ -33,7 +33,7 @@ pub(super) fn root() -> Option<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".cache")))?;
     base.is_absolute()
-        .then(|| base.join("herdr-gpui/avatars-v1"))
+        .then(|| base.join("herdr-personal-dev/avatars-v1"))
 }
 
 /// The disk cache relies on `openat`, `flock`, and POSIX ownership and mode

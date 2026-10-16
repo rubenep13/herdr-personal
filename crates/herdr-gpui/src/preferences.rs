@@ -251,7 +251,7 @@ fn state_dir_with(var: impl Fn(&str) -> Option<std::ffi::OsString>) -> Option<Pa
         }
         None
     });
-    root.map(|root| root.join("herdr").join("gpui"))
+    root.map(|root| root.join(crate::constants::APP_NAMESPACE))
 }
 
 fn endpoint_path(dir: &Path, socket: &Path) -> PathBuf {

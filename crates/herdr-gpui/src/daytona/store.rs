@@ -14,7 +14,7 @@ fn valid(key: &str) -> bool {
 }
 
 const ENTRY: Entry = Entry {
-    service: "dev.herdr.gpui.daytona",
+    service: "dev.ruben.herdr-personal.daytona",
     account: "api-key",
     label: "Herdr UI Daytona API key",
     file: c"daytona-api-key",

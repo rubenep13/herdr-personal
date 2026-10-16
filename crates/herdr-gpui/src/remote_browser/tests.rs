@@ -32,9 +32,9 @@ fn one(pairs: &[(&str, &str)]) -> Option<Request> {
 fn a_request_is_read_from_its_tokens() {
     let request = one(&[
         ("ci", "green"),
-        ("herdr-gpui-17-42", "open w1:p2"),
-        ("herdr-gpui-17-42_0", "http://localhost:3000/a"),
-        ("herdr-gpui-17-42_1", "?b=c"),
+        ("hp-dev-17-42", "open w1:p2"),
+        ("hp-dev-17-42_0", "http://localhost:3000/a"),
+        ("hp-dev-17-42_1", "?b=c"),
     ])
     .unwrap();
     assert_eq!(
@@ -49,8 +49,8 @@ fn a_request_is_read_from_its_tokens() {
         }
     );
     let quiet = one(&[
-        ("herdr-gpui-1", "open-background"),
-        ("herdr-gpui-1_0", "example.com"),
+        ("hp-dev-1", "open-background"),
+        ("hp-dev-1_0", "example.com"),
     ])
     .unwrap();
     assert_eq!(
@@ -61,7 +61,7 @@ fn a_request_is_read_from_its_tokens() {
         }
     );
     assert_eq!(quiet.pane, None);
-    let reload = one(&[("herdr-gpui-2", "reload p")]).unwrap();
+    let reload = one(&[("hp-dev-2", "reload p")]).unwrap();
     assert_eq!(reload.action, Action::Reload);
     assert_eq!(reload.pane.as_deref(), Some("p"));
 }
@@ -69,11 +69,11 @@ fn a_request_is_read_from_its_tokens() {
 #[test]
 fn requests_made_together_are_all_read() {
     let all = Request::all(&tokens(&[
-        ("herdr-gpui-5-1", "open w1:p1"),
-        ("herdr-gpui-5-1_0", "a.test"),
-        ("herdr-gpui-5-2", "open w1:p2"),
-        ("herdr-gpui-5-2_0", "b.test"),
-        ("herdr-gpui-5-3", "reload w1:p3"),
+        ("hp-dev-5-1", "open w1:p1"),
+        ("hp-dev-5-1_0", "a.test"),
+        ("hp-dev-5-2", "open w1:p2"),
+        ("hp-dev-5-2_0", "b.test"),
+        ("hp-dev-5-3", "reload w1:p3"),
     ]));
     let found: Vec<_> = all
         .iter()
@@ -93,18 +93,18 @@ fn requests_made_together_are_all_read() {
 #[test]
 fn incomplete_or_unknown_requests_are_ignored() {
     let open = |extra: &[(&str, &str)]| {
-        let mut pairs = vec![("herdr-gpui-1", "open")];
+        let mut pairs = vec![("hp-dev-1", "open")];
         pairs.extend_from_slice(extra);
         one(&pairs)
     };
     // No address, or one that skips its first part.
     assert_eq!(open(&[]), None);
-    assert_eq!(open(&[("herdr-gpui-1_1", "x")]), None);
+    assert_eq!(open(&[("hp-dev-1_1", "x")]), None);
     // Another request's parts are not this one's.
-    assert_eq!(open(&[("herdr-gpui-2_0", "a.test")]), None);
+    assert_eq!(open(&[("hp-dev-2_0", "a.test")]), None);
     // A gap ends the address at the last part before it.
     assert_eq!(
-        open(&[("herdr-gpui-1_0", "a.test"), ("herdr-gpui-1_2", "/x")])
+        open(&[("hp-dev-1_0", "a.test"), ("hp-dev-1_2", "/x")])
             .unwrap()
             .action,
         Action::Open {
@@ -114,9 +114,9 @@ fn incomplete_or_unknown_requests_are_ignored() {
     );
     // Parts past the last number are never read.
     let parts: Vec<(String, String)> = (0..=URL_CHUNKS)
-        .map(|index| (format!("herdr-gpui-1_{index}"), "a".to_owned()))
+        .map(|index| (format!("hp-dev-1_{index}"), "a".to_owned()))
         .collect();
-    let mut many = tokens(&[("herdr-gpui-1", "open")]);
+    let mut many = tokens(&[("hp-dev-1", "open")]);
     many.extend(parts);
     let all = Request::all(&many);
     let [
@@ -131,26 +131,26 @@ fn incomplete_or_unknown_requests_are_ignored() {
     assert_eq!(address.len(), URL_CHUNKS);
 
     for (key, value) in [
-        ("herdr-gpui-1", "run"),
-        ("herdr-gpui-1", ""),
-        ("herdr-gpui-", "open"),
-        ("herdr-gpui-a.b", "open"),
-        ("herdr-gpui-123456789012345678x", "open"),
+        ("hp-dev-1", "run"),
+        ("hp-dev-1", ""),
+        ("hp-dev-", "open"),
+        ("hp-dev-a.b", "open"),
+        ("hp-dev-123456789012345678901234x", "open"),
     ] {
         let part = format!("{key}_0");
         let pairs = [(key, value), (part.as_str(), "a.test")];
         assert_eq!(one(&pairs), None, "{key}={value}");
     }
     // A pane that is not a plain identifier is dropped, not trusted.
-    let odd = open(&[("herdr-gpui-1_0", "a.test")]);
+    let odd = open(&[("hp-dev-1_0", "a.test")]);
     assert_eq!(odd.unwrap().pane, None);
-    let odd = one(&[("herdr-gpui-1", "open p 1"), ("herdr-gpui-1_0", "a.test")]).unwrap();
+    let odd = one(&[("hp-dev-1", "open p 1"), ("hp-dev-1_0", "a.test")]).unwrap();
     assert_eq!(odd.pane, None);
 }
 
 #[test]
 fn request_tokens_are_told_from_other_plugins() {
-    assert!(is_request_token("herdr-gpui-url-3"));
+    assert!(is_request_token("hp-dev-url-3"));
     assert!(!is_request_token("ci"));
     assert!(!is_request_token("herdr-status"));
 }

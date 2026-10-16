@@ -647,7 +647,7 @@ impl HerdrWindow {
                 "Agents in your panes can open pages and HTML drafts in browser tabs here, and read the notes you pin on them. A skill teaches them how.",
             ))
             .child(div().p(px(8.)).text_color(rgb(theme.muted)).child(
-                "Install writes herdr-gpui-browser/SKILL.md into ~/.claude/skills and ~/.agents/skills, whichever exist, and keeps it up to date. A skill of that name you wrote yourself is left alone. Remove it any time in Settings.",
+                "Install writes herdr-personal-dev-browser/SKILL.md into ~/.claude/skills and ~/.agents/skills, whichever exist, and keeps it up to date. A skill of that name you wrote yourself is left alone. Remove it any time in Settings.",
             ))
             .child(
                 div()

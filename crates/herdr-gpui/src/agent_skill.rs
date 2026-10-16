@@ -9,10 +9,10 @@ use gpui::{App, Global};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-const SKILL: &str = include_str!("../../../skills/herdr-gpui-browser/SKILL.md");
+const SKILL: &str = include_str!("../../../skills/herdr-personal-dev-browser/SKILL.md");
 /// Marks a skill file this app manages.
-const MARKER: &str = "<!-- herdr-gpui-managed-skill v1";
-const NAME: &str = "herdr-gpui-browser";
+const MARKER: &str = "<!-- herdr-personal-dev-managed-skill v1";
+const NAME: &str = "herdr-personal-dev-browser";
 /// Agent configuration directories under the home directory, whose
 /// `skills/` subdirectory agents read.
 const ROOTS: [&str; 2] = [".claude", ".agents"];
@@ -35,7 +35,7 @@ fn shell_word(path: &str) -> String {
 pub(crate) fn command(executable: Option<&Path>) -> String {
     executable
         .and_then(Path::to_str)
-        .map_or_else(|| "herdr-gpui".to_owned(), shell_word)
+        .map_or_else(|| "herdr-personal-dev".to_owned(), shell_word)
 }
 
 /// The skill, naming `executable` in its commands.
@@ -49,7 +49,7 @@ pub(crate) fn text(executable: Option<&Path>) -> String {
 /// The skill, naming `command` in its commands, as one shell word.
 pub(crate) fn text_naming(command: &str) -> String {
     // Every command line in the skill starts with the executable's name.
-    SKILL.replace("herdr-gpui ", &format!("{command} "))
+    SKILL.replace("herdr-personal-dev ", &format!("{command} "))
 }
 
 fn managed(contents: &str) -> bool {
@@ -259,17 +259,17 @@ mod tests {
 
     #[test]
     fn the_skill_is_marked_and_names_this_executable() {
-        assert!(SKILL.starts_with("---\nname: herdr-gpui-browser\n"));
+        assert!(SKILL.starts_with("---\nname: herdr-personal-dev-browser\n"));
         assert!(managed(SKILL));
-        assert!(SKILL.contains("herdr-gpui browser open"));
+        assert!(SKILL.contains("herdr-personal-dev browser open"));
         assert_eq!(text(None), SKILL);
         let bundled = text(Some(Path::new(
             "/Applications/Herdr.app/Contents/MacOS/Herdr",
         )));
         assert!(bundled.contains("/Applications/Herdr.app/Contents/MacOS/Herdr browser open"));
-        assert!(!bundled.contains("herdr-gpui browser"));
+        assert!(!bundled.contains("herdr-personal-dev browser"));
         // Every command, not only the browser's, names the executable.
-        assert!(!bundled.contains("herdr-gpui "));
+        assert!(!bundled.contains("herdr-personal-dev "));
         assert!(bundled.contains("/Applications/Herdr.app/Contents/MacOS/Herdr code open"));
         let spaced = text(Some(Path::new("/Users/a b/it's/Herdr")));
         assert!(spaced.contains(r"'/Users/a b/it'\''s/Herdr' browser open"));
@@ -305,7 +305,7 @@ mod tests {
             "HerdrKit.scenario(",
             "HerdrKit.variants(",
             "herdr.send(",
-            "herdr-gpui browser example",
+            "herdr-personal-dev browser example",
         ] {
             assert!(SKILL.contains(taught), "{taught}");
         }

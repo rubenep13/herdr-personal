@@ -29,3 +29,6 @@ mise.local.toml
 
 # Wrangler local state for the site Worker.
 .wrangler/
+
+# Local read-only daemon reference for the personal client project
+/references/
