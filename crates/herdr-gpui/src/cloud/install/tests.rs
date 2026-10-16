@@ -10,7 +10,9 @@ fn local(home: &std::path::Path) -> Command {
         .arg("sh")
         .env_clear()
         .env("HOME", home)
-        .env("PATH", "/usr/bin:/bin");
+        // The probe uses only shell builtins. A system Herdr on PATH would
+        // make the missing-install assertion depend on this machine.
+        .env("PATH", "");
     command
 }
 
