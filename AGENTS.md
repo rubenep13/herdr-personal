@@ -274,3 +274,14 @@ just test-perf
   check that did not run.
 - Keep user-facing docs and public API examples synchronized with behavior changes. Do not copy another repository's release, issue-tracker, or mandatory-push workflow into this one.
 - Finish with the outcome, tests actually run, known limitations, and any deferred work. Never claim unrun checks passed.
+
+## Personal client project context
+
+This is a personal fork (Herdr Personal Dev, executable `herdr-personal-dev`);
+the root README summarizes how it differs. When a local, untracked
+`docs/personal/` exists, read its README, evaluation, MVP plan, and progress
+log before working: they hold the owner's current scope and decisions, and
+never get committed. `references/herdr/` is a read-only source reference,
+never a build dependency. Keep upstream attribution and protocol
+compatibility; the saved plan is guidance and may need evidence-based
+corrections.

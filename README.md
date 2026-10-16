@@ -1,3 +1,25 @@
+> **Herdr Personal Dev** is a personal development fork of
+> [penso/herdr-gpui](https://github.com/penso/herdr-gpui), based on
+> `4223e9896b6b9a52a678e66269b08b1e0125dfb0`. It is not affiliated with the
+> upstream project or herdr.dev, and it does not modify Herdr itself.
+>
+> - It builds `herdr-personal-dev` (app ID `dev.ruben.herdr-personal`) with its
+>   own config, state, cache, control socket, credentials, and agent skill, so
+>   it runs beside the upstream client without sharing them. App updates and
+>   the upstream installer are disabled; it is a development build only.
+> - The `tree` sidebar layout, which new installs start with, nests each
+>   space's agents under it, with an order and folds of your own that never
+>   reorder Herdr's workspaces. Space and agent ranks hold for one daemon boot,
+>   since Herdr may reuse public IDs after a restart.
+> - A space's menu can start an installed agent in a new tab of that space
+>   through the official `herdr agent start` CLI, locally or over SSH.
+> - `scripts/personal-tree-qa.sh /absolute/path/to/herdr` opens it against an
+>   isolated daemon with sample agents for manual QA.
+>
+> The upstream README and attribution are preserved below; its release and
+> install instructions refer to the original project. License and NOTICE are
+> unchanged.
+
 <p align="center">
   <img src="assets/icons/herdr-ui-icon-badge.png" alt="Herdr ram on a simple ivory tile with a red notification badge showing 1" width="176" height="176">
 </p>
