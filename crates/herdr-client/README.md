@@ -76,7 +76,7 @@ resize(&self, boot_id: &str, options: ConnectOptions) -> Result<()>
 set_host_theme(&self, boot_id: &str, theme: &HostTheme) -> Result<()>
 set_focus(&self, boot_id: &str, focused: bool) -> Result<()>
 set_surface_active(&self, boot_id: &str, active: bool) -> Result<String>
-request(&self, boot_id: &str, method: &str, params: serde_json::Value) -> Result<String>
+request(&self, boot_id: &str, method: Method, params: serde_json::Value) -> Result<String>
 focus_pane(&self, boot_id: &str, pane_id: &str) -> Result<String>
 focus_tab(&self, boot_id: &str, tab_id: &str) -> Result<String>
 focus_workspace(&self, boot_id: &str, workspace_id: &str) -> Result<String>
