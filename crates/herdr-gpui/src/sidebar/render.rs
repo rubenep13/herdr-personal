@@ -411,10 +411,13 @@ impl HerdrWindow {
                 // The tree keeps them in the row; the others give them a line.
                 let (inline_ports, ports) = match personal {
                     Some(_) => (chips, None),
-                    None => (None, chips.map(|chips| {
-                        let line = chips.h(px(line_height(font))).w_full();
-                        line.pl(px(under_left)).pr(px(content_x))
-                    })),
+                    None => (
+                        None,
+                        chips.map(|chips| {
+                            let line = chips.h(px(line_height(font))).w_full();
+                            line.pl(px(under_left)).pr(px(content_x))
+                        }),
+                    ),
                 };
                 let element = Cell::new(
                     rows,
@@ -446,8 +449,12 @@ impl HerdrWindow {
                         status: shown_status,
                         lines,
                         ports: inline_ports.map(IntoElement::into_any_element),
-                        attention: personal.as_ref().map_or(0, |t| t.attention(endpoint_index, index)),
-                        more: personal.as_ref().map(|_| self.tree_more(&endpoint_id, &id, cx)),
+                        attention: personal
+                            .as_ref()
+                            .map_or(0, |t| t.attention(endpoint_index, index)),
+                        more: personal
+                            .as_ref()
+                            .map(|_| self.tree_more(&endpoint_id, &id, cx)),
                     }),
                     &row_cx,
                 )

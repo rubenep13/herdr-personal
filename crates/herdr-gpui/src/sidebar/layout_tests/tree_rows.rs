@@ -1,5 +1,5 @@
-use super::*;
 use super::tree_layout::{draw, tree_window};
+use super::*;
 use crate::{
     config::{AgentDetails, Theme, TreeTabs},
     icons::AgentIcon,
@@ -56,7 +56,9 @@ fn tree_rows_show_state_text_only_when_enabled(cx: &mut gpui::TestAppContext) {
     assert!(cx.debug_bounds("agent-badge-p0").is_some());
     assert!(cx.debug_bounds("agent-state-p0").is_none());
     let before = drawn_texts(cx);
-    edit(&view, cx, |view| view.config.sidebar_style.state_text = true);
+    edit(&view, cx, |view| {
+        view.config.sidebar_style.state_text = true
+    });
     let state = cx.debug_bounds("agent-state-p0").unwrap();
     let kind = cx.debug_bounds("detail-agent-p0").unwrap();
     // The state sits beside the kind on the second line, after it.
@@ -83,8 +85,7 @@ fn tree_rows_show_details_only_with_herdr_details(cx: &mut gpui::TestAppContext)
     });
     edit(&view, cx, |view| {
         view.config.sidebar_layout.agents =
-            toml::from_str(r#"rows = [["state_icon", "agent"], ["$model", "$summary"]]"#)
-                .unwrap();
+            toml::from_str(r#"rows = [["state_icon", "agent"], ["$model", "$summary"]]"#).unwrap();
     });
     let details = cx.debug_bounds("agent-details-p0").unwrap();
     let grown = cx.debug_bounds("row-agent-p0").unwrap();
@@ -113,7 +114,9 @@ fn tree_tab_rows_follow_tree_tabs(cx: &mut gpui::TestAppContext) {
         assert!(texts.iter().any(|drawn| drawn == text), "{text}: {texts:?}");
     }
     assert!(cx.debug_bounds("agent-badge-t1").is_none());
-    edit(&view, cx, |view| view.config.sidebar_style.tree_tabs = TreeTabs::Agents);
+    edit(&view, cx, |view| {
+        view.config.sidebar_style.tree_tabs = TreeTabs::Agents
+    });
     assert!(cx.debug_bounds("tab-row-local-t1").is_none());
 }
 
@@ -167,15 +170,24 @@ fn light_theme_inks_status_colors() {
         assert_eq!(color, latte.ink(indicators.color(status)));
         // It reads on the agent's tile, which is the theme's active colour.
         let ratio = crate::contrast::ratio(color, latte.active);
-        assert!(ratio >= latte.contrast.mark_ratio() - 0.05, "{status:?}: {ratio}");
+        assert!(
+            ratio >= latte.contrast.mark_ratio() - 0.05,
+            "{status:?}: {ratio}"
+        );
     }
     // Claude's orange keeps its hue but is inked to read on a light tile.
     let claude = logo_color(AgentIcon::Claude, &latte);
     assert_eq!(claude, latte.ink(0xd97757));
     let ratio = crate::contrast::ratio(claude, latte.active);
-    assert!(ratio >= latte.contrast.mark_ratio() - 0.05, "claude: {ratio}");
+    assert!(
+        ratio >= latte.contrast.mark_ratio() - 0.05,
+        "claude: {ratio}"
+    );
     // A mark without a brand draws in the theme's text colour.
-    assert_eq!(logo_color(AgentIcon::Codex, &latte), latte.ink(latte.foreground));
+    assert_eq!(
+        logo_color(AgentIcon::Codex, &latte),
+        latte.ink(latte.foreground)
+    );
 }
 
 #[gpui::test]
@@ -224,5 +236,8 @@ fn folded_space_counts_attention_in_a_pill(cx: &mut gpui::TestAppContext) {
     assert!(pill.right() <= row.right() && pill.left() > row.left());
     // The count no longer rides in the name.
     let texts = drawn_texts(cx);
-    assert!(!texts.iter().any(|text| text == "herdr \u{00b7} 1"), "{texts:?}");
+    assert!(
+        !texts.iter().any(|text| text == "herdr \u{00b7} 1"),
+        "{texts:?}"
+    );
 }

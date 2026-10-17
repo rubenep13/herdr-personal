@@ -21,7 +21,10 @@ fn tree_agent_rows_take_the_tab_label_and_the_agent_kind() {
     );
     // The tab names the row even when it is the space's only tab.
     listing.tabs.truncate(1);
-    assert_eq!(tree_agent_titles(&listing.agents[0], &listing).0, "visor-git");
+    assert_eq!(
+        tree_agent_titles(&listing.agents[0], &listing).0,
+        "visor-git"
+    );
     // An agent whose tab the snapshot does not list leads with its own name.
     let lost = &listing.agents[1];
     assert_eq!(tree_agent_titles(lost, &listing).0, agent_name(lost));

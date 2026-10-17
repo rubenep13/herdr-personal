@@ -27,7 +27,10 @@ fn tree_options_parse_every_value() -> anyhow::Result<()> {
         ("block", TreeHierarchy::Block),
         ("guide", TreeHierarchy::Guide),
     ] {
-        assert_eq!(style(&format!("hierarchy = \"{name}\""))?.hierarchy, hierarchy);
+        assert_eq!(
+            style(&format!("hierarchy = \"{name}\""))?.hierarchy,
+            hierarchy
+        );
     }
     for (name, tabs) in [("all", TreeTabs::All), ("agents", TreeTabs::Agents)] {
         assert_eq!(style(&format!("tree_tabs = \"{name}\""))?.tree_tabs, tabs);
@@ -56,6 +59,9 @@ fn tree_options_refuse_unknown_values() {
         "state_text = \"yes\"",
         "agent_details = \"daemon\"",
     ] {
-        assert!(Config::parse(&format!("[sidebar]\n{text}")).is_err(), "{text}");
+        assert!(
+            Config::parse(&format!("[sidebar]\n{text}")).is_err(),
+            "{text}"
+        );
     }
 }

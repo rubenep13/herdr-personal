@@ -79,13 +79,13 @@ pub use sidebar_style::{
 };
 pub use status_bar::StatusBar;
 pub use status_icons::StatusIcons;
-pub use tabs_style::{TabContent, TabPlacement, TabsStyle};
 use std::{
     collections::BTreeMap,
     env, fs,
     io::ErrorKind,
     path::{Path, PathBuf},
 };
+pub use tabs_style::{TabContent, TabPlacement, TabsStyle};
 pub use theme::Theme;
 pub(crate) use theme::ThemeName;
 pub(crate) use theme::mix;

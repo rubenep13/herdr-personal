@@ -44,7 +44,15 @@ fn all_lists_agentless_tabs_after_the_agents() {
     );
     assert_eq!(
         labels(&hosts, &rows),
-        ["Local", "API", "Review", "Implement", "logs", "Tools", "shell"]
+        [
+            "Local",
+            "API",
+            "Review",
+            "Implement",
+            "logs",
+            "Tools",
+            "shell"
+        ]
     );
     assert_eq!(rows[4].id, tab(&k, "boot", "w1", "t3"));
     assert_eq!(rows[4].id.parent(), Some(space(&k, "boot", "w1")));

@@ -122,5 +122,11 @@ pub(super) fn grouped(
     preferences: &TreePreferences,
     query: &str,
 ) -> Vec<TreeRow> {
-    project(hosts, preferences, AgentSort::Grouped, query, TreeTabs::Agents)
+    project(
+        hosts,
+        preferences,
+        AgentSort::Grouped,
+        query,
+        TreeTabs::Agents,
+    )
 }

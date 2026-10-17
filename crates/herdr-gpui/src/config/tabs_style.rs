@@ -48,9 +48,7 @@ pub(super) struct TabsSettings {
 }
 
 impl<'de> Deserialize<'de> for TabsSettings {
-    fn deserialize<D: serde::Deserializer<'de>>(
-        deserializer: D,
-    ) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct Visitor;
 
         impl<'de> serde::de::Visitor<'de> for Visitor {
@@ -70,8 +68,8 @@ impl<'de> Deserialize<'de> for TabsSettings {
                     match key.as_str() {
                         // The terminal-only keys go with the font so they are
                         // reported as they were before this table had style keys.
-                        "family" | "size" | "fallback" | "line_height" | "weight"
-                        | "padding_x" | "padding_y" => {
+                        "family" | "size" | "fallback" | "line_height" | "weight" | "padding_x"
+                        | "padding_y" => {
                             font.insert(key, map.next_value()?);
                         }
                         "content" => settings.style.content = map.next_value()?,

@@ -261,7 +261,11 @@ impl RowLayout for Tree {
                 .overflow_hidden()
                 .text_size(px(scale.secondary))
                 .text_color(rgb(theme.muted))
-                .child(parts::icon("icons/git-branch.svg", BRANCH_MARK, theme.muted))
+                .child(parts::icon(
+                    "icons/git-branch.svg",
+                    BRANCH_MARK,
+                    theme.muted,
+                ))
                 .child(div().min_w_0().truncate().child(label_text(branch)))
                 .when_some(upstream, |line, upstream| {
                     line.child(upstream.element(id, glyph, theme))
@@ -278,7 +282,9 @@ impl RowLayout for Tree {
                 .when_some(badge.pr.as_ref(), |marks, pr| {
                     marks.child(parts::pr_number(id, pr, BRANCH_MARK, glyph).1)
                 })
-                .when(badge.dirty, |marks| marks.child(parts::dirty(id, size, theme)))
+                .when(badge.dirty, |marks| {
+                    marks.child(parts::dirty(id, size, theme))
+                })
                 .when(badge.noted, |marks| {
                     marks.child(crate::icons::note(theme, size))
                 })
@@ -344,10 +350,7 @@ impl RowLayout for Tree {
             AgentDetails::Herdr => details(&agent.lines),
             AgentDetails::Off => Vec::new(),
         };
-        let state_text = agent
-            .status_text
-            .as_deref()
-            .filter(|_| tree.state_text);
+        let state_text = agent.status_text.as_deref().filter(|_| tree.state_text);
         let color = badge_color(agent.status, cx.indicators, theme);
         let second = div()
             .flex()
@@ -368,26 +371,29 @@ impl RowLayout for Tree {
                     scale.detail - 1.,
                 ))
             });
-        let second = div().flex().flex_col().min_w_0().child(second).when(
-            !details.is_empty(),
-            |column| {
-                column.child(
-                    div()
-                        .debug_selector(move || format!("agent-details-{id}"))
-                        .flex()
-                        .items_center()
-                        .gap(px(7.))
-                        .min_w_0()
-                        .children(details.iter().enumerate().map(|(index, detail)| {
-                            text(format!("agent-detail-{id}-{index}"), detail, scale.detail)
-                                .when(index == 0, |first| {
-                                    first.flex_none().text_color(rgb(theme.subtext()))
-                                })
-                                .when(index > 0, |rest| rest.text_color(rgb(theme.muted)))
-                        })),
-                )
-            },
-        );
+        let second =
+            div()
+                .flex()
+                .flex_col()
+                .min_w_0()
+                .child(second)
+                .when(!details.is_empty(), |column| {
+                    column.child(
+                        div()
+                            .debug_selector(move || format!("agent-details-{id}"))
+                            .flex()
+                            .items_center()
+                            .gap(px(7.))
+                            .min_w_0()
+                            .children(details.iter().enumerate().map(|(index, detail)| {
+                                text(format!("agent-detail-{id}-{index}"), detail, scale.detail)
+                                    .when(index == 0, |first| {
+                                        first.flex_none().text_color(rgb(theme.subtext()))
+                                    })
+                                    .when(index > 0, |rest| rest.text_color(rgb(theme.muted)))
+                            })),
+                    )
+                });
         let height = if details.is_empty() {
             AGENT_ROW_HEIGHT
         } else {
@@ -426,8 +432,8 @@ pub(in crate::sidebar) fn tab_row(
 ) -> Div {
     let theme = cx.theme;
     let scale = TypeScale::of(cx.font);
-    let second = text(format!("tab-kind-{id}"), "Terminal", scale.secondary)
-        .text_color(rgb(theme.muted));
+    let second =
+        text(format!("tab-kind-{id}"), "Terminal", scale.secondary).text_color(rgb(theme.muted));
     frame(&format!("tab-{id}"), AGENT_ROW_HEIGHT, state, cx)
         .child(tile(
             format!("tab-tile-{id}"),
