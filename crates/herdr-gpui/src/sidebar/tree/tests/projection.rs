@@ -250,6 +250,7 @@ fn attention_sorts_within_each_space_and_never_overrides_a_plugin() {
             &prefs,
             AgentSort::Priority,
             "",
+            TreeTabs::Agents,
         )
     };
     assert_eq!(panes(&rows(&s)), ["p2", "p1"]);

@@ -5,6 +5,7 @@ use super::*;
 mod projection;
 mod ranks;
 mod scale;
+mod tabs;
 
 /// Two spaces, two agents in the first: `p1` working, `p2` blocked.
 pub(super) fn snapshot() -> ClientShellSnapshot {
@@ -101,6 +102,7 @@ pub(super) fn labels(hosts: &[HostInput<'_>], rows: &[TreeRow]) -> Vec<String> {
                 Entry::Agent(index) => {
                     crate::sidebar::agent_name(&host.snapshot.unwrap().agents[index]).to_owned()
                 }
+                Entry::Tab(index) => host.snapshot.unwrap().tabs[index].label.clone(),
             }
         })
         .collect()
@@ -120,5 +122,5 @@ pub(super) fn grouped(
     preferences: &TreePreferences,
     query: &str,
 ) -> Vec<TreeRow> {
-    project(hosts, preferences, AgentSort::Grouped, query)
+    project(hosts, preferences, AgentSort::Grouped, query, TreeTabs::Agents)
 }

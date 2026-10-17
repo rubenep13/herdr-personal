@@ -33,7 +33,8 @@ pub(in crate::sidebar) struct TreeLayout {
 
 struct TreeSpace {
     row: TreeRow,
-    agents: Vec<TreeRow>,
+    /// Its agents, then its agentless tabs when the tree lists them.
+    children: Vec<TreeRow>,
 }
 
 impl TreeLayout {
@@ -45,11 +46,11 @@ impl TreeLayout {
                 Entry::Host => {}
                 Entry::Space(_) => spaces.push(TreeSpace {
                     row,
-                    agents: Vec::new(),
+                    children: Vec::new(),
                 }),
-                Entry::Agent(_) => {
+                Entry::Agent(_) | Entry::Tab(_) => {
                     if let Some(space) = spaces.last_mut() {
-                        space.agents.push(row);
+                        space.children.push(row);
                     }
                 }
             }
@@ -153,7 +154,13 @@ impl HerdrWindow {
     pub(crate) fn tree_rows(&self, query: &str, cx: &App) -> Vec<TreeRow> {
         let default = TreePreferences::default();
         let preferences = TreeState::of(cx).map_or(&default, TreeState::preferences);
-        tree::project(&self.tree_hosts(), preferences, self.agent_sort, query)
+        tree::project(
+            &self.tree_hosts(),
+            preferences,
+            self.agent_sort,
+            query,
+            self.config.sidebar_style.tree_tabs,
+        )
     }
 
     pub(in crate::sidebar) fn tree_layout(&self, query: &str, cx: &App) -> TreeLayout {
@@ -177,7 +184,7 @@ impl HerdrWindow {
         else {
             return None;
         };
-        if !space.row.collapsed && space.agents.is_empty() {
+        if !space.row.collapsed && space.children.is_empty() {
             return None;
         }
         let collapsed = space.row.collapsed;
@@ -230,7 +237,7 @@ impl HerdrWindow {
         let draggable = !tree.searching && tree::manual(snapshot, self.agent_sort);
         let mut count = 0;
         let mut focused = None;
-        for row in &space.agents {
+        for row in &space.children {
             let Entry::Agent(index) = row.entry else {
                 continue;
             };
