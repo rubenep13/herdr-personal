@@ -6,7 +6,7 @@ pub(super) struct Icons;
 /// Declares each agent mark once: its variant, Herdr's canonical
 /// `agent_label` identity, and the embedded asset named after that identity.
 macro_rules! agent_icons {
-    ($($variant:ident => $label:literal,)+) => {
+    ($($variant:ident => $label:literal as $display:literal,)+) => {
         /// Canonical daemon identities, independent of editable display names.
         #[derive(Clone, Copy, Debug, PartialEq, Eq)]
         pub(crate) enum AgentIcon {
@@ -21,6 +21,15 @@ macro_rules! agent_icons {
                 match identity {
                     $(Some($label) => Self::$variant,)+
                     _ => Self::Generic,
+                }
+            }
+
+            /// The agent's name as people write it, for a row that names
+            /// its kind.
+            pub(crate) fn label(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $display,)+
+                    Self::Generic => "Agent",
                 }
             }
 
@@ -43,32 +52,45 @@ macro_rules! agent_icons {
     };
 }
 
-// Keyed on Herdr's `src/detect/mod.rs` `agent_label`, in its declaration order.
+// Keyed on Herdr's `src/detect/mod.rs` `agent_label`, in its declaration
+// order, each with the name a row shows for its kind.
 agent_icons! {
-    Pi => "pi",
-    Claude => "claude",
-    Codex => "codex",
-    Gemini => "gemini",
-    Cursor => "cursor",
-    Devin => "devin",
-    Antigravity => "agy",
-    Cline => "cline",
-    Omp => "omp",
-    Mastracode => "mastracode",
-    OpenCode => "opencode",
-    Copilot => "copilot",
-    Kimi => "kimi",
-    Kiro => "kiro",
-    Droid => "droid",
-    Amp => "amp",
-    Grok => "grok",
-    Hermes => "hermes",
-    Kilo => "kilo",
-    Qodercli => "qodercli",
-    Qwen => "qwen",
-    Letta => "letta",
-    Maki => "maki",
-    Muse => "muse",
+    Pi => "pi" as "Pi",
+    Claude => "claude" as "Claude",
+    Codex => "codex" as "Codex",
+    Gemini => "gemini" as "Gemini",
+    Cursor => "cursor" as "Cursor",
+    Devin => "devin" as "Devin",
+    Antigravity => "agy" as "Antigravity",
+    Cline => "cline" as "Cline",
+    Omp => "omp" as "Omp",
+    Mastracode => "mastracode" as "Mastra Code",
+    OpenCode => "opencode" as "OpenCode",
+    Copilot => "copilot" as "Copilot",
+    Kimi => "kimi" as "Kimi",
+    Kiro => "kiro" as "Kiro",
+    Droid => "droid" as "Droid",
+    Amp => "amp" as "Amp",
+    Grok => "grok" as "Grok",
+    Hermes => "hermes" as "Hermes",
+    Kilo => "kilo" as "Kilo",
+    Qodercli => "qodercli" as "Qoder",
+    Qwen => "qwen" as "Qwen",
+    Letta => "letta" as "Letta",
+    Maki => "maki" as "Maki",
+    Muse => "muse" as "Muse",
+}
+
+impl AgentIcon {
+    /// The colour of the agent's own brand, which its mark keeps on every
+    /// theme as part of its identity. Marks without one take the theme's
+    /// foreground.
+    pub(crate) fn brand(self) -> Option<u32> {
+        match self {
+            Self::Claude => Some(0xd97757),
+            _ => None,
+        }
+    }
 }
 
 /// Embeds each `status_icons` set, one asset per status, in the order

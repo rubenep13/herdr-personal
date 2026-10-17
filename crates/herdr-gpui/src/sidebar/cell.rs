@@ -98,6 +98,9 @@ pub(super) struct AgentRow<'a> {
     /// Stable probe key, unique across both lists.
     pub(super) key: String,
     pub(super) name: &'a str,
+    /// The agent's kind (Claude, Codex…) under a row named by its tab; only
+    /// the tree names rows that way.
+    pub(super) kind: Option<&'a str>,
     pub(super) icon: AgentIcon,
     pub(super) status: AgentStatus,
     /// Its workspace and, when that earns a place, its tab. Missing once the

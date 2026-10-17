@@ -188,6 +188,7 @@ fn cells_hand_their_state_and_data_to_the_layout() {
         RowData::Agent(AgentRow {
             key: "agent-p0".into(),
             name: "Claude Code",
+            kind: None,
             icon: crate::icons::AgentIcon::Generic,
             status: AgentStatus::Working,
             place: None,

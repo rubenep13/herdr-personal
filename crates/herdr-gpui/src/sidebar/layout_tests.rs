@@ -84,6 +84,8 @@ mod text_width;
 #[cfg(test)]
 mod tree_layout;
 #[cfg(test)]
+mod tree_row_data;
+#[cfg(test)]
 mod update_notes;
 #[cfg(test)]
 mod update_notes_scrollbar;
