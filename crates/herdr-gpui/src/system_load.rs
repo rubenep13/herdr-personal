@@ -326,6 +326,25 @@ impl SystemLoad {
         self.monitors.get(host).map(|monitor| &monitor.reading)
     }
 
+    /// Shows a sample for `host` as if its worker had taken it: `cpu`
+    /// percent busy and `memory` as used and total bytes.
+    #[cfg(test)]
+    pub(crate) fn seed(&mut self, host: Host, cpu: f32, (used, total): (u64, u64)) {
+        let mut reading = Reading::default();
+        reading.apply(Ok(Sample {
+            cpu: Some(cpu),
+            memory: Some(Memory { used, total }),
+            ..Sample::default()
+        }));
+        self.monitors.insert(
+            host,
+            Monitor {
+                worker: None,
+                reading,
+            },
+        );
+    }
+
     /// Samples exactly `hosts` (at most [`HOST_LIMIT`]): starts workers for
     /// new ones, stops and forgets the rest, and takes finished samples.
     /// Returns whether anything shown changed.

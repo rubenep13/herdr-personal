@@ -19,6 +19,7 @@ mod search;
 mod sticky;
 mod tokens;
 pub(crate) mod tree;
+mod tree_host;
 mod view;
 mod wash;
 mod workspaces;

@@ -82,6 +82,8 @@ mod superset_dots;
 #[cfg(test)]
 mod text_width;
 #[cfg(test)]
+mod tree_host;
+#[cfg(test)]
 mod tree_layout;
 #[cfg(test)]
 mod tree_row_data;

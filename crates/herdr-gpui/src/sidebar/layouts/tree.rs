@@ -108,9 +108,15 @@ fn pill(selector: String, value: &str, color: u32, size: f32) -> Div {
         .child(label_text(value))
 }
 
-/// A square button at a row's end that shows only while the row is pointed
-/// at, selected, or its menu is open, so a row at rest stays quiet.
-fn control(id: ElementId, selector: String, shown: bool, theme: &Theme) -> Stateful<Div> {
+/// A square button at a row's end that shows only while the row, a member of
+/// hover `group`, is pointed at, or while `shown`, so a row at rest stays
+/// quiet.
+pub(in crate::sidebar) fn control(
+    id: ElementId,
+    selector: String,
+    (shown, group): (bool, &'static str),
+    theme: &Theme,
+) -> Stateful<Div> {
     let hover = mix(theme.active, theme.foreground, 12);
     div()
         .id(id)
@@ -124,9 +130,7 @@ fn control(id: ElementId, selector: String, shown: bool, theme: &Theme) -> State
         .cursor_pointer()
         .hover(move |style| style.bg(rgb(hover)))
         .when(!shown, |control| {
-            control
-                .hidden()
-                .group_hover(ROW_GROUP, |style| style.flex())
+            control.hidden().group_hover(group, |style| style.flex())
         })
 }
 
@@ -142,12 +146,17 @@ fn fold_button(fold: Fold, id: &str, shown: bool, theme: &Theme) -> Stateful<Div
     } else {
         "icons/chevron-down.svg"
     };
-    control(element, format!("space-fold-{id}"), shown, theme)
-        .child(parts::icon(chevron, 14., theme.muted))
-        .on_click(move |event, window, cx| {
-            cx.stop_propagation();
-            toggle(event, window, cx);
-        })
+    control(
+        element,
+        format!("space-fold-{id}"),
+        (shown, ROW_GROUP),
+        theme,
+    )
+    .child(parts::icon(chevron, 14., theme.muted))
+    .on_click(move |event, window, cx| {
+        cx.stop_propagation();
+        toggle(event, window, cx);
+    })
 }
 
 /// An agent's or tab's tile: `mark` drawn in `color` on the active colour,
@@ -313,7 +322,7 @@ impl RowLayout for Tree {
                     control(
                         SharedString::from(format!("space-more-{id}")).into(),
                         format!("space-more-{id}"),
-                        shown,
+                        (shown, ROW_GROUP),
                         theme,
                     )
                     .child(parts::icon("icons/more.svg", 14., theme.muted))
