@@ -65,6 +65,12 @@ mod find;
 mod font_picker;
 mod fonts;
 mod git;
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the Git graph tab wires it into the window")
+)]
+#[cfg_attr(test, allow(dead_code))]
+mod git_graph;
 mod github;
 mod group_menu;
 mod group_terminals;
