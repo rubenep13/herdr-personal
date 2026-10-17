@@ -26,6 +26,7 @@ use gpui::{prelude::*, *};
 
 mod agent_rows;
 mod device_tree;
+mod ports;
 pub(crate) mod tree;
 
 impl HerdrWindow {
@@ -388,26 +389,9 @@ impl HerdrWindow {
                 // A child's trunk runs on past its note and ports to the next
                 // sibling, as it runs through the row itself.
                 let trunk = rows.trunk_below(&format!("{endpoint_id}-{id}"), tree, &row_cx);
-                let chips = (self.config.show_listening_ports && !removing_row)
-                    .then_some(daemon.as_ref())
-                    .flatten()
-                    .and_then(|daemon| self.listening_ports.get(daemon, &workspace.workspace_id))
-                    .map(|listed| {
-                        let size = (font.size * 0.85).round();
-                        div()
-                            .debug_selector(|| format!("ports-{endpoint_id}-{id}"))
-                            .flex_none()
-                            .min_w_0()
-                            .text_size(px(size))
-                            .child(crate::listening_ports::chips(
-                                listed,
-                                (&endpoint_id, &workspace.workspace_id),
-                                &self.tunnels,
-                                theme,
-                                size,
-                                cx,
-                            ))
-                    });
+                let chips = (!removing_row)
+                    .then(|| self.space_port_chips(daemon.as_ref(), (&endpoint_id, &id), font, cx))
+                    .flatten();
                 // The tree keeps them in the row; the others give them a line.
                 let (inline_ports, ports) = match personal {
                     Some(_) => (chips, None),
