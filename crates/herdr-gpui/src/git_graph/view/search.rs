@@ -24,6 +24,7 @@ pub(super) struct Search {
     more: bool,
     /// The result selected last, for n and N.
     index: Option<usize>,
+    failed: bool,
 }
 
 impl GitGraphView {
@@ -111,6 +112,20 @@ impl GitGraphView {
         true
     }
 
+    /// A failed search says so; it never touches the rows.
+    pub(super) fn search_failed(&mut self, generation: u64) -> bool {
+        let Some(search) = self
+            .search
+            .as_mut()
+            .filter(|search| search.generation == generation)
+        else {
+            return false;
+        };
+        search.failed = true;
+        search.hits = Some(Arc::default());
+        true
+    }
+
     pub(crate) fn is_match(&self, oid: &str) -> bool {
         self.matches.contains(oid)
     }
@@ -125,6 +140,7 @@ impl GitGraphView {
         let search = self.search.as_ref()?;
         let theme = &self.look.theme;
         let count = match (&search.hits, search.query.is_empty()) {
+            _ if search.failed => "Search failed".into(),
             (Some(hits), _) => results_label(hits.len(), search.more),
             (None, false) => "Searching\u{2026}".into(),
             (None, true) => String::new(),

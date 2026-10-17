@@ -113,6 +113,9 @@ pub(crate) struct GitGraphView {
     probe_failed: bool,
     /// Whether the shortcuts are shown.
     help: bool,
+    /// The last page failed to load; none is asked for again until the
+    /// history is read afresh.
+    more_failed: bool,
 }
 
 /// The headline for a failure, on this machine or the SSH host `remote`.
@@ -223,6 +226,7 @@ impl GitGraphView {
             probe: None,
             probe_failed: false,
             help: false,
+            more_failed: false,
         };
         view.send(Request::Load);
         view
@@ -399,6 +403,12 @@ impl GitGraphView {
                     truncated,
                 }),
             ),
+            // A failure is applied only to the request of its own
+            // generation, so a failed search or a failed detail never
+            // clears the rows.
+            Reply::Failed(error) if generation == self.latest.0 => {
+                self.receive_history(generation, Err(error), cx)
+            }
             Reply::Failed(error) => match self
                 .panel
                 .as_ref()
@@ -406,7 +416,7 @@ impl GitGraphView {
             {
                 Some(true) => self.receive_detail(generation, Err(error)),
                 Some(false) => self.receive_diff(generation, None, Err(error)),
-                None => self.receive_history(generation, Err(error), cx),
+                None => self.search_failed(generation),
             },
         };
         if applied {
@@ -427,6 +437,7 @@ impl GitGraphView {
         self.waiting = false;
         match history {
             Ok(history) => {
+                self.more_failed = false;
                 // The selection follows its commit; one rewritten away
                 // falls back to HEAD.
                 if self
@@ -448,6 +459,7 @@ impl GitGraphView {
                 if self.latest.1 == Request::Load {
                     self.history = None;
                 }
+                self.more_failed = self.latest.1 == Request::More;
                 self.error = Some(error);
             }
         }
@@ -479,7 +491,11 @@ impl GitGraphView {
         let Some(history) = &self.history else {
             return;
         };
-        if history.has_more && !self.waiting && drawn_to + MORE_WITHIN >= history.commits.len() {
+        if history.has_more
+            && !self.waiting
+            && !self.more_failed
+            && drawn_to + MORE_WITHIN >= history.commits.len()
+        {
             self.send(Request::More);
         }
     }
@@ -641,12 +657,32 @@ impl Render for GitGraphView {
             (Some(history), _) if history.commits.is_empty() => {
                 self.render_message("No commits yet", None)
             }
-            (Some(history), _) => div()
+            (Some(history), error) => div()
                 .flex_1()
                 .min_w_0()
                 .min_h_0()
                 .flex()
                 .flex_col()
+                .when_some(error.clone(), |el, error| {
+                    el.child(
+                        div()
+                            .debug_selector(|| "graph-banner".to_owned())
+                            .flex_none()
+                            .px_3()
+                            .py_1()
+                            .text_size(px(12.5))
+                            .bg(rgb(crate::config::mix(
+                                theme.background,
+                                theme.ink(theme.palette[3]),
+                                14,
+                            )))
+                            .text_color(rgb(theme.foreground))
+                            .child(format!(
+                                "{} \u{2014} r reloads",
+                                error_title(&error, self.remote.as_deref())
+                            )),
+                    )
+                })
                 .child(self.render_columns(cx))
                 .child(
                     uniform_list(

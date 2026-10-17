@@ -16,6 +16,7 @@ use std::{
 
 mod chips;
 mod detail;
+mod failures;
 #[cfg(unix)]
 mod git;
 mod help;

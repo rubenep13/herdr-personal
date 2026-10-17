@@ -46,7 +46,8 @@ impl GitGraphView {
                 self.reload(cx);
                 true
             }
-            ("?", _) => {
+            // `?` arrives as itself or as Shift-/ depending on the layout.
+            ("?", _) | ("/", true) => {
                 self.toggle_help(cx);
                 true
             }
@@ -54,7 +55,7 @@ impl GitGraphView {
                 self.toggle_help(cx);
                 true
             }
-            ("/", _) => {
+            ("/", false) => {
                 self.open_search(window, cx);
                 true
             }

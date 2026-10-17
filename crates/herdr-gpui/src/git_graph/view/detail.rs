@@ -320,6 +320,11 @@ impl GitGraphView {
     }
 
     #[cfg(test)]
+    pub(crate) fn close_detail_for_test(&mut self, cx: &mut Context<Self>) {
+        self.close_detail(cx);
+    }
+
+    #[cfg(test)]
     pub(crate) fn last_detail(&self) -> u64 {
         self.panel.as_ref().map_or(0, |panel| panel.generation)
     }

@@ -37,3 +37,16 @@ fn question_mark_shows_every_shortcut(cx: &mut TestAppContext) {
     draw(cx);
     assert!(!drawn(cx, "graph-help"));
 }
+
+#[gpui::test]
+fn shift_slash_is_help_too(cx: &mut TestAppContext) {
+    let (view, cx) = shown(cx, History::new(&line(3), &[], None, None, false), 600.);
+    cx.update(|window, cx| {
+        let handle = view.read(cx).focus_handle.clone();
+        window.focus(&handle, cx);
+    });
+    cx.simulate_keystrokes("shift-/");
+    draw(cx);
+    assert!(drawn(cx, "graph-help"));
+    assert!(!drawn(cx, "graph-search-input"), "it is not the search");
+}
