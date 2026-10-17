@@ -8,6 +8,7 @@ pub(crate) mod geometry;
 pub(crate) mod git;
 pub(crate) mod history;
 pub(crate) mod layout;
+pub(crate) mod live;
 pub(crate) mod model;
 mod parse;
 pub(crate) mod prefs;

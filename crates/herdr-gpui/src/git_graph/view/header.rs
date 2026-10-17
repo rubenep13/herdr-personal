@@ -90,9 +90,10 @@ impl GitGraphView {
                     theme.muted
                 })))
         };
-        let live = match self.connection {
-            super::Connection::Online => theme.ink(theme.palette[2]),
-            super::Connection::Offline => theme.muted,
+        let live = match self.liveness() {
+            super::Liveness::Live => theme.ink(theme.palette[2]),
+            super::Liveness::Reconnecting => theme.ink(theme.palette[3]),
+            super::Liveness::Offline => theme.muted,
         };
         div()
             .debug_selector(|| "graph-bar".to_owned())

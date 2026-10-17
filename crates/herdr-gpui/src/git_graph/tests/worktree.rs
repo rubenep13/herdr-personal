@@ -193,6 +193,8 @@ fn w_selects_the_worktree_row(cx: &mut TestAppContext) {
             assert!(view.receive(0, Reply::History(Arc::new(clean)), cx));
         })
     });
+    // The WIP row went, so the selection fell back to HEAD's row (0).
+    assert_eq!(view.read_with(cx, |view, _| view.selected_row()), Some(0));
     cx.simulate_keystrokes("j j w");
-    assert_eq!(view.read_with(cx, |view, _| view.selected_row()), Some(1));
+    assert_eq!(view.read_with(cx, |view, _| view.selected_row()), Some(2));
 }

@@ -165,7 +165,7 @@ impl HerdrWindow {
     /// Runs every window tick: views for restored tabs are made, closed
     /// tabs' views go (dropping their workers, which cancels their scripts),
     /// and every view gets its worker's news and the window's current look.
-    pub(crate) fn poll_git_graphs(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn poll_git_graphs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(store) = cx.try_global::<Store>() else {
             self.git_graphs.clear();
             return;
@@ -188,12 +188,25 @@ impl HerdrWindow {
             return;
         }
         let look = self.graph_look();
-        for graph in self.git_graphs.values() {
+        // A tab is shown when a group of this window shows it and the
+        // window itself can be seen.
+        let window_visible = window.visibility() == WindowVisibility::Visible;
+        let shown: Vec<TabId> = self
+            .group_slots()
+            .into_iter()
+            .filter_map(|slot| match self.group_pick(slot.id) {
+                Some(Pick::Page(id)) => Some(id),
+                _ => None,
+            })
+            .collect();
+        for (id, graph) in &self.git_graphs {
+            let visible = window_visible && shown.contains(id);
             let index = self.endpoints.iter().position(|e| e.id == graph.endpoint);
             let connection =
                 index.map_or(Connection::Offline, |index| self.graph_connection(index));
             graph.view.update(cx, |view, cx| {
                 view.set_connection(connection, cx);
+                view.set_visible(visible, cx);
                 view.poll(cx);
                 view.set_look(look.clone(), cx);
             });

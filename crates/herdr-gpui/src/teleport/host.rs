@@ -95,6 +95,14 @@ impl Host {
     }
 
     /// Whether `herdr_cli` can reach this host's session; see `development`.
+    /// The SSH target scripts run on, for an SSH host.
+    pub(crate) fn ssh_target(&self) -> Option<&str> {
+        match &self.route {
+            Route::Ssh(target) => Some(target),
+            _ => None,
+        }
+    }
+
     pub(crate) fn scripts_herdr(&self) -> bool {
         !self.development
     }

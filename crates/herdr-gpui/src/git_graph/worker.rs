@@ -13,6 +13,7 @@ use super::{
     error::{Error, Result},
     git::{PAGE, Repo, Snapshot, WorktreeCounts},
     history::History,
+    live::Prober,
     model::Commit,
     search::{SEARCH_LIMIT, SearchHit, search},
     worktree::{Section, WorktreeStatus},
@@ -54,6 +55,8 @@ pub(crate) enum Request {
     },
     /// Commits whose message, author or hash match.
     Search(String),
+    /// Whether the repository changed since it was last read.
+    Probe,
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +79,11 @@ pub(crate) enum Reply {
         spans: Arc<Vec<Vec<Span>>>,
         truncated: bool,
     },
+    /// Whether the refs, HEAD or the working tree changed since the history
+    /// was last read.
+    Probe {
+        changed: bool,
+    },
     Search {
         query: String,
         hits: Arc<Vec<SearchHit>>,
@@ -95,6 +103,7 @@ pub(crate) struct Pending {
     detail: Option<(u64, Request)>,
     diff: Option<(u64, Request)>,
     search: Option<(u64, Request)>,
+    probe: Option<(u64, Request)>,
 }
 
 impl Pending {
@@ -111,6 +120,7 @@ impl Pending {
                 self.diff = Some((generation, request));
             }
             Request::Search(_) => self.search = Some((generation, request)),
+            Request::Probe => self.probe = Some((generation, request)),
         }
     }
 
@@ -121,6 +131,7 @@ impl Pending {
             self.detail.take(),
             self.diff.take(),
             self.search.take(),
+            self.probe.take(),
         ]
         .into_iter()
         .flatten()
@@ -243,6 +254,10 @@ struct State<'a> {
     folder: &'a str,
     repo: Option<Repo>,
     loaded: Option<Loaded>,
+    /// Checks the repository while its tab is shown; made at the first.
+    prober: Option<Prober>,
+    /// The repository's fingerprint when the history was last read.
+    fingerprint: Option<String>,
 }
 
 /// What stops the thread's scripts: closing the tab stops all of them, a
@@ -266,6 +281,8 @@ fn run(
         folder,
         repo: None,
         loaded: None,
+        prober: None,
+        fingerprint: None,
     };
     while woken.recv().is_ok() {
         let batch = pending
@@ -347,6 +364,12 @@ impl State<'_> {
             Request::More if self.loaded.is_some() => self.more(cancelled),
             Request::Load | Request::More => self.load(cancelled),
             Request::Search(query) => self.search(query, cancelled),
+            Request::Probe => {
+                let now = self.fingerprint(cancelled)?;
+                let changed = self.fingerprint.as_ref().is_some_and(|then| *then != now);
+                self.fingerprint = Some(now);
+                Ok(Reply::Probe { changed })
+            }
         }
     }
 
@@ -369,7 +392,25 @@ impl State<'_> {
         })
     }
 
+    /// The repository's fingerprint now; a failed check gives up its
+    /// shell, so the next one connects afresh.
+    fn fingerprint(&mut self, cancelled: &AtomicBool) -> Result<String> {
+        let root = self.repo(cancelled)?.root().to_owned();
+        if self.prober.is_none() {
+            self.prober = Some(Prober::new(self.host)?);
+        }
+        let prober = self.prober.as_mut().ok_or(Error::WorkerStopped)?;
+        let fingerprint = prober.fingerprint(&root, cancelled);
+        if fingerprint.is_err() {
+            self.prober = None;
+        }
+        fingerprint
+    }
+
     fn load(&mut self, cancelled: &AtomicBool) -> Result<Reply> {
+        // Taken first, so a change made while the history is read shows at
+        // the next check.
+        self.fingerprint = self.fingerprint(cancelled).ok();
         let repo = self.repo(cancelled)?;
         let snapshot = repo.snapshot(cancelled)?;
         let page = repo.page(&snapshot, 0, cancelled)?;

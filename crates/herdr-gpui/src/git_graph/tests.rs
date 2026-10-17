@@ -20,6 +20,7 @@ mod detail;
 mod git;
 mod keys;
 mod layout;
+mod live;
 mod prefs;
 #[cfg(unix)]
 mod readonly;

@@ -10,6 +10,7 @@ mod rows;
 mod search;
 mod worktree;
 
+pub(crate) use super::live::Liveness;
 #[cfg(test)]
 pub(crate) use chips::chip_icons;
 #[cfg(test)]
@@ -20,6 +21,7 @@ use super::{
     error::Error,
     geometry::{ROW_H, graph_width},
     history::History,
+    live::{LOCAL_EVERY, REMOTE_EVERY},
     prefs::{GraphPrefs, GraphPrefsStore},
     worker::{Reply, Request, Worker},
 };
@@ -36,6 +38,7 @@ use std::{
     collections::{HashMap, HashSet},
     rc::Rc,
     sync::Arc,
+    time::Instant,
 };
 
 /// Rows from the end at which the next page is asked for.
@@ -97,6 +100,14 @@ pub(crate) struct GitGraphView {
     search: Option<search::Search>,
     /// The commits the search found, marked in their rows.
     matches: HashSet<String>,
+    /// Whether the tab is shown in a visible window; hidden tabs ask nothing.
+    visible: bool,
+    /// When the next live check is due, once the history is in.
+    next_probe: Option<Instant>,
+    /// The live check still out, by generation.
+    probe: Option<u64>,
+    /// The last live check failed.
+    probe_failed: bool,
 }
 
 /// The headline for a failure, on this machine or the SSH host `remote`.
@@ -202,6 +213,10 @@ impl GitGraphView {
             search_input,
             search: None,
             matches: HashSet::new(),
+            visible: true,
+            next_probe: None,
+            probe: None,
+            probe_failed: false,
         };
         view.send(Request::Load);
         view
@@ -231,12 +246,83 @@ impl GitGraphView {
         self.connection
     }
 
+    pub(crate) fn liveness(&self) -> Liveness {
+        match (self.connection, self.probe_failed) {
+            (Connection::Offline, _) => Liveness::Offline,
+            (Connection::Online, true) => Liveness::Reconnecting,
+            (Connection::Online, false) => Liveness::Live,
+        }
+    }
+
     /// What the top bar's indicator says.
     pub(crate) fn indicator(&self) -> &'static str {
-        match self.connection {
-            Connection::Online => "live",
-            Connection::Offline => "offline",
+        match self.liveness() {
+            Liveness::Live => "live",
+            Liveness::Reconnecting => "reconnecting",
+            Liveness::Offline => "offline",
         }
+    }
+
+    /// Whether the tab is shown in a visible window; only then is the
+    /// repository checked.
+    pub(crate) fn set_visible(&mut self, visible: bool, _: &mut Context<Self>) {
+        self.visible = visible;
+    }
+
+    /// Asks whether the repository changed, every `LOCAL_EVERY` here and
+    /// `REMOTE_EVERY` on an SSH host, while shown and with nothing else out.
+    pub(crate) fn live_tick(&mut self, now: Instant) {
+        let idle = self.visible
+            && self.connection == Connection::Online
+            && self.history.is_some()
+            && !self.waiting
+            && self.probe.is_none();
+        if !idle {
+            return;
+        }
+        let every = if self.remote.is_some() {
+            REMOTE_EVERY
+        } else {
+            LOCAL_EVERY
+        };
+        match self.next_probe {
+            None => self.next_probe = Some(now + every),
+            Some(due) if now < due => {}
+            Some(_) => {
+                let generation = self.send(Request::Probe);
+                self.probe = (generation > 0).then_some(generation);
+                self.next_probe = Some(now + every);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn probe_now(&mut self, _: &mut Context<Self>) {
+        let generation = self.send(Request::Probe);
+        self.probe = (generation > 0).then_some(generation);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn last_probe(&self) -> Option<u64> {
+        self.probe
+    }
+
+    #[cfg(test)]
+    pub(crate) fn select_oid(&mut self, oid: &str) {
+        self.selected = Some(oid.to_owned());
+    }
+
+    /// A live check's answer: a change reads the repository again.
+    fn receive_probe(&mut self, generation: u64, changed: Result<bool, ()>) -> bool {
+        if self.probe != Some(generation) {
+            return false;
+        }
+        self.probe = None;
+        self.probe_failed = changed.is_err();
+        if changed == Ok(true) {
+            self.send(Request::Load);
+        }
+        true
     }
 
     #[cfg(test)]
@@ -255,6 +341,7 @@ impl GitGraphView {
         while let Some((generation, reply)) = self.worker.as_mut().and_then(Worker::try_recv) {
             changed |= self.receive(generation, reply, cx);
         }
+        self.live_tick(Instant::now());
         changed
     }
 
@@ -286,6 +373,10 @@ impl GitGraphView {
             Reply::Worktree(status) => self.receive_worktree(generation, status),
             Reply::Search { query, hits, more } => {
                 self.receive_search(generation, &query, hits, more, cx)
+            }
+            Reply::Probe { changed } => self.receive_probe(generation, Ok(changed)),
+            Reply::Failed(_) if self.probe == Some(generation) => {
+                self.receive_probe(generation, Err(()))
             }
             Reply::WorktreeDiff {
                 section,
@@ -330,6 +421,18 @@ impl GitGraphView {
         self.waiting = false;
         match history {
             Ok(history) => {
+                // The selection follows its commit; one rewritten away
+                // falls back to HEAD.
+                if self
+                    .selected
+                    .as_ref()
+                    .is_some_and(|oid| history.row_of(oid).is_none())
+                {
+                    self.selected = history
+                        .head
+                        .clone()
+                        .filter(|head| history.row_of(head).is_some());
+                }
                 self.history = Some(history);
                 self.error = None;
             }

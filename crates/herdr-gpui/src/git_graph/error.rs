@@ -9,6 +9,10 @@ pub enum Error {
     Host(#[from] crate::teleport::Error),
     #[error("A Git graph needs an absolute folder")]
     InvalidCheckout,
+    #[error("The live check of the repository failed")]
+    Live(#[source] Box<crate::Error>),
+    #[error("The live check of the repository did not finish")]
+    LiveCheck,
     #[error("This folder is not inside a Git repository")]
     NotARepository,
     #[error("Git {operation} gave output the graph could not read")]
