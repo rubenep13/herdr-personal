@@ -65,10 +65,6 @@ mod find;
 mod font_picker;
 mod fonts;
 mod git;
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the graph's rows draw the rest of the model")
-)]
 mod git_graph;
 mod github;
 mod group_menu;

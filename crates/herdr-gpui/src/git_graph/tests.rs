@@ -20,6 +20,7 @@ mod git;
 mod layout;
 #[cfg(unix)]
 mod readonly;
+mod rows;
 mod tab;
 mod text;
 mod worker;

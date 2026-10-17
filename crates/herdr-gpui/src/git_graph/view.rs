@@ -1,10 +1,19 @@
 //! A Git graph tab's view: it asks its worker for the history and draws what
 //! comes back. It knows nothing of tabs; the window feeds it from its tick.
 
+mod chips;
+mod lanes;
+mod rows;
+
+#[cfg(test)]
+pub(crate) use chips::chip_icons;
+
 use super::{
     checkout::GraphCheckout,
     error::Error,
+    geometry::{ROW_H, graph_width},
     history::History,
+    prefs::GraphPrefs,
     worker::{Reply, Request, Worker},
 };
 use crate::{
@@ -13,10 +22,10 @@ use crate::{
     teleport::Host,
 };
 use gpui::{prelude::*, *};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-/// hgg's row height.
-const ROW_HEIGHT: f32 = 30.;
+/// Rows from the end at which the next page is asked for.
+const MORE_WITHIN: usize = 50;
 
 /// What the view draws with; the window replaces it when settings change.
 #[derive(Clone, Debug)]
@@ -30,6 +39,7 @@ pub(crate) struct GitGraphView {
     checkout: GraphCheckout,
     pub(crate) focus_handle: FocusHandle,
     look: GraphLook,
+    prefs: GraphPrefs,
     scroll: UniformListScrollHandle,
     /// `None` when the host cannot run scripts; `error` says why.
     worker: Option<Worker>,
@@ -38,6 +48,10 @@ pub(crate) struct GitGraphView {
     waiting: bool,
     history: Option<Arc<History>>,
     error: Option<Arc<Error>>,
+    /// Shaped label widths, by label; cleared when the font changes.
+    chip_widths: HashMap<SharedString, f32>,
+    /// The label the pointer is over, shown whole above the others.
+    hovered_chip: Option<(usize, usize)>,
 }
 
 /// The headline for a failure the tab shows instead of rows.
@@ -70,11 +84,14 @@ impl GitGraphView {
             checkout,
             focus_handle: cx.focus_handle(),
             look,
+            prefs: GraphPrefs::default(),
             scroll: UniformListScrollHandle::new(),
             worker,
             latest: (latest, Request::Load),
             history: None,
             error,
+            chip_widths: HashMap::new(),
+            hovered_chip: None,
         }
     }
 
@@ -123,10 +140,30 @@ impl GitGraphView {
         }
     }
 
+    /// Asks for the next page once the rows drawn come near the end, one
+    /// request at a time.
+    fn more_if_near_the_end(&mut self, drawn_to: usize) {
+        let Some(history) = &self.history else {
+            return;
+        };
+        if history.has_more && !self.waiting && drawn_to + MORE_WITHIN >= history.commits.len() {
+            self.send(Request::More);
+        }
+    }
+
     /// Reads the repository again.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the r key and the reload button ask for it")
+    )]
     pub(crate) fn reload(&mut self, cx: &mut Context<Self>) {
         self.send(Request::Load);
         cx.notify();
+    }
+
+    #[cfg_attr(not(test), expect(dead_code, reason = "keys move the selection"))]
+    pub(crate) fn scroll_to_row(&mut self, row: usize) {
+        self.scroll.scroll_to_item(row, ScrollStrategy::Top);
     }
 
     pub(crate) fn set_look(&mut self, look: GraphLook, cx: &mut Context<Self>) {
@@ -138,13 +175,42 @@ impl GitGraphView {
         {
             return;
         }
+        if look.ui.family != self.look.ui.family {
+            self.chip_widths.clear();
+        }
         self.look = look;
         cx.notify();
+    }
+
+    /// The graph column's width: chosen, or fitted to the lanes.
+    fn graph_width(&self) -> f32 {
+        let lanes = self
+            .history
+            .as_ref()
+            .map_or(1, |history| history.layout.lane_count);
+        self.prefs.graph_width.unwrap_or_else(|| graph_width(lanes))
+    }
+
+    /// Which of `row`'s labels fit in the label column.
+    #[cfg(test)]
+    pub(crate) fn chip_fit(
+        &mut self,
+        row: usize,
+        window: &mut Window,
+    ) -> Option<super::chips::ChipFit> {
+        let history = self.history.clone()?;
+        let chips = history.chips.get(&history.commits.get(row)?.oid)?;
+        Some(self.fit(chips, window))
     }
 
     #[cfg(test)]
     pub(crate) fn generation(&self) -> u64 {
         self.latest.0
+    }
+
+    #[cfg(test)]
+    pub(crate) fn last_request(&self) -> (u64, Request) {
+        self.latest
     }
 
     #[cfg(test)]
@@ -182,37 +248,6 @@ impl GitGraphView {
             })
             .into_any_element()
     }
-
-    fn render_row(&self, history: &History, row: usize) -> AnyElement {
-        let theme = &self.look.theme;
-        let Some(commit) = history.commits.get(row) else {
-            return div().into_any_element();
-        };
-        div()
-            .id(("graph-row", row))
-            .debug_selector(move || format!("graph-row-{row}"))
-            .h(px(ROW_HEIGHT))
-            .px_3()
-            .flex()
-            .items_center()
-            .gap_2()
-            .overflow_hidden()
-            .child(
-                div()
-                    .flex_none()
-                    .text_color(rgb(theme.muted))
-                    .text_font(&self.look.mono)
-                    .child(commit.oid.chars().take(7).collect::<String>()),
-            )
-            .child(
-                div()
-                    .min_w_0()
-                    .truncate()
-                    .text_color(rgb(theme.foreground))
-                    .child(commit.subject.clone()),
-            )
-            .into_any_element()
-    }
 }
 
 impl Focusable for GitGraphView {
@@ -233,20 +268,32 @@ impl Render for GitGraphView {
             (Some(history), _) if history.commits.is_empty() => {
                 self.render_message("No commits yet", None)
             }
-            (Some(history), _) => uniform_list(
-                "graph-rows",
-                history.commits.len(),
-                cx.processor(|this, range: std::ops::Range<usize>, _, _| {
-                    let Some(history) = this.history.clone() else {
-                        return Vec::new();
-                    };
-                    range.map(|row| this.render_row(&history, row)).collect()
-                }),
-            )
-            .track_scroll(&self.scroll)
-            .flex_1()
-            .min_h_0()
-            .into_any_element(),
+            (Some(history), _) => div()
+                .flex_1()
+                .min_h_0()
+                .flex()
+                .flex_col()
+                .child(self.render_columns())
+                .child(
+                    uniform_list(
+                        "graph-rows",
+                        history.commits.len(),
+                        cx.processor(|this, range: std::ops::Range<usize>, window, cx| {
+                            this.more_if_near_the_end(range.end);
+                            let Some(history) = this.history.clone() else {
+                                return Vec::new();
+                            };
+                            let now = chrono::Utc::now().timestamp();
+                            range
+                                .map(|row| this.render_row(&history, row, now, window, cx))
+                                .collect()
+                        }),
+                    )
+                    .track_scroll(&self.scroll)
+                    .flex_1()
+                    .min_h_0(),
+                )
+                .into_any_element(),
         };
         div()
             .id("git-graph")
@@ -255,10 +302,12 @@ impl Render for GitGraphView {
             .size_full()
             .flex()
             .flex_col()
+            .overflow_hidden()
             .bg(rgb(theme.background))
             .text_color(rgb(theme.foreground))
             .text_font(&self.look.ui)
             .text_size(px(self.look.ui.size))
+            .line_height(px(ROW_H))
             .child(body)
     }
 }

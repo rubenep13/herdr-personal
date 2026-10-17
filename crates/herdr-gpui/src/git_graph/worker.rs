@@ -24,7 +24,6 @@ pub(crate) enum Request {
     /// Read the refs and the first page again.
     Load,
     /// Read the next page.
-    #[expect(dead_code, reason = "scrolling near the end asks for it")]
     More,
 }
 

@@ -134,6 +134,7 @@ impl Repo {
         Ok(Self { host, root })
     }
 
+    #[cfg_attr(not(test), expect(dead_code, reason = "the tab's header names it"))]
     pub(crate) fn root(&self) -> &str {
         &self.root
     }

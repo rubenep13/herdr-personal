@@ -72,3 +72,18 @@ pub(crate) fn relative_time(at: i64, now: i64) -> String {
     }
     plural(days / 365, "year")
 }
+
+/// The local date and time of `at`, seconds since the Unix epoch, as the
+/// tooltips and the detail show it; empty for an unknown date.
+pub(crate) fn full_date(at: i64) -> String {
+    if at <= 0 {
+        return String::new();
+    }
+    chrono::DateTime::from_timestamp(at, 0)
+        .map(|time| {
+            time.with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string()
+        })
+        .unwrap_or_default()
+}

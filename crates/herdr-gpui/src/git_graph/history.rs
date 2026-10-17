@@ -18,15 +18,12 @@ use std::{
 const LONG: usize = 64;
 
 #[derive(Debug, Default)]
-#[expect(
-    dead_code,
-    reason = "the graph's rows draw the labels, HEAD and paging"
-)]
 pub(crate) struct History {
     /// The rows, child before parent, with the uncommitted changes first.
     pub(crate) commits: Vec<Commit>,
     pub(crate) layout: Layout,
     pub(crate) chips: HashMap<String, Vec<Chip>>,
+    #[expect(dead_code, reason = "the h key selects HEAD")]
     pub(crate) head: Option<String>,
     pub(crate) worktree: Option<WorktreeCounts>,
     pub(crate) has_more: bool,
@@ -112,6 +109,10 @@ impl History {
         }
     }
 
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "selection follows a commit across reloads")
+    )]
     pub(crate) fn row_of(&self, oid: &str) -> Option<usize> {
         self.rows.get(oid).copied()
     }
