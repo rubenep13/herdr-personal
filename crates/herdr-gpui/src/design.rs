@@ -14,6 +14,11 @@ pub(crate) const AGENT_DETAILS_HEIGHT: f32 = 60.;
 /// How far a selected row's fill keeps from the sidebar's edges.
 pub(crate) const SELECTION_INSET: f32 = 8.;
 pub(crate) const SELECTION_RADIUS: f32 = 8.;
+/// The sidebar's header and the main header beside it.
+pub(crate) const HEADER_HEIGHT: f32 = 48.;
+/// A square chrome button holding one icon, and its corners.
+pub(crate) const ICON_BUTTON: f32 = 28.;
+pub(crate) const ICON_BUTTON_RADIUS: f32 = 7.;
 
 /// Text sizes of the main window's chrome, in logical pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]

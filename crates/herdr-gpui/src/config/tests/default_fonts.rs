@@ -121,7 +121,7 @@ fn resolution_replaces_missing_platform_defaults_only() -> anyhow::Result<()> {
         PLATFORM_FONTS.sans
     };
     assert_eq!(config.sidebar.family, monospace);
-    assert_eq!(config.tabs.family, monospace);
+    assert_eq!(config.tabs.family, sans);
     assert_eq!(config.terminal.family, "Iosevka");
     assert_eq!(config.ui.family, sans);
     // Defaults themselves are untouched; only the loaded copy is resolved.

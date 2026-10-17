@@ -194,6 +194,10 @@ fn a_tabs_close_button_in_a_split_closes_the_tab_through_its_confirmation(cx: &m
         })
     });
     draw(cx);
+    // An inactive tab shows its cross under the pointer.
+    let tab = cx.debug_bounds("tab-t1").unwrap();
+    cx.simulate_mouse_move(tab.center(), None, Modifiers::none());
+    draw(cx);
     let close = cx.debug_bounds("close-tab-t1").unwrap();
     cx.simulate_click(close.center(), Modifiers::none());
     draw(cx);

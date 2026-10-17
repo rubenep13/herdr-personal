@@ -66,7 +66,12 @@ impl HerdrWindow {
         tabs.into_iter()
             .map(|tab| {
                 let id = tab.id;
-                let (background, text) = self.tab_colors(shown == Some(id), slot.id);
+                let selected = shown == Some(id);
+                let text = if selected {
+                    self.theme.foreground
+                } else {
+                    self.theme.muted
+                };
                 // The VS Code tab bears its mark; a review tab shows a diff,
                 // a code tab a file, and the overview devices, not a page.
                 let icon = match tab.location {
@@ -82,18 +87,9 @@ impl HerdrWindow {
                     .debug_selector(move || slot.selector(&format!("browser-tab-{id}")))
                     .pl(px(10.))
                     .pr(px(3.))
-                    .py(px(2.))
                     .min_w(px(crate::TAB_WIDTH))
                     .map(|tab| self.grow_tab(tab, slot.id, &Pick::Page(id)))
-                    .border_r_1()
-                    .border_color(rgb(self.theme.active))
-                    .flex_none()
-                    .flex()
-                    .items_center()
                     .gap(px(6.))
-                    .cursor_pointer()
-                    .bg(rgb(background))
-                    .text_color(rgb(text))
                     // A page's own icon stands in for the globe.
                     .child(match self.tab_favicon(id).filter(|_| icon == GLOBE) {
                         Some(favicon) => img(favicon)
@@ -138,7 +134,10 @@ impl HerdrWindow {
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.show_browser_tab_in(Some(slot.id), id, window, cx);
                     }));
-                (id, tab)
+                (
+                    id,
+                    self.tab_shell(tab, slot, &format!("browser-{id}"), selected),
+                )
             })
             .collect()
     }

@@ -112,9 +112,8 @@ fn new_space_button_targets_its_host(cx: &mut gpui::TestAppContext) {
     let row = cx.debug_bounds("host-ssh:test").unwrap();
     cx.simulate_mouse_move(row.center(), None, Modifiers::none());
     draw(cx);
-    let button = cx
-        .debug_bounds("host-new-space-ssh:test")
-        .expect("the hovered host shows its new space button");
+    // The hovered host shows its new space button.
+    let button = cx.debug_bounds("host-new-space-ssh:test").unwrap();
     let fold = cx.debug_bounds("host-fold-ssh:test").unwrap();
     assert!(button.right() <= row.right() && fold.right() <= row.right());
     cx.simulate_click(button.center(), Modifiers::none());

@@ -1,10 +1,10 @@
 //! Native chrome and GitHub account access.
 mod decorations;
+mod main_header;
 mod navigation;
+mod sidebar_tools;
 mod status;
 mod tabs;
-
-pub(crate) use tabs::{Ends, strip_height};
 
 pub(crate) use decorations::controls;
 pub(crate) use decorations::frame;
@@ -214,43 +214,6 @@ impl HerdrWindow {
         )
     }
 
-    pub(super) fn render_titlebar(
-        &self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        // The toggle leads the bar so it stays put whether or not the sidebar
-        // below it is showing, and can always bring the sidebar back. Back
-        // and Forward follow it, as in Finder and Files.
-        let leading = div()
-            .flex()
-            .flex_none()
-            .items_center()
-            .h_full()
-            .child(self.sidebar_toggle(cx))
-            .when(
-                f32::from(window.viewport_size().width) >= NAVIGATION_MIN_WIDTH,
-                |leading| leading.child(self.navigation(cx)),
-            )
-            .into_any_element();
-        render(
-            self.fill().tint(bar(self.theme.surface)),
-            Some(leading),
-            window,
-        )
-        .child(
-            div()
-                .debug_selector(|| "titlebar-center".into())
-                .flex_1()
-                .min_w_0()
-                .h_full()
-                .when(self.config.usage.topbar, |center| {
-                    center.child(status::render(&self.live, &self.config.ui, &self.theme))
-                }),
-        )
-        .child(self.titlebar_end(window, cx))
-    }
-
     fn sidebar_toggle(&self, cx: &mut Context<Self>) -> AnyElement {
         div()
             .id("toggle-sidebar")
@@ -345,11 +308,10 @@ impl HerdrWindow {
                             ),
                     ),
             )
-            .when(!cfg!(target_os = "linux"), |end| {
-                end.children(controls(window, &self.theme, |window, _| {
-                    window.remove_window();
-                }))
-            })
+            // Linux drew these in its menu bar, which the menu button replaced.
+            .children(controls(window, &self.theme, |window, _| {
+                window.remove_window();
+            }))
     }
 }
 
@@ -583,29 +545,22 @@ mod tests {
                 window.refresh();
                 let _ = window.draw(cx);
             });
-            let menu_bottom = cx
-                .debug_bounds("application-menu-bar")
-                .map_or(px(0.), |bar| bar.bottom());
-            assert_eq!(
-                cx.debug_bounds("titlebar").unwrap(),
-                Bounds::new(point(px(0.), menu_bottom), size(px(width), px(34.)))
-            );
+            // The main header runs from the sidebar's edge to the window's,
+            // its avatar centred in the account slot at its end.
+            let header = cx.debug_bounds("titlebar").unwrap();
+            let height = px(crate::design::HEADER_HEIGHT);
+            assert_eq!((header.top(), header.right()), (px(0.), px(width)));
+            assert_eq!(header.size.height, height);
             assert_eq!(
                 cx.debug_bounds("titlebar-avatar").unwrap(),
                 Bounds::new(
-                    point(px(width - 34.), menu_bottom + px(3.)),
+                    // Centred above the header's bottom line.
+                    point(px(width - 34.), (height - px(1.) - px(28.)) / 2.),
                     size(px(28.), px(28.))
                 )
             );
-            let banner_height = if env!("HERDR_BUILD_WORKTREE") == "1" {
-                22.
-            } else {
-                0.
-            };
-            assert_eq!(
-                cx.debug_bounds("window-body").unwrap().top(),
-                menu_bottom + px(34. + banner_height)
-            );
+            // Both columns start at the window's top, each with its header.
+            assert_eq!(cx.debug_bounds("window-body").unwrap().top(), px(0.));
         }
         let bounds = cx.debug_bounds("titlebar-avatar").unwrap();
         cx.simulate_event(MouseDownEvent {

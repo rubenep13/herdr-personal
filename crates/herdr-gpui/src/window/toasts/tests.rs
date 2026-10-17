@@ -203,7 +203,9 @@ fn notifications_honor_all_corners_and_global_card_limit(cx: &mut TestAppContext
             position,
             ToastHerdrPosition::TopLeft | ToastHerdrPosition::TopRight
         ) {
-            assert_eq!(bounds.top(), px(72.));
+            // Under the main header and the tab strip, clear of the tabs.
+            let chrome = view.read_with(cx, |view, _| view.chrome_top());
+            assert_eq!(bounds.top(), px(chrome + 8.));
         } else {
             assert_eq!(bounds.bottom(), px(564.));
         }

@@ -18,7 +18,7 @@ use super::{
     workspaces::{displayed_workspace_status, workspace_badge, workspace_label, workspace_note},
 };
 use crate::{
-    Command, HerdrWindow, NavigationTarget,
+    HerdrWindow, NavigationTarget,
     config::{FontConfig, Theme},
     fonts::StyledFont,
 };
@@ -26,6 +26,7 @@ use gpui::{prelude::*, *};
 
 mod agent_rows;
 mod device_tree;
+mod footer;
 mod hierarchy;
 mod ports;
 pub(super) use hierarchy::{pinned_block, space_nest};
@@ -717,29 +718,20 @@ impl HerdrWindow {
                     })
                     .min_h_0()
                     .overflow_hidden()
-                    // With search on, the heading is its field.
-                    .child(
-                        searchable
-                            .then_some(super::search::Heading::Spaces)
-                            .or(tree_search.then_some(if nested {
-                                super::search::Heading::Tree
-                            } else {
-                                super::search::Heading::DeviceTree
-                            }))
-                            .and_then(|heading| self.search_heading(heading, look, window, cx))
-                            .unwrap_or_else(|| {
-                                header(
-                                    match (devices, nested) {
-                                        (true, _) => "devices",
-                                        (_, true) => "tree",
-                                        _ => "spaces",
-                                    },
-                                    font,
-                                    theme,
-                                    look,
-                                )
-                            }),
-                    )
+                    // With search on, the heading is its field. The tree has
+                    // none: its search lives in the sidebar's header.
+                    .when(!nested, |section| {
+                        section.child(
+                            searchable
+                                .then_some(super::search::Heading::Spaces)
+                                .or(tree_search.then_some(super::search::Heading::DeviceTree))
+                                .and_then(|heading| self.search_heading(heading, look, window, cx))
+                                .unwrap_or_else(|| {
+                                    let label = if devices { "devices" } else { "spaces" };
+                                    header(label, font, theme, look)
+                                }),
+                        )
+                    })
                     // The wrapper clips the pinned header as the next host's
                     // pushes it up, so it never paints over the title above.
                     .child(
@@ -755,42 +747,8 @@ impl HerdrWindow {
                                 None => list.child(spaces).children(pinned_host),
                             }),
                     )
-                    .child(
-                        div()
-                            .flex_none()
-                            .h(px(line_height(font) + 2. * layout.footer_padding()))
-                            .px(px(content_x))
-                            .flex()
-                            .items_center()
-                            // Menu hugs the sidebar's edge, as in the terminal client.
-                            .justify_between()
-                            .text_color(rgb(theme.muted))
-                            .gap(px(20.))
-                            .child(
-                                div()
-                                    .id("new-workspace")
-                                    .cursor_pointer()
-                                    .hover(|s| s.text_color(rgb(theme.foreground)))
-                                    .child("new")
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.command(Command::Workspace, window, cx)
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .id("sidebar-menu")
-                                    .debug_selector(|| "sidebar-menu".into())
-                                    .cursor_pointer()
-                                    .hover(|s| s.text_color(rgb(theme.foreground)))
-                                    .child(label_text("menu"))
-                                    .on_click(cx.listener(
-                                        |this, event: &ClickEvent, window, cx| {
-                                            this.menu.anchor = event.position();
-                                            this.open_menu(window, cx);
-                                        },
-                                    )),
-                            ),
-                    ),
+                    // The tree's host + and space ⋯ buttons stand in for these.
+                    .when(!nested, |section| section.child(self.list_footer(look, cx))),
             )
             .when(agents_panel, |sidebar| {
                 sidebar

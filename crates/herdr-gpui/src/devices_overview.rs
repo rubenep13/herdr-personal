@@ -190,7 +190,12 @@ impl HerdrWindow {
             self.devices_overview.tree_search = None;
             return;
         }
-        let font = self.config.sidebar.clone();
+        // The Tree reads in the interface face, its search included.
+        let font = if mode.nests_agents() {
+            self.config.ui.clone()
+        } else {
+            self.config.sidebar.clone()
+        };
         match &self.devices_overview.tree_search {
             Some(search) => {
                 let theme = self.theme.clone();

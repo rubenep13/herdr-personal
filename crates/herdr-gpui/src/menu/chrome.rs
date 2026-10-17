@@ -178,7 +178,7 @@ impl HerdrWindow {
 
     pub(crate) fn render_menu(&self, window: &Window, cx: &mut Context<Self>) -> Stateful<Div> {
         if self.menu.page == Some(Page::Application) {
-            return self.render_application_menu(window, cx);
+            return self.render_application_menu(cx);
         }
         if self.menu.page == Some(Page::Sessions) && self.menu.session_edit.is_some() {
             let theme = &self.theme;

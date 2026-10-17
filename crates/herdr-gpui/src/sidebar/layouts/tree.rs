@@ -208,7 +208,7 @@ fn titles(
 
 /// The text tokens Herdr's agent rows add beyond what the row already names:
 /// its own `$tokens` and terminal titles, such as a model and a summary.
-fn details<'a>(lines: &'a [Vec<super::super::tokens::ResolvedToken>]) -> Vec<&'a SharedString> {
+fn details(lines: &[Vec<super::super::tokens::ResolvedToken>]) -> Vec<&SharedString> {
     lines
         .iter()
         .flatten()

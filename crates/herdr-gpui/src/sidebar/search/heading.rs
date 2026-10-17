@@ -158,6 +158,94 @@ impl HerdrWindow {
         )
     }
 
+    /// The Tree's search as the sidebar's header shows it: a field while it
+    /// holds the keyboard or a query, and nothing otherwise, when the header
+    /// shows its button instead. Escape empties it and closes it.
+    pub(crate) fn tree_header_search(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<Stateful<Div>> {
+        let input = self.heading_input(Heading::Tree)?.clone();
+        let theme = &self.theme;
+        let (focus, typed) = {
+            let input = input.read(cx);
+            (input.focus.clone(), !input.text().is_empty())
+        };
+        if !typed && !focus.is_focused(window) {
+            return None;
+        }
+        input.update(cx, |input, cx| {
+            input.set_placeholder(Heading::Tree.placeholder(), cx)
+        });
+        Some(
+            div()
+                .id(Heading::Tree.selector())
+                .debug_selector(|| Heading::Tree.selector().into())
+                .flex_1()
+                .min_w_0()
+                .h(px(30.))
+                .flex()
+                .items_center()
+                .gap(px(8.))
+                .px(px(10.))
+                .rounded(px(crate::design::SELECTION_RADIUS))
+                .bg(rgb(theme.background))
+                .border_1()
+                .border_color(rgb(theme.active))
+                .cursor(CursorStyle::IBeam)
+                // The header moves the window; the field must not.
+                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                    cx.stop_propagation();
+                    window.focus(&focus, cx);
+                })
+                .on_key_down(
+                    cx.listener(|this, event, window, cx| this.device_tree_key(event, window, cx)),
+                )
+                .child(
+                    svg()
+                        .path("icons/search.svg")
+                        .size(px(14.))
+                        .flex_none()
+                        .text_color(rgb(theme.muted)),
+                )
+                .child(div().flex_1().min_w_0().child(input))
+                .when(typed, |field| {
+                    field.child(
+                        div()
+                            .id("sidebar-search-clear")
+                            .debug_selector(|| "sidebar-search-clear".into())
+                            .flex_none()
+                            .size(px(20.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(corners::SMALL))
+                            .cursor_pointer()
+                            .hover(|style| style.bg(rgb(theme.active)))
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.clear_heading_search(Heading::Tree, window, cx);
+                            }))
+                            .child(
+                                svg()
+                                    .path("icons/x.svg")
+                                    .size(px(12.))
+                                    .text_color(rgb(theme.muted)),
+                            ),
+                    )
+                }),
+        )
+    }
+
+    /// Gives the Tree's search the keyboard, which opens its field.
+    pub(crate) fn focus_tree_search(&self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(input) = self.heading_input(Heading::Tree) {
+            let focus = input.read(cx).focus.clone();
+            window.focus(&focus, cx);
+            cx.notify();
+        }
+    }
+
     /// Empties `heading`'s field and gives the keyboard back to the terminal.
     pub(in crate::sidebar) fn clear_heading_search(
         &mut self,

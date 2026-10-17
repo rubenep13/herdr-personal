@@ -338,11 +338,11 @@ size = 12
 # "Mac mini" = "#5a3a3a"
 
 [tabs]
-# Default: "Menlo" on macOS, "Cascadia Mono" on Windows (Consolas when
-# missing), "DejaVu Sans Mono" on Linux (or an installed monospace family such
-# as JetBrains Mono when DejaVu is missing).
-# family = "DejaVu Sans Mono"
-size = 12
+# Default: the [ui] family: ".SystemUIFont" on macOS and Windows, "Adwaita
+# Sans" on Linux (or the first installed of Inter, DejaVu Sans, and Noto Sans
+# when it is missing).
+# family = "Adwaita Sans"
+size = 13
 # fallback = ["Symbols Nerd Font Mono"]
 # What each tab shows besides its name: "name" (nothing more), "agent" (its
 # agent's logo, or a terminal icon for a tab without one), or "status" (the

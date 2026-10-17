@@ -110,8 +110,9 @@ fn steps(
 #[gpui::test]
 fn agents_nest_under_their_space_under_their_host(cx: &mut gpui::TestAppContext) {
     let (_view, cx) = tree_window(cx, true);
-    assert!(cx.debug_bounds("header-tree").is_some());
-    assert!(cx.debug_bounds("tree-search").is_some());
+    // The search waits behind its button in the sidebar's header.
+    assert!(cx.debug_bounds("header-tree").is_none());
+    assert!(cx.debug_bounds("sidebar-search-button").is_some());
     // The agents sit in the tree, so the separate panel is gone.
     assert!(cx.debug_bounds("header-agents").is_none());
     assert!(cx.debug_bounds("agents-section").is_none());

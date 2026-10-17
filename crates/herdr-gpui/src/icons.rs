@@ -249,6 +249,7 @@ embedded_icons! {
     "globe.svg",
     "keyboard.svg",
     "lock.svg",
+    "menu.svg",
     "more.svg",
     "network/tailscale.svg",
     "note.svg",

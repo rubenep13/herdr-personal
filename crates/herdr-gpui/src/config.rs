@@ -446,9 +446,9 @@ impl Default for Config {
             sound: SoundConfig::default(),
             status_bar: StatusBar::default(),
             status_icons: None,
-            // Tabs are terminal chrome, so they read in the monospace face the
-            // sidebar and terminal use, as they do in the reference UI.
-            tabs: font(monospace, 12.0),
+            // Tabs name what the window shows, so they read in the interface
+            // face at the main window's name size, as its header does.
+            tabs: font(ui, 13.0),
             tabs_style: TabsStyle::default(),
             terminal: font(monospace, 14.0),
             terminal_padding: Padding::default(),

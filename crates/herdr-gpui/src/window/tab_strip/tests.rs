@@ -1,31 +1,17 @@
 #![allow(clippy::unwrap_used)]
 
 use super::*;
-use crate::sidebar::STATUS_WIDTH;
 use core::prelude::v1::test;
 use std::sync::Arc;
 
 #[gpui::test]
-fn a_tab_leads_its_title_with_its_status_dot_unless_unknown(cx: &mut TestAppContext) {
-    status_layout(cx, None, crate::config::Config::default().tabs.size);
+fn a_tab_leads_its_title_with_its_state_when_asked(cx: &mut TestAppContext) {
+    status_layout(cx, crate::config::Config::default().tabs.size);
 }
 
 #[gpui::test]
-fn shared_custom_dots_keep_the_tab_label_centered(cx: &mut TestAppContext) {
-    status_layout(
-        cx,
-        Some("[ui]\nstatus_indicators = 'dots'\n[theme.custom]\nyellow = '#123456'\n"),
-        19.,
-    );
-}
-
-#[gpui::test]
-fn shared_symbols_extend_the_tab_without_displacing_its_label(cx: &mut TestAppContext) {
-    status_layout(
-        cx,
-        Some("[ui]\nstatus_indicators = 'symbols'\n[theme.custom]\nyellow = '#ff9900'\n"),
-        19.,
-    );
+fn a_larger_tab_font_keeps_the_lead_and_label_in_the_measured_width(cx: &mut TestAppContext) {
+    status_layout(cx, 19.);
 }
 
 /// A zoomed tab carries its mark after the title, inside the width
@@ -62,35 +48,39 @@ fn zoomed_tab_shows_its_mark_within_its_width(cx: &mut TestAppContext) {
     assert!((mark.center().y - tab.center().y).abs() <= px(0.5));
     let (zoomed, unzoomed) = cx.update(|window, cx| {
         let view = view.read(cx);
-        let indicators = Indicators::new(None, None, false, &view.theme);
-        let label = view.live.snapshot.as_ref().unwrap().tabs[0].label.clone();
-        let lead = Lead::of(view.live.snapshot.as_ref().unwrap().tabs[0].agent_status);
+        let first = &view.live.snapshot.as_ref().unwrap().tabs[0];
+        let label = first.label.clone();
+        let lead = view.tab_lead_kind(first);
         (
-            view.tab_width(&label.clone().into(), lead, true, indicators, window),
-            view.tab_width(&label.into(), lead, false, indicators, window),
+            view.tab_width(&label.clone().into(), lead, true, window),
+            view.tab_width(&label.into(), lead, false, window),
         )
     });
-    assert_eq!(zoomed - unzoomed, DOT_GAP + ZOOM_ICON);
+    assert_eq!(
+        zoomed - unzoomed,
+        super::super::tab_look::LEAD_GAP + ZOOM_ICON
+    );
     assert!((tab.size.width - px(zoomed)).abs() <= px(0.5), "{tab:?}");
 }
 
-fn status_layout(cx: &mut TestAppContext, settings: Option<&str>, font_size: f32) {
+/// With `[tabs] content = "status"`, a tab Claude runs in leads with its
+/// state and mark, a terminal tab with its mark alone, and each tab's
+/// measured width holds what it draws.
+fn status_layout(cx: &mut TestAppContext, font_size: f32) {
     let label = "a title long enough to outgrow the narrowest tab";
     let (view, cx) = cx.add_window_view(|window, cx| {
         let mut view = crate::sidebar::layout_tests::fixture_window(window, cx);
-        view.settings.shared =
-            settings.map(|text| crate::herdr_settings::Settings::parse_text(text).unwrap());
         view.config.tabs.size = font_size;
+        view.config.tabs_style.content = crate::config::TabContent::Status;
         let mut snapshot: herdr_client::protocol::ClientShellSnapshot = serde_json::from_str(
             include_str!("../../../../herdr-protocol/tests/fixtures/endpoint-snapshot-v1.json"),
         )
         .unwrap();
         snapshot.tabs[0].label = label.into();
-        assert_eq!(snapshot.tabs[0].agent_status, AgentStatus::Working);
         let mut plain = snapshot.tabs[0].clone();
         plain.tab_id = "plain".into();
+        plain.label = label.into();
         plain.focused = false;
-        plain.agent_status = AgentStatus::Unknown;
         snapshot.tabs.push(plain);
         view.live.snapshot = Some(Arc::new(snapshot));
         view
@@ -103,40 +93,35 @@ fn status_layout(cx: &mut TestAppContext, settings: Option<&str>, font_size: f32
     // Layout snaps to device pixels, so edges agree within half of one.
     let near = |a: Pixels, b: Pixels| (a - b).abs() <= px(0.5);
     let tab = cx.debug_bounds("tab-w1:t1").unwrap();
-    let dot = cx.debug_bounds("tab-status-w1:t1").unwrap();
-    let (width, measured) = cx.update(|window, cx| {
+    let state = cx.debug_bounds("tab-status-w1:t1").unwrap();
+    let logo = cx.debug_bounds("tab-logo-w1:t1").unwrap();
+    let measured = cx.update(|window, cx| {
         let view = view.read(cx);
-        let indicators = Indicators::new(
-            view.settings.shared.as_ref(),
-            view.config.status_icons,
-            matches!(
-                cx.window_appearance(),
-                WindowAppearance::Light | WindowAppearance::VibrantLight
-            ),
-            &view.theme,
-        );
-        (
-            indicators.width(&view.config.tabs),
-            view.tab_width(&label.into(), Lead::Status, false, indicators, window),
-        )
+        view.tab_width(&label.into(), Lead::MarkAndState, false, window)
     });
-    assert_eq!(dot.size.width, px(width));
-    if settings.is_none() {
-        assert_eq!(dot.size, size(px(STATUS_WIDTH), px(STATUS_WIDTH)));
-    }
     assert!(
         near(tab.size.width, px(measured)),
         "{tab:?} measured {measured}"
     );
-    assert!(near(dot.left(), tab.left() + px(12.)), "{dot:?} in {tab:?}");
-    assert!(near(dot.center().y, tab.center().y), "{dot:?} in {tab:?}");
-
-    assert!(cx.debug_bounds("tab-status-plain").is_none());
-    let plain = cx.debug_bounds("tab-plain").unwrap();
-    // The dot and its gap widen the tab by what they take, so the
-    // title and close button keep their room.
     assert!(
-        near(tab.size.width - plain.size.width, px(width + DOT_GAP)),
+        near(state.left(), tab.left() + px(12.)),
+        "{state:?} in {tab:?}"
+    );
+    assert!(state.right() <= logo.left());
+    assert!(
+        near(state.center().y, tab.center().y),
+        "{state:?} in {tab:?}"
+    );
+
+    // A terminal reports no state: its mark alone leads it.
+    assert!(cx.debug_bounds("tab-status-plain").is_none());
+    assert!(cx.debug_bounds("tab-logo-plain").is_some());
+    let plain = cx.debug_bounds("tab-plain").unwrap();
+    assert!(
+        near(
+            tab.size.width - plain.size.width,
+            px(Lead::MarkAndState.width() - Lead::Mark.width())
+        ),
         "{tab:?} beside {plain:?}"
     );
     let close = cx.debug_bounds("close-tab-w1:t1").unwrap();
@@ -181,7 +166,9 @@ fn crowded(
     });
     let view = window.root(cx).unwrap();
     let cx = VisualTestContext::from_window(window.into(), cx).into_mut();
-    for _ in 0..2 {
+    // A reveal retries for a few frames until the strip's last layout shows
+    // the tab; let it settle before the test scrolls by hand.
+    for _ in 0..4 {
         cx.update(|window, cx| crate::sidebar::layout_tests::full_draw(window, cx).clear(cx));
     }
     (view, cx)
@@ -541,19 +528,32 @@ fn shared_tabs<'a>(
     (view, cx)
 }
 
+/// Following Herdr, the strip sits at the group's foot when Herdr puts its
+/// tab bar at the bottom, and atop the group when at the top.
 #[gpui::test]
 fn the_strip_sits_below_the_group_when_herdr_puts_it_at_the_bottom(cx: &mut TestAppContext) {
-    let (_, cx) = shared_tabs(cx, &["a", "b"], "tab_bar_position = 'bottom'");
+    let follow = |view: &Entity<HerdrWindow>, cx: &mut VisualTestContext| {
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.config.tabs_style.placement = crate::config::TabPlacement::Herdr;
+                cx.notify();
+            })
+        });
+        draw(cx);
+    };
+    let (view, cx) = shared_tabs(cx, &["a", "b"], "tab_bar_position = 'bottom'");
+    follow(&view, cx);
     let group = cx.debug_bounds("group").unwrap();
+    let strip = cx.debug_bounds("tab-strip").unwrap();
     let tab = cx.debug_bounds("tab-a").unwrap();
-    let new_tab = cx.debug_bounds("new-tab").unwrap();
     assert!(
-        (group.bottom() - new_tab.bottom()).abs() <= px(0.5),
-        "{group:?} {new_tab:?}"
+        (group.bottom() - strip.bottom()).abs() <= px(0.5),
+        "{group:?} {strip:?}"
     );
     assert!(tab.top() > group.top() + px(100.), "{group:?} {tab:?}");
 
-    let (_, cx) = shared_tabs(&mut cx.cx, &["a", "b"], "tab_bar_position = 'top'");
+    let (view, cx) = shared_tabs(&mut cx.cx, &["a", "b"], "tab_bar_position = 'top'");
+    follow(&view, cx);
     let group = cx.debug_bounds("group").unwrap();
     let tab = cx.debug_bounds("tab-a").unwrap();
     assert!(
@@ -609,9 +609,19 @@ fn a_bottom_strip_still_reorders_by_dragging(cx: &mut TestAppContext) {
         &["a", "b", "c"],
         "tab_bar_position = 'bottom'\nhide_tab_bar_when_single_tab = true",
     );
-    view.update(cx, |view, _| view.live.supports_tab_move = true);
+    view.update(cx, |view, _| {
+        view.live.supports_tab_move = true;
+        view.config.tabs_style.placement = crate::config::TabPlacement::Bottom;
+    });
+    draw(cx);
+    draw(cx);
     let a = cx.debug_bounds("tab-a").unwrap();
     let b = cx.debug_bounds("tab-b").unwrap();
+    let group = cx.debug_bounds("group").unwrap();
+    assert!(
+        a.top() > group.top() + px(100.),
+        "the strip sits at the foot"
+    );
     cx.simulate_mouse_down(a.center(), MouseButton::Left, Modifiers::default());
     let over = point(a.center().x + b.size.width / 2. + px(4.), a.center().y);
     for _ in 0..2 {
@@ -627,6 +637,7 @@ fn a_bottom_strip_still_reorders_by_dragging(cx: &mut TestAppContext) {
 /// A chosen page's tab stays in view as its title comes in.
 mod group_drop;
 mod page_title;
+mod style;
 mod tear_off;
 
 /// The dividers between groups, and the grips that drag them.
