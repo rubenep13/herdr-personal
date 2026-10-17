@@ -230,8 +230,20 @@ export PATH
         limits: ScriptLimits,
         cancelled: &AtomicBool,
     ) -> herdr_client::Result<Vec<u8>> {
+        self.capture_fed(body, &[], limits, cancelled)
+    }
+
+    /// [`Host::capture_limited`] with `input` on the script's stdin, for
+    /// arguments too many for one command line.
+    pub(crate) fn capture_fed(
+        &self,
+        body: &str,
+        input: &[u8],
+        limits: ScriptLimits,
+        cancelled: &AtomicBool,
+    ) -> herdr_client::Result<Vec<u8>> {
         let mut output = Vec::new();
-        self.stream(body, &[][..], &mut output, limits, cancelled)?;
+        self.stream(body, input, &mut output, limits, cancelled)?;
         Ok(output)
     }
 

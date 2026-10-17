@@ -1,9 +1,25 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[cfg(unix)]
+use super::git::Repo;
 use super::model::{Commit, CommitKind};
+#[cfg(unix)]
+use crate::teleport::Host;
+#[cfg(unix)]
+use herdr_client::ConnectTarget;
+#[cfg(unix)]
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    sync::atomic::AtomicBool,
+};
 
 mod chips;
+#[cfg(unix)]
+mod git;
 mod layout;
+#[cfg(unix)]
+mod readonly;
 mod text;
 
 /// A commit with only the fields the lane engine reads.
@@ -58,4 +74,116 @@ fn tangled_history() -> Vec<Commit> {
             commit(&oid(row), &parents)
         })
         .collect()
+}
+
+/// A repository in a temporary directory, driven by the system `git` with no
+/// global or system configuration.
+#[cfg(unix)]
+struct Fixture {
+    temp: tempfile::TempDir,
+    repo: PathBuf,
+}
+
+#[cfg(unix)]
+impl Fixture {
+    /// An empty repository on `main`.
+    fn new() -> Self {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        std::fs::create_dir_all(temp.path().join("home")).unwrap();
+        let fixture = Self { temp, repo };
+        fixture.git(&["init", "-q", "-b", "main"]);
+        fixture
+    }
+
+    /// A repository with `count` commits on `main`, the newest first.
+    fn with_commits(count: usize) -> Self {
+        let fixture = Self::new();
+        for index in 0..count {
+            fixture.write("file.txt", &format!("{index}\n"));
+            fixture.commit(&format!("commit {index}"));
+        }
+        fixture
+    }
+
+    fn path(&self) -> &Path {
+        &self.repo
+    }
+
+    fn command(&self, directory: &Path) -> Command {
+        let mut command = Command::new("git");
+        command
+            .current_dir(directory)
+            .env("HOME", self.temp.path().join("home"))
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
+            .args([
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+            ])
+            .args(["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false"]);
+        command
+    }
+
+    /// Runs `git` in `directory` and returns its stdout.
+    fn git_in(&self, directory: &Path, args: &[&str]) -> String {
+        let output = self.command(directory).args(args).output().unwrap();
+        assert!(output.status.success(), "git {args:?}: {output:?}");
+        String::from_utf8(output.stdout).unwrap()
+    }
+
+    fn git(&self, args: &[&str]) -> String {
+        self.git_in(&self.repo, args)
+    }
+
+    /// Runs `git fast-import` on `stream`.
+    fn import(&self, stream: &str) {
+        use std::io::Write;
+        let mut child = self
+            .command(&self.repo)
+            .args(["fast-import", "--quiet"])
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(stream.as_bytes())
+            .unwrap();
+        assert!(child.wait().unwrap().success());
+    }
+
+    fn write(&self, name: &str, text: &str) {
+        std::fs::write(self.repo.join(name), text).unwrap();
+    }
+
+    fn commit(&self, message: &str) -> String {
+        self.git(&["add", "-A"]);
+        self.git(&["commit", "-qm", message]);
+        self.head()
+    }
+
+    fn head(&self) -> String {
+        self.git(&["rev-parse", "HEAD"]).trim().to_owned()
+    }
+
+    fn host(&self) -> Host {
+        Host::new(&ConnectTarget::Local).unwrap()
+    }
+
+    fn open(&self) -> Repo {
+        open_at(self.host(), &self.repo)
+    }
+}
+
+#[cfg(unix)]
+fn open_at(host: Host, folder: &Path) -> Repo {
+    Repo::open(host, folder.to_str().unwrap(), &AtomicBool::new(false)).unwrap()
 }
