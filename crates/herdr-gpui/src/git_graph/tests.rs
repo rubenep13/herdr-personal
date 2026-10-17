@@ -2,7 +2,9 @@
 
 use super::model::{Commit, CommitKind};
 
+mod chips;
 mod layout;
+mod text;
 
 /// A commit with only the fields the lane engine reads.
 fn commit(oid: &str, parents: &[&str]) -> Commit {
