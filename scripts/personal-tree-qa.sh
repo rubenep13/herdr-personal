@@ -7,6 +7,9 @@
 #   scripts/personal-tree-qa.sh /usr/bin/herdr [target/debug/herdr-personal-dev]
 #
 # Agents are declared with `herdr pane report-agent`, so no real agent runs.
+# The daemon's config shows the machine and time in `tab_bar_right` and a
+# `$model` line under each agent, the way a personal Herdr config might, and
+# Tools gets a second tab with no agent in it.
 # Press Enter in this terminal to quit the app, stop the daemon, and remove
 # the sandbox.
 set -euo pipefail
@@ -52,8 +55,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf 'onboarding = false\n[terminal]\ndefault_shell = "/bin/sh"\nshell_mode = "non_login"\n' \
-  > "$sandbox/config.toml"
+cat > "$sandbox/config.toml" <<'TOML'
+onboarding = false
+[terminal]
+default_shell = "/bin/sh"
+shell_mode = "non_login"
+[ui]
+tab_bar_right = [{ type = "hostname" }, { type = "datetime" }]
+[ui.sidebar.agents]
+rows = [["state_icon", "agent"], ["$model"]]
+TOML
 env -i "${isolated[@]}" "$herdr" server > "$sandbox/server.log" 2>&1 &
 daemon_pid=$!
 for _ in $(seq 1 100); do [ -S "$sandbox/a-client.sock" ] && break; sleep 0.1; done
@@ -67,6 +78,9 @@ cli pane report-agent --source qa --agent claude --state blocked --message "need
 cli pane report-agent --source qa --agent codex --state working w1:p2
 cli pane report-agent --source qa --agent opencode --state idle w1:p3
 cli pane report-agent --source qa --agent claude --state working w2:p1
+cli pane report-metadata w1:p1 --source qa --agent claude --token model=opus-4.7
+cli pane report-metadata w1:p2 --source qa --agent codex --token model=gpt-5.5
+cli tab create --workspace w2 --cwd "$sandbox" --label shell
 
 env -i "${gui[@]}" "$client" --socket "$sandbox/a-client.sock" > "$sandbox/gui.log" 2>&1 &
 gui_pid=$!
@@ -79,4 +93,6 @@ echo "Isolated daemon $daemon_pid and Herdr Personal Dev $gui_pid are running."
 echo "Sandbox: $sandbox"
 echo "Try: fold API, drag Tools above API, Move Space Down from the palette,"
 echo "search \"codex\", quit and rerun this step to see the order kept."
+echo "Options: $client config set sidebar.hierarchy indent|block|guide,"
+echo "tabs.position subheader|bottom|herdr, tabs.content name|agent|status."
 read -r -p "Press Enter to quit and clean up. " _ || :
