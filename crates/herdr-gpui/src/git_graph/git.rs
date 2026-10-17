@@ -5,6 +5,7 @@
 //! optional locks, lazy fetches, hooks, a filesystem monitor, any transport
 //! or automatic maintenance, so reading never writes to the repository.
 
+use super::detail::{self, CommitDetail, DIFF_READ, DiffText};
 use super::error::{Error, Result};
 use super::model::{Commit, Ref};
 use super::parse;
@@ -101,6 +102,16 @@ fi
 
 const WORKTREE: &str = "herdr_git status --porcelain=v2 --branch --untracked-files=all\n";
 
+/// Sets the positional parameters to what `diff-tree` compares for `oid`,
+/// already quoted: its first parent and it, or `--root` and it for a root
+/// commit.
+fn first_parent(oid: &str) -> String {
+    format!(
+        r#"parent=$(herdr_git rev-parse -q --verify {oid}^1 || :)
+if [ -n "$parent" ]; then set -- "$parent" {oid}; else set -- --root {oid}; fi"#
+    )
+}
+
 /// Runs `body` after the prelude in `folder`, translating the prelude's
 /// refusals.
 fn run(
@@ -179,6 +190,54 @@ impl Repo {
             cancelled,
         )?;
         parse::page(&output, snapshot).ok_or(Error::Output { operation: "log" })
+    }
+
+    /// `oid`'s whole message and the files it changed against its first
+    /// parent, or against nothing for a root commit.
+    pub(crate) fn commit_detail(&self, oid: &str, cancelled: &AtomicBool) -> Result<CommitDetail> {
+        if !parse::is_oid(oid) {
+            return Err(Error::Output { operation: "show" });
+        }
+        let oid = shell_quote(oid);
+        let parent = first_parent(&oid);
+        let body = format!(
+            r#"herdr_git show -s --no-show-signature --no-color -z --format='%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%B' {oid} --
+{parent}
+herdr_git diff-tree -r -M --no-commit-id -z --raw --numstat "$@"
+"#
+        );
+        let output = run(&self.host, &self.root, "show", &body, &[], cancelled)?;
+        detail::commit_detail(&output).ok_or(Error::Output { operation: "show" })
+    }
+
+    /// The diff of `path` (renamed from `old_path`) in `oid`, against its
+    /// first parent, at most `DIFF_READ` lines of it.
+    pub(crate) fn file_diff(
+        &self,
+        oid: &str,
+        path: &str,
+        old_path: Option<&str>,
+        cancelled: &AtomicBool,
+    ) -> Result<DiffText> {
+        if !parse::is_oid(oid) {
+            return Err(Error::Output {
+                operation: "diff-tree",
+            });
+        }
+        let oid = shell_quote(oid);
+        let paths = std::iter::once(path)
+            .chain(old_path)
+            .map(|path| shell_quote(&crate::review::literal(path)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let parent = first_parent(&oid);
+        let body = format!(
+            r#"{parent}
+herdr_git diff-tree -r -M -p --no-color --src-prefix=a/ --dst-prefix=b/ "$@" -- {paths} | head -n {DIFF_READ}
+"#
+        );
+        let output = run(&self.host, &self.root, "diff-tree", &body, &[], cancelled)?;
+        Ok(detail::file_diff(&output, path))
     }
 
     pub(crate) fn worktree(&self, cancelled: &AtomicBool) -> Result<WorktreeCounts> {

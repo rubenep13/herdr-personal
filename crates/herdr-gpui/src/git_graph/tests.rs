@@ -15,6 +15,7 @@ use std::{
 };
 
 mod chips;
+mod detail;
 #[cfg(unix)]
 mod git;
 mod keys;

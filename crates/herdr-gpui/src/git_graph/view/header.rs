@@ -24,6 +24,8 @@ const EDGE: f32 = 6.;
 pub(super) enum ColumnDrag {
     Refs,
     Graph,
+    /// The detail panel's left edge.
+    Panel,
 }
 
 /// The optional columns, in order, with their key and header.
@@ -183,6 +185,7 @@ impl GitGraphView {
                         GraphPrefsStore::update(cx, |prefs| match drag {
                             ColumnDrag::Refs => prefs.refs_width = REFS_DEFAULT,
                             ColumnDrag::Graph => prefs.graph_width = None,
+                            ColumnDrag::Panel => {}
                         });
                     }
                 })
@@ -345,6 +348,7 @@ impl GitGraphView {
         GraphPrefsStore::update(cx, |prefs| match drag {
             ColumnDrag::Refs => prefs.refs_width = x,
             ColumnDrag::Graph => prefs.graph_width = Some(x - refs),
+            ColumnDrag::Panel => {}
         });
     }
 }

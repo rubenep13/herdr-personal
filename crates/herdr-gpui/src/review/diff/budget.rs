@@ -129,6 +129,6 @@ pub(crate) fn batch(pending: impl IntoIterator<Item = (usize, u64)>) -> Vec<usiz
 
 /// The pathspec naming `path` alone, matched literally from the top of the
 /// repository, so no name can act as a pattern or an option.
-pub(super) fn literal(path: &str) -> String {
+pub(crate) fn literal(path: &str) -> String {
     format!(":(top,literal){path}")
 }

@@ -13,7 +13,7 @@ const REF_LIMIT: usize = 1024;
 const SUBJECT_LIMIT: usize = 1024;
 const DESCRIPTION_LIMIT: usize = 4096;
 
-fn is_oid(text: &str) -> bool {
+pub(super) fn is_oid(text: &str) -> bool {
     matches!(text.len(), 40 | 64) && text.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
@@ -144,47 +144,52 @@ pub(super) fn page(output: &[u8], snapshot: &Snapshot) -> Option<Page> {
         .collect();
     let mut commits = Vec::with_capacity(records.len().min(PAGE));
     for record in records.into_iter().take(PAGE) {
-        let mut parts = record.trim_start_matches('\n').splitn(6, '\u{1f}');
-        let (oid, parents, author, email, authored, message) = (
-            parts.next()?,
-            parts.next()?,
-            parts.next()?,
-            parts.next()?,
-            parts.next()?,
-            parts.next()?,
-        );
-        if !is_oid(oid) {
-            return None;
-        }
-        if snapshot.stash_helpers.contains(oid) {
+        let (mut commit, _) = commit(record)?;
+        if snapshot.stash_helpers.contains(&commit.oid) {
             continue;
         }
-        let mut parents: Vec<String> = parents.split_whitespace().map(str::to_owned).collect();
-        if !parents.iter().all(|parent| is_oid(parent)) {
-            return None;
+        if let Some(real) = snapshot.shallow.get(&commit.oid) {
+            commit.parents.clone_from(real);
         }
-        if let Some(real) = snapshot.shallow.get(oid) {
-            parents.clone_from(real);
+        if stashes.contains(commit.oid.as_str()) {
+            commit
+                .parents
+                .retain(|parent| !snapshot.stash_helpers.contains(parent));
+            commit.kind = CommitKind::Stash;
         }
-        let kind = if stashes.contains(oid) {
-            parents.retain(|parent| !snapshot.stash_helpers.contains(parent));
-            CommitKind::Stash
-        } else {
-            CommitKind::Commit
-        };
-        let (subject, description) = split_message(message);
-        commits.push(Commit {
-            oid: oid.to_owned(),
-            parents,
-            author: safe_text(author, NAME_LIMIT),
-            email: safe_text(email, NAME_LIMIT),
-            authored: authored.parse().ok()?,
-            subject: safe_text(&subject, SUBJECT_LIMIT),
-            description: safe_text(&description, DESCRIPTION_LIMIT),
-            kind,
-        });
+        commits.push(commit);
     }
     Some(Page { commits, has_more })
+}
+
+/// One `%H%x1f%P%x1f%an%x1f%ae%x1f%at%x1f%B` record as a commit, and its
+/// whole message as Git wrote it.
+pub(super) fn commit(record: &str) -> Option<(Commit, &str)> {
+    let mut parts = record.trim_start_matches('\n').splitn(6, '\u{1f}');
+    let (oid, parents, author, email, authored, message) = (
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+        parts.next()?,
+    );
+    let parents: Vec<String> = parents.split_whitespace().map(str::to_owned).collect();
+    if !is_oid(oid) || !parents.iter().all(|parent| is_oid(parent)) {
+        return None;
+    }
+    let (subject, description) = split_message(message);
+    let commit = Commit {
+        oid: oid.to_owned(),
+        parents,
+        author: safe_text(author, NAME_LIMIT),
+        email: safe_text(email, NAME_LIMIT),
+        authored: authored.parse().ok()?,
+        subject: safe_text(&subject, SUBJECT_LIMIT),
+        description: safe_text(&description, DESCRIPTION_LIMIT),
+        kind: CommitKind::Commit,
+    };
+    Some((commit, message))
 }
 
 /// Counts from `status --porcelain=v2`: an entry staged and also changed in

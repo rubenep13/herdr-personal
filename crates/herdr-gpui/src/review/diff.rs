@@ -14,9 +14,10 @@ mod load;
 mod parse;
 mod words;
 
-pub(crate) use budget::{EAGER_LINES, batch};
+pub(crate) use budget::{EAGER_LINES, batch, literal};
 pub(crate) use context::read_lines;
 pub(crate) use load::{Loaded, Request, bodies, load};
+pub(crate) use parse::parse as parse_files;
 pub(crate) use words::emphasis;
 
 /// Characters kept of one line; a longer one ends in an ellipsis.

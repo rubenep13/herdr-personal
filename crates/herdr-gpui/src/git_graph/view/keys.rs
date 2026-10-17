@@ -22,6 +22,12 @@ impl GitGraphView {
                 self.reload(cx);
                 true
             }
+            ("enter", false) => {
+                let row = self.selected_row().unwrap_or_default();
+                self.open_detail(row, cx);
+                true
+            }
+            ("escape", _) if self.close_detail(cx) => true,
             ("escape", _) if self.column_menu => {
                 self.column_menu = false;
                 cx.notify();
@@ -48,7 +54,12 @@ impl GitGraphView {
             Some(row) => row.saturating_add_signed(delta).min(last),
             None => 0,
         };
-        self.select_row(row, cx);
+        // An open panel follows the selection.
+        if self.panel.is_some() {
+            self.open_detail(row, cx);
+        } else {
+            self.select_row(row, cx);
+        }
         true
     }
 

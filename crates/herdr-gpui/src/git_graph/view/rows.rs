@@ -112,7 +112,7 @@ impl GitGraphView {
             .items_center()
             .on_click(cx.listener(move |this, _, window, cx| {
                 window.focus(&this.focus_handle, cx);
-                this.select_row(row, cx);
+                this.open_detail(row, cx);
             }))
             .child(refs)
             .child(graph)

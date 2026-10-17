@@ -2,6 +2,7 @@
 
 mod checkout;
 pub(crate) mod chips;
+pub(crate) mod detail;
 mod error;
 pub(crate) mod geometry;
 pub(crate) mod git;

@@ -6,7 +6,7 @@ use std::sync::Arc;
 /// One file as the diff gave it. Its names are Git's, decoded but not
 /// cleaned: they match the listing's, and are cleaned where they are shown.
 #[derive(Debug)]
-pub(super) struct Parsed {
+pub(crate) struct Parsed {
     pub path: String,
     pub old_path: Option<String>,
     pub status: Status,
@@ -163,7 +163,7 @@ impl Open {
 }
 
 /// The files of a diff, in its order.
-pub(super) fn parse(text: &str) -> Vec<Parsed> {
+pub(crate) fn parse(text: &str) -> Vec<Parsed> {
     let mut files = Vec::new();
     let mut open: Option<Open> = None;
     for raw in text.split('\n') {

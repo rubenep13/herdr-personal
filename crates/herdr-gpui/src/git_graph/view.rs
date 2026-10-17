@@ -2,6 +2,7 @@
 //! comes back. It knows nothing of tabs; the window feeds it from its tick.
 
 mod chips;
+mod detail;
 mod header;
 mod keys;
 mod lanes;
@@ -9,6 +10,8 @@ mod rows;
 
 #[cfg(test)]
 pub(crate) use chips::chip_icons;
+#[cfg(test)]
+pub(crate) use detail::diff_tint;
 
 use super::{
     checkout::GraphCheckout,
@@ -25,7 +28,7 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 use header::ColumnDrag;
-use std::{collections::HashMap, sync::Arc};
+use std::{cell::Cell, collections::HashMap, rc::Rc, sync::Arc};
 
 /// Rows from the end at which the next page is asked for.
 const MORE_WITHIN: usize = 50;
@@ -75,6 +78,12 @@ pub(crate) struct GitGraphView {
     chip_widths: HashMap<SharedString, f32>,
     /// The label the pointer is over, shown whole above the others.
     hovered_chip: Option<(usize, usize)>,
+    /// The commit shown beside the graph.
+    panel: Option<detail::Panel>,
+    /// A commit being looked for page by page, and the pages left to read.
+    jump: Option<(String, usize)>,
+    /// The tab's width at the last frame, for the panel's bounds.
+    width: Rc<Cell<f32>>,
 }
 
 /// The headline for a failure, on this machine or the SSH host `remote`.
@@ -167,6 +176,9 @@ impl GitGraphView {
             error,
             chip_widths: HashMap::new(),
             hovered_chip: None,
+            panel: None,
+            jump: None,
+            width: Rc::default(),
         };
         view.send(Request::Load);
         view
@@ -223,23 +235,63 @@ impl GitGraphView {
         changed
     }
 
-    /// Applies a reply unless a later request made it stale.
+    /// Applies a reply unless a later request of its kind made it stale.
     pub(crate) fn receive(
         &mut self,
         generation: u64,
         reply: Reply,
         cx: &mut Context<Self>,
     ) -> bool {
+        let applied = match reply {
+            Reply::History(history) => self.receive_history(generation, Ok(history), cx),
+            Reply::Detail(detail) => self.receive_detail(generation, Ok(detail)),
+            Reply::Diff {
+                oid,
+                path,
+                lines,
+                spans,
+                truncated,
+            } => self.receive_diff(
+                generation,
+                Some((&oid, &path)),
+                Ok(detail::DiffLines {
+                    lines,
+                    spans,
+                    truncated,
+                }),
+            ),
+            Reply::Failed(error) => match self
+                .panel
+                .as_ref()
+                .and_then(|panel| panel.waits_for(generation))
+            {
+                Some(true) => self.receive_detail(generation, Err(error)),
+                Some(false) => self.receive_diff(generation, None, Err(error)),
+                None => self.receive_history(generation, Err(error), cx),
+            },
+        };
+        if applied {
+            cx.notify();
+        }
+        applied
+    }
+
+    fn receive_history(
+        &mut self,
+        generation: u64,
+        history: Result<Arc<History>, Arc<Error>>,
+        cx: &mut Context<Self>,
+    ) -> bool {
         if generation < self.latest.0 {
             return false;
         }
         self.waiting = false;
-        match reply {
-            Reply::History(history) => {
+        match history {
+            Ok(history) => {
                 self.history = Some(history);
                 self.error = None;
             }
-            Reply::Failed(error) => {
+            Err(error) => {
                 // A failed load leaves nothing worth showing; a failed page
                 // keeps the rows already read.
                 if self.latest.1 == Request::Load {
@@ -248,18 +300,26 @@ impl GitGraphView {
                 self.error = Some(error);
             }
         }
-        cx.notify();
+        self.continue_jump(cx);
         true
     }
 
-    fn send(&mut self, request: Request) {
+    /// Hands `request` to the worker; its generation, or 0 when nothing can
+    /// be asked.
+    fn send(&mut self, request: Request) -> u64 {
         if self.connection == Connection::Offline {
-            return;
+            return 0;
         }
-        if let Some(worker) = self.worker.as_mut() {
-            self.latest = (worker.send(request), request);
+        let Some(worker) = self.worker.as_mut() else {
+            return 0;
+        };
+        let history = matches!(request, Request::Load | Request::More);
+        let generation = worker.send(request.clone());
+        if history {
+            self.latest = (generation, request);
             self.waiting = true;
         }
+        generation
     }
 
     /// Asks for the next page once the rows drawn come near the end, one
@@ -292,6 +352,11 @@ impl GitGraphView {
 
     /// Selects `row` and scrolls it into view.
     fn select_row(&mut self, row: usize, cx: &mut Context<Self>) {
+        self.select(row);
+        cx.notify();
+    }
+
+    fn select(&mut self, row: usize) {
         let Some(commit) = self
             .history
             .as_ref()
@@ -302,7 +367,6 @@ impl GitGraphView {
         self.selected = Some(commit.oid.clone());
         self.column_menu = false;
         self.scroll.scroll_to_item(row, ScrollStrategy::Nearest);
-        cx.notify();
     }
 
     /// How strongly `row`'s band is tinted.
@@ -358,7 +422,7 @@ impl GitGraphView {
 
     #[cfg(test)]
     pub(crate) fn last_request(&self) -> (u64, Request) {
-        self.latest
+        self.latest.clone()
     }
 
     #[cfg(test)]
@@ -425,6 +489,7 @@ impl Render for GitGraphView {
             }
             (Some(history), _) => div()
                 .flex_1()
+                .min_w_0()
                 .min_h_0()
                 .flex()
                 .flex_col()
@@ -451,6 +516,14 @@ impl Render for GitGraphView {
                 .into_any_element(),
         };
         let bar = self.render_bar(cx);
+        let panel = self.render_panel(cx);
+        let width = self.width.clone();
+        let measure = canvas(
+            move |bounds, _, _| width.set(f32::from(bounds.size.width)),
+            |_, (), _, _| {},
+        )
+        .absolute()
+        .size_full();
         div()
             .id("git-graph")
             .key_context("GitGraph")
@@ -459,7 +532,12 @@ impl Render for GitGraphView {
             .on_drag_move(
                 cx.listener(|this, event: &DragMoveEvent<ColumnDrag>, _, cx| {
                     let x = f32::from(event.event.position.x - event.bounds.origin.x);
-                    this.drag_column(*event.drag(cx), x, cx);
+                    match *event.drag(cx) {
+                        ColumnDrag::Panel => {
+                            Self::drag_panel(x, f32::from(event.bounds.size.width), cx)
+                        }
+                        drag => this.drag_column(drag, x, cx),
+                    }
                 }),
             )
             .size_full()
@@ -471,7 +549,9 @@ impl Render for GitGraphView {
             .text_font(&self.look.ui)
             .text_size(px(self.look.ui.size))
             .line_height(px(ROW_H))
+            .relative()
+            .child(measure)
             .child(bar)
-            .child(body)
+            .child(div().flex_1().min_h_0().flex().child(body).children(panel))
     }
 }
