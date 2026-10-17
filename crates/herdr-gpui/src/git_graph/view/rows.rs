@@ -220,13 +220,31 @@ impl GitGraphView {
             "{body}\n\n{who}\n{} \u{00b7} {short}",
             full_date(commit.authored)
         );
-        cell.child(
+        let matched = self.is_match(&commit.oid);
+        let match_colour = theme.ink(theme.palette[3]);
+        cell.when(matched, |cell| {
+            cell.child(
+                div()
+                    .absolute()
+                    .right_0()
+                    .top_0()
+                    .h_full()
+                    .w(px(3.))
+                    .bg(rgb(match_colour)),
+            )
+        })
+        .relative()
+        .child(
             div()
                 .debug_selector(move || format!("graph-subject-{row}"))
                 .flex_none()
                 .max_w_full()
                 .truncate()
-                .text_color(rgb(theme.foreground))
+                .text_color(rgb(if matched {
+                    match_colour
+                } else {
+                    theme.foreground
+                }))
                 .child(commit.subject.clone()),
         )
         .when(!commit.description.is_empty(), |cell| {

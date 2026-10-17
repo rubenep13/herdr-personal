@@ -193,6 +193,17 @@ impl Repo {
         parse::page(&output, snapshot).ok_or(Error::Output { operation: "log" })
     }
 
+    /// Runs `body` in the repository with `input` on its stdin.
+    pub(super) fn script(
+        &self,
+        operation: &'static str,
+        body: &str,
+        input: &[u8],
+        cancelled: &AtomicBool,
+    ) -> Result<Vec<u8>> {
+        run(&self.host, &self.root, operation, body, input, cancelled)
+    }
+
     /// `oid`'s whole message and the files it changed against its first
     /// parent, or against nothing for a root commit.
     pub(crate) fn commit_detail(&self, oid: &str, cancelled: &AtomicBool) -> Result<CommitDetail> {

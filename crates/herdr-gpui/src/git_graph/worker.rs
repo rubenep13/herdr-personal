@@ -14,6 +14,7 @@ use super::{
     git::{PAGE, Repo, Snapshot, WorktreeCounts},
     history::History,
     model::Commit,
+    search::{SEARCH_LIMIT, SearchHit, search},
     worktree::{Section, WorktreeStatus},
 };
 use crate::{
@@ -51,6 +52,8 @@ pub(crate) enum Request {
         path: String,
         old_path: Option<String>,
     },
+    /// Commits whose message, author or hash match.
+    Search(String),
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +76,12 @@ pub(crate) enum Reply {
         spans: Arc<Vec<Vec<Span>>>,
         truncated: bool,
     },
+    Search {
+        query: String,
+        hits: Arc<Vec<SearchHit>>,
+        /// More commits matched than the list keeps.
+        more: bool,
+    },
     /// The request of this generation failed, whatever its kind.
     Failed(Arc<Error>),
 }
@@ -85,6 +94,7 @@ pub(crate) struct Pending {
     history: Option<(u64, Request)>,
     detail: Option<(u64, Request)>,
     diff: Option<(u64, Request)>,
+    search: Option<(u64, Request)>,
 }
 
 impl Pending {
@@ -100,15 +110,21 @@ impl Pending {
             Request::Diff { .. } | Request::WorktreeDiff { .. } => {
                 self.diff = Some((generation, request));
             }
+            Request::Search(_) => self.search = Some((generation, request)),
         }
     }
 
     /// Everything waiting, history first.
     pub(crate) fn take(&mut self) -> Vec<(u64, Request)> {
-        [self.history.take(), self.detail.take(), self.diff.take()]
-            .into_iter()
-            .flatten()
-            .collect()
+        [
+            self.history.take(),
+            self.detail.take(),
+            self.diff.take(),
+            self.search.take(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
 
@@ -119,6 +135,8 @@ pub(crate) struct Worker {
     /// The generation of the last request sent.
     generation: u64,
     cancelled: Arc<AtomicBool>,
+    /// Stops the search in flight when a newer one is asked for.
+    search_stop: Arc<AtomicBool>,
     /// Why the thread is not there, reported once.
     failure: Option<Arc<Error>>,
     /// Set when the thread ends, for tests that close a tab.
@@ -134,6 +152,8 @@ impl Worker {
         let (outbox, replies) = mpsc::sync_channel(REPLIES);
         let cancelled = Arc::new(AtomicBool::new(false));
         let flag = cancelled.clone();
+        let search_stop = Arc::new(AtomicBool::new(false));
+        let stop = search_stop.clone();
         #[cfg(test)]
         let finished = Arc::new(AtomicBool::new(false));
         #[cfg(test)]
@@ -141,7 +161,11 @@ impl Worker {
         let failure = std::thread::Builder::new()
             .name("git-graph".into())
             .spawn(move || {
-                run(&host, &folder, &mailbox, &woken, &outbox, &flag);
+                let flags = Flags {
+                    cancelled: &flag,
+                    search_stop: &stop,
+                };
+                run(&host, &folder, &mailbox, &woken, &outbox, &flags);
                 #[cfg(test)]
                 done.store(true, Ordering::Release);
             })
@@ -153,6 +177,7 @@ impl Worker {
             replies,
             generation: 0,
             cancelled,
+            search_stop,
             failure,
             #[cfg(test)]
             finished,
@@ -165,6 +190,9 @@ impl Worker {
         self.generation += 1;
         if self.failure.is_some() {
             return self.generation;
+        }
+        if matches!(request, Request::Search(_)) {
+            self.search_stop.store(true, Ordering::Release);
         }
         self.pending
             .lock()
@@ -195,6 +223,7 @@ impl Drop for Worker {
         // The thread ends once its wake-ups close; this also stops the
         // script it is running now.
         self.cancelled.store(true, Ordering::Release);
+        self.search_stop.store(true, Ordering::Release);
     }
 }
 
@@ -216,14 +245,22 @@ struct State<'a> {
     loaded: Option<Loaded>,
 }
 
+/// What stops the thread's scripts: closing the tab stops all of them, a
+/// newer search the search in flight.
+struct Flags<'a> {
+    cancelled: &'a AtomicBool,
+    search_stop: &'a AtomicBool,
+}
+
 fn run(
     host: &Host,
     folder: &str,
     pending: &Mutex<Pending>,
     woken: &mpsc::Receiver<()>,
     outbox: &mpsc::SyncSender<(u64, Reply)>,
-    cancelled: &AtomicBool,
+    flags: &Flags,
 ) {
+    let cancelled = flags.cancelled;
     let mut state = State {
         host,
         folder,
@@ -239,9 +276,14 @@ fn run(
             if cancelled.load(Ordering::Acquire) {
                 return;
             }
-            let reply = state
-                .handle(request, cancelled)
-                .unwrap_or_else(|error| Reply::Failed(Arc::new(error)));
+            let reply = match request {
+                Request::Search(query) => {
+                    flags.search_stop.store(false, Ordering::Release);
+                    state.search(query, flags.search_stop)
+                }
+                request => state.handle(request, cancelled),
+            }
+            .unwrap_or_else(|error| Reply::Failed(Arc::new(error)));
             if cancelled.load(Ordering::Acquire) || outbox.send((generation, reply)).is_err() {
                 return;
             }
@@ -304,7 +346,27 @@ impl State<'_> {
             }
             Request::More if self.loaded.is_some() => self.more(cancelled),
             Request::Load | Request::More => self.load(cancelled),
+            Request::Search(query) => self.search(query, cancelled),
         }
+    }
+
+    /// Searches the snapshot the history was read from; nothing before the
+    /// first page.
+    fn search(&mut self, query: String, stop: &AtomicBool) -> Result<Reply> {
+        let Some(snapshot) = self.loaded.as_ref().map(|loaded| loaded.snapshot.clone()) else {
+            return Ok(Reply::Search {
+                query,
+                hits: Arc::default(),
+                more: false,
+            });
+        };
+        let repo = self.repo(stop)?;
+        let (hits, more) = search(repo, &snapshot, &query, SEARCH_LIMIT, stop)?;
+        Ok(Reply::Search {
+            query,
+            hits: Arc::new(hits),
+            more,
+        })
     }
 
     fn load(&mut self, cancelled: &AtomicBool) -> Result<Reply> {

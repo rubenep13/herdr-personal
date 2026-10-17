@@ -25,6 +25,7 @@ mod prefs;
 mod readonly;
 mod remote;
 mod rows;
+mod search;
 mod tab;
 mod text;
 mod worker;

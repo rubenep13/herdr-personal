@@ -7,6 +7,7 @@ mod header;
 mod keys;
 mod lanes;
 mod rows;
+mod search;
 mod worktree;
 
 #[cfg(test)]
@@ -25,11 +26,17 @@ use super::{
 use crate::{
     config::{FontConfig, Theme},
     fonts::StyledFont,
+    search_input::SearchInput,
     teleport::Host,
 };
 use gpui::{prelude::*, *};
 use header::ColumnDrag;
-use std::{cell::Cell, collections::HashMap, rc::Rc, sync::Arc};
+use std::{
+    cell::Cell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+    sync::Arc,
+};
 
 /// Rows from the end at which the next page is asked for.
 const MORE_WITHIN: usize = 50;
@@ -85,6 +92,11 @@ pub(crate) struct GitGraphView {
     jump: Option<(String, usize)>,
     /// The tab's width at the last frame, for the panel's bounds.
     width: Rc<Cell<f32>>,
+    search_input: Entity<SearchInput>,
+    /// The search, while its field is open.
+    search: Option<search::Search>,
+    /// The commits the search found, marked in their rows.
+    matches: HashSet<String>,
 }
 
 /// The headline for a failure, on this machine or the SSH host `remote`.
@@ -157,6 +169,13 @@ impl GitGraphView {
             this.prefs = GraphPrefsStore::get(cx);
             cx.notify();
         });
+        let search_input = cx.new(|cx| {
+            let mut input = SearchInput::new(cx);
+            input.set_placeholder("Message, author or hash\u{2026}", cx);
+            input.set_frameless(cx);
+            input.set_appearance(look.ui.clone(), look.theme.clone(), cx);
+            input
+        });
         let mut view = Self {
             waiting: false,
             checkout,
@@ -180,6 +199,9 @@ impl GitGraphView {
             panel: None,
             jump: None,
             width: Rc::default(),
+            search_input,
+            search: None,
+            matches: HashSet::new(),
         };
         view.send(Request::Load);
         view
@@ -262,6 +284,9 @@ impl GitGraphView {
                 }),
             ),
             Reply::Worktree(status) => self.receive_worktree(generation, status),
+            Reply::Search { query, hits, more } => {
+                self.receive_search(generation, &query, hits, more, cx)
+            }
             Reply::WorktreeDiff {
                 section,
                 path,
@@ -407,6 +432,9 @@ impl GitGraphView {
         if look.ui.family != self.look.ui.family {
             self.chip_widths.clear();
         }
+        self.search_input.update(cx, |input, cx| {
+            input.set_appearance(look.ui.clone(), look.theme.clone(), cx);
+        });
         self.look = look;
         cx.notify();
     }
@@ -534,6 +562,7 @@ impl Render for GitGraphView {
         };
         let bar = self.render_bar(cx);
         let panel = self.render_panel(cx);
+        let results = self.render_results(header::BAR_H, cx);
         let width = self.width.clone();
         let measure = canvas(
             move |bounds, _, _| width.set(f32::from(bounds.size.width)),
@@ -569,6 +598,7 @@ impl Render for GitGraphView {
             .relative()
             .child(measure)
             .child(bar)
+            .children(results)
             .child(div().flex_1().min_h_0().flex().child(body).children(panel))
     }
 }

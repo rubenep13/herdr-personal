@@ -8,7 +8,30 @@ use crate::git_graph::model::CommitKind;
 use gpui::{prelude::*, *};
 
 impl GitGraphView {
-    pub(super) fn on_key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn on_key(
+        &mut self,
+        event: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // While the search field has focus, keys type into it; only Enter
+        // and Escape are the graph's.
+        if self.search_input.read(cx).focus.is_focused(window) {
+            match event.keystroke.key.as_str() {
+                "enter" => {
+                    let query = self.search_input.read(cx).text().to_owned();
+                    window.focus(&self.focus_handle, cx);
+                    self.start_search(&query, cx);
+                }
+                "escape" => {
+                    window.focus(&self.focus_handle, cx);
+                    self.close_search(cx);
+                }
+                _ => return,
+            }
+            cx.stop_propagation();
+            return;
+        }
         let modifiers = &event.keystroke.modifiers;
         if modifiers.platform || modifiers.control || modifiers.alt || modifiers.function {
             return;
@@ -23,12 +46,19 @@ impl GitGraphView {
                 self.reload(cx);
                 true
             }
+            ("/", _) => {
+                self.open_search(window, cx);
+                true
+            }
+            ("n", false) => self.step_result(true, cx),
+            ("n", true) | ("N", _) => self.step_result(false, cx),
             ("enter", false) => {
                 let row = self.selected_row().unwrap_or_default();
                 self.open_detail(row, cx);
                 true
             }
             ("escape", _) if self.close_detail(cx) => true,
+            ("escape", _) if self.close_search(cx) => true,
             ("escape", _) if self.column_menu => {
                 self.column_menu = false;
                 cx.notify();

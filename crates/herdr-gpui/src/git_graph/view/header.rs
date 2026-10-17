@@ -15,7 +15,7 @@ use crate::{
 use gpui::{prelude::*, *};
 
 /// The top bar's height.
-const BAR_H: f32 = 40.;
+pub(super) const BAR_H: f32 = 40.;
 /// How wide a column's grabbable edge is.
 const EDGE: f32 = 6.;
 
@@ -149,7 +149,12 @@ impl GitGraphView {
                 button("graph-reload", "icons/graph-refresh.svg", true)
                     .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
             )
-            .child(button("graph-search", "icons/search.svg", false))
+            .child(match self.render_search_field() {
+                Some(field) => field,
+                None => button("graph-search", "icons/search.svg", true)
+                    .on_click(cx.listener(|this, _, window, cx| this.open_search(window, cx)))
+                    .into_any_element(),
+            })
             .into_any_element()
     }
 

@@ -11,6 +11,7 @@ pub(crate) mod layout;
 pub(crate) mod model;
 mod parse;
 pub(crate) mod prefs;
+pub(crate) mod search;
 mod tab;
 pub(crate) mod text;
 pub(crate) mod view;
