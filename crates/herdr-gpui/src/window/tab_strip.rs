@@ -67,9 +67,13 @@ impl HerdrWindow {
     /// How wide a tab with `label` draws, as its padding, gaps, close
     /// button, and whatever leads its title add up around the shaped text.
     fn tab_width(&self, label: &SharedString, lead: Lead, zoomed: bool, window: &Window) -> f32 {
+        // At the chosen tab's weight, so choosing a tab never cuts its name
+        // or changes its width.
+        let mut font = self.config.tabs.font();
+        font.weight = FontWeight(font.weight.0.max(super::tab_look::CHOSEN_WEIGHT.0));
         let run = TextRun {
             len: label.len(),
-            font: self.config.tabs.font(),
+            font,
             color: black(),
             background_color: None,
             underline: None,

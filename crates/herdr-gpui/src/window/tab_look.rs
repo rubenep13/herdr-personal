@@ -23,6 +23,8 @@ const MARK: f32 = 11.;
 const BADGE: f32 = 12.;
 /// Space after a tab's lead, before its name.
 pub(super) const LEAD_GAP: f32 = 7.;
+/// The weight the chosen tab's name draws in.
+pub(super) const CHOSEN_WEIGHT: FontWeight = FontWeight::MEDIUM;
 
 /// What a tab shows before its name, which its width makes room for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -142,7 +144,7 @@ impl HerdrWindow {
             .map(|tab| {
                 if selected {
                     tab.text_color(rgb(theme.foreground))
-                        .font_weight(FontWeight::MEDIUM)
+                        .font_weight(CHOSEN_WEIGHT)
                 } else {
                     tab.text_color(rgb(theme.muted))
                         .hover(move |style| style.text_color(rgb(hover)))
@@ -262,7 +264,7 @@ impl HerdrWindow {
                     .min_w_0()
                     .gap(px(LEAD_GAP))
                     .children(self.tab_lead(slot, tab))
-                    .child(tab.label.clone())
+                    .child(div().min_w_0().truncate().child(tab.label.clone()))
                     // Herdr's " Z": one pane fills the tab, the rest are
                     // hidden behind it.
                     .when(tab.zoomed, |title| {
