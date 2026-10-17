@@ -1,8 +1,19 @@
 //! Design tokens of the redesigned main window: the type scale it reads from
-//! the `[ui]` face. Dialogs and menus still size their text from `[ui]`
-//! directly until their own redesign.
+//! the `[ui]` face and the sizes of its rows, from the approved mockup.
+//! Dialogs and menus still size their text from `[ui]` directly until their
+//! own redesign.
 
 use crate::config::FontConfig;
+
+/// A host's or space's row.
+pub(crate) const ROW_HEIGHT: f32 = 34.;
+/// An agent's or tab's row: its name over its kind.
+pub(crate) const AGENT_ROW_HEIGHT: f32 = 44.;
+/// An agent's row with the details line Herdr's config adds.
+pub(crate) const AGENT_DETAILS_HEIGHT: f32 = 60.;
+/// How far a selected row's fill keeps from the sidebar's edges.
+pub(crate) const SELECTION_INSET: f32 = 8.;
+pub(crate) const SELECTION_RADIUS: f32 = 8.;
 
 /// Text sizes of the main window's chrome, in logical pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]

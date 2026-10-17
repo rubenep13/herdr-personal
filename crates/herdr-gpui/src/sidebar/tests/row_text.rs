@@ -179,6 +179,9 @@ fn cells_hand_their_state_and_data_to_the_layout() {
             removing: false,
             status: snapshot.workspaces[0].agent_status,
             lines: vec![],
+            ports: None,
+            attention: 0,
+            more: None,
         })
     };
     let _ = Cell::new(&recorder, workspace(), &cx).row();

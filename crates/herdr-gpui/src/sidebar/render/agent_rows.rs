@@ -150,12 +150,14 @@ impl HerdrWindow {
                 icon: crate::icons::AgentIcon::from_identity(agent.agent.as_deref()),
                 status: agent.agent_status,
                 place,
-                status_text: self
-                    .config
-                    .sidebar_layout
-                    .agents
-                    .shows_status_text(agent.agent.as_deref())
-                    .then(|| state_label(agent, status_text(agent.agent_status))),
+                // The tree's own option decides whether its rows show it.
+                status_text: (titles.is_some()
+                    || self
+                        .config
+                        .sidebar_layout
+                        .agents
+                        .shows_status_text(agent.agent.as_deref()))
+                .then(|| state_label(agent, status_text(agent.agent_status))),
                 lines,
             }),
             row_cx,

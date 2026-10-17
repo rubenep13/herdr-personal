@@ -19,7 +19,7 @@ use crate::{
     config::{FontConfig, LayoutMode, Theme},
     icons::AgentIcon,
 };
-use gpui::{App, ClickEvent, Div, ElementId, ParentElement, Styled, Window};
+use gpui::{AnyElement, App, ClickEvent, Div, ElementId, ParentElement, Styled, Window};
 use herdr_client::protocol::{AgentStatus, ClientShellWorkspace};
 use std::borrow::Cow;
 
@@ -72,6 +72,15 @@ pub(super) struct WorkspaceRow<'a> {
     pub(super) status: AgentStatus,
     /// Daemon token rows, painted in the layout's own frame. Empty keeps its native lines.
     pub(super) lines: Vec<Vec<super::tokens::ResolvedToken>>,
+    /// Its listening ports' chips, for a layout that keeps them in the row;
+    /// the others take them on a line of their own.
+    pub(super) ports: Option<AnyElement>,
+    /// Agents under a folded space that want attention, for a layout that
+    /// counts them in the row rather than in its label.
+    pub(super) attention: usize,
+    /// Opens the space's menu where it was clicked, for a layout that offers
+    /// it on a button as well as on a right click.
+    pub(super) more: Option<Box<ClickHandler>>,
 }
 
 impl<'a> WorkspaceRow<'a> {
@@ -220,7 +229,6 @@ pub(super) fn layout_for(mode: LayoutMode) -> &'static dyn RowLayout {
         LayoutMode::Minimal => &super::layouts::Minimal,
         // Herdr's own rows, nested under each device's header.
         LayoutMode::Devices => &super::layouts::Herdr,
-        // Herdr's own rows, with agents nested under their space.
-        LayoutMode::Tree => &super::layouts::Herdr,
+        LayoutMode::Tree => &super::layouts::Tree,
     }
 }

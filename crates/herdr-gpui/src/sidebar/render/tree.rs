@@ -5,11 +5,12 @@
 //! which only ever changes this client's own order.
 
 use crate::{
-    HerdrWindow,
+    HerdrWindow, NavigationTarget,
     sidebar::{
-        cell::{Fold, RowContext},
+        cell::{ClickHandler, Fold, RowContext, RowState},
         label_text,
         layout::SidebarLook,
+        layouts::tab_row,
         tree::{
             self, EndpointKey, Entry, HostInput, NodeId, SnapshotKey, TreePreferences, TreeRow,
             storage::TreeState,
@@ -18,7 +19,7 @@ use crate::{
     window::Flash,
 };
 use gpui::{prelude::*, *};
-use herdr_client::protocol::ClientShellSnapshot;
+use herdr_client::protocol::{ClientShellSnapshot, ClientShellTab};
 use std::collections::HashMap;
 
 /// The projected tree, grouped the way the spaces list draws it.
@@ -84,17 +85,12 @@ impl TreeLayout {
             .find(|space| space.row.entry == Entry::Space(workspace))
     }
 
-    /// A folded space's name with how many of its agents want attention, so
-    /// the count shows without unfolding it or moving the rows below.
-    pub(in crate::sidebar) fn label(
-        &self,
-        host: usize,
-        workspace: usize,
-        name: &str,
-    ) -> Option<String> {
-        let space = self.space(host, workspace)?;
-        (space.row.collapsed && space.row.attention > 0)
-            .then(|| format!("{name} \u{00b7} {}", space.row.attention))
+    /// How many agents of a folded space want attention, so the count shows
+    /// in its row without unfolding it; none while it is open.
+    pub(in crate::sidebar) fn attention(&self, host: usize, workspace: usize) -> usize {
+        self.space(host, workspace)
+            .filter(|space| space.row.collapsed)
+            .map_or(0, |space| space.row.attention)
     }
 }
 
@@ -238,8 +234,23 @@ impl HerdrWindow {
         let mut count = 0;
         let mut focused = None;
         for row in &space.children {
-            let Entry::Agent(index) = row.entry else {
-                continue;
+            let index = match row.entry {
+                Entry::Agent(index) => index,
+                Entry::Tab(index) => {
+                    let Some(tab) = snapshot.tabs.get(index) else {
+                        continue;
+                    };
+                    let selected = host == self.selected_endpoint
+                        && tab.focused
+                        && snapshot.focused_workspace_id.as_deref() == Some(&tab.workspace_id);
+                    if selected {
+                        focused = Some(count);
+                    }
+                    list = list.child(self.tab_cell(host, tab, selected, &nested, cx));
+                    count += 1;
+                    continue;
+                }
+                Entry::Host | Entry::Space(_) => continue,
             };
             let Some(agent) = snapshot.agents.get(index) else {
                 continue;
@@ -257,6 +268,63 @@ impl HerdrWindow {
             count += 1;
         }
         (list, count, focused)
+    }
+
+    /// The row of a tab no agent runs in, which shows the tab when clicked
+    /// and offers the tab's menu on a right click.
+    fn tab_cell(
+        &self,
+        host: usize,
+        tab: &ClientShellTab,
+        selected: bool,
+        row_cx: &RowContext,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let endpoint = self
+            .endpoints
+            .get(host)
+            .map(|endpoint| endpoint.id.clone())
+            .unwrap_or_default();
+        let selector = format!("tab-row-{endpoint}-{}", tab.tab_id);
+        let (menu_endpoint, menu_tab) = (endpoint.clone(), tab.tab_id.clone());
+        let id = tab.tab_id.clone();
+        let state = RowState {
+            selected,
+            ..RowState::default()
+        };
+        tab_row((&tab.tab_id, &tab.label), state, row_cx)
+            .id(SharedString::from(selector.clone()))
+            .debug_selector(move || selector)
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    if this.navigate_endpoint(&menu_endpoint, NavigationTarget::Tab(&menu_tab), cx)
+                    {
+                        this.open_tab_menu(&menu_tab, None, event.position, window, cx);
+                    }
+                }),
+            )
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.navigate_endpoint(&endpoint, NavigationTarget::Tab(&id), cx);
+                window.focus(&this.focus, cx);
+            }))
+    }
+
+    /// What a space row's menu button does: select the space and open its
+    /// menu where the button was clicked, as a right click on the row does.
+    pub(in crate::sidebar) fn tree_more(
+        &self,
+        endpoint: &str,
+        workspace: &str,
+        cx: &mut Context<Self>,
+    ) -> Box<ClickHandler> {
+        let (endpoint, workspace) = (endpoint.to_owned(), workspace.to_owned());
+        Box::new(cx.listener(move |this, event: &ClickEvent, window, cx| {
+            if this.navigate_endpoint(&endpoint, NavigationTarget::Workspace(&workspace), cx) {
+                this.open_workspace_menu(&workspace, event.position(), window, cx);
+            }
+        }))
     }
 
     /// The space row of `workspace`, dragged among its siblings while no

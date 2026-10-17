@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     backdrop::Fill,
-    config::{Density, LayoutMode, SidebarOverrides, Style, Theme},
+    config::{AgentDetails, Density, LayoutMode, SidebarOverrides, Style, Theme, TreeHierarchy},
 };
 use gpui::{
     Div, Hsla, InteractiveElement, ParentElement, Rgba, Styled, div, prelude::FluentBuilder, px,
@@ -56,6 +56,9 @@ pub(crate) struct SidebarMetrics {
 impl SidebarMetrics {
     /// The density and style a layout name selects.
     pub(crate) fn for_mode(mode: LayoutMode) -> Self {
+        if mode == LayoutMode::Tree {
+            return Self::tree();
+        }
         let density = match mode.density() {
             Density::Comfortable => Self::comfortable(),
             Density::Normal => Self::normal(),
@@ -131,6 +134,26 @@ impl SidebarMetrics {
     /// Edge-to-edge rows, square highlights, and tree lines tying worktrees
     /// to their repository. The spacing fields are placeholders a density
     /// fills in.
+    /// The Tree layout's own rows: content set in from a rounded selection
+    /// that keeps a margin from the sidebar's edges.
+    const fn tree() -> Self {
+        Self {
+            padding: 8.,
+            gap: 8.,
+            child_indent: 22.,
+            nest: 22.,
+            card_indent: 8.,
+            header_padding: 4.,
+            host_padding: 2.,
+            footer_padding: 3.,
+            workspace_details: true,
+            inset: crate::design::SELECTION_INSET,
+            radius: crate::design::SELECTION_RADIUS,
+            tree_lines: false,
+            ..Self::FLAT
+        }
+    }
+
     const FLAT: Self = Self {
         padding: 0.,
         gap: 0.,
@@ -248,6 +271,17 @@ pub(super) struct SidebarLook {
     pub(super) density: SidebarMetrics,
     /// How solid a row's highlight paints; see [`crate::backdrop::Fill::mark`].
     pub(super) mark: f32,
+    /// What the Tree layout's options ask its rows to show.
+    pub(super) tree: TreeLook,
+}
+
+/// The `[sidebar]` options only the Tree layout reads.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct TreeLook {
+    pub(super) hierarchy: TreeHierarchy,
+    /// Name an agent's state in words beside its badge.
+    pub(super) state_text: bool,
+    pub(super) details: AgentDetails,
 }
 
 /// Group every row joins, so its highlight layer can follow the row's hover.
@@ -454,14 +488,21 @@ pub(super) fn for_mode(mode: LayoutMode) -> SidebarLook {
     SidebarLook {
         density: SidebarMetrics::for_mode(mode),
         mark: 1.,
+        tree: TreeLook::default(),
     }
 }
 
 /// The look a window's config asks for: its layout with its overrides, and
 /// highlights as translucent as its backdrop's panels allow.
 pub(super) fn for_config(config: &crate::config::Config, fill: Fill) -> SidebarLook {
+    let style = &config.sidebar_style;
     SidebarLook {
-        density: SidebarMetrics::for_mode(config.layout.mode).with(&config.sidebar_style.overrides),
+        density: SidebarMetrics::for_mode(config.layout.mode).with(&style.overrides),
         mark: fill.mark(),
+        tree: TreeLook {
+            hierarchy: style.hierarchy,
+            state_text: style.state_text,
+            details: style.agent_details,
+        },
     }
 }

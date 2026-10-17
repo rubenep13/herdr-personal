@@ -45,7 +45,13 @@ impl HerdrWindow {
         let layout = look.density;
         let content_x = look.content_x();
         let view = cx.entity().downgrade();
-        let font = &self.config.sidebar;
+        // The tree reads in the interface face, as the rest of the main window.
+        let nested = self.config.layout.mode.nests_agents();
+        let font = if nested {
+            &self.config.ui
+        } else {
+            &self.config.sidebar
+        };
         let spaces_custom = self.config.usage.inline
             && self.config.sidebar_layout.spaces != crate::config::SpaceLayout::default();
         let theme = &self.theme;
@@ -59,7 +65,6 @@ impl HerdrWindow {
         // replace the list, gives way to it; one setting hides either.
         let devices = !self.config.layout.mode.lists_workspaces();
         // The Tree layout narrows in place too, keeping each match's parents.
-        let nested = self.config.layout.mode.nests_agents();
         // A hidden field keeps whatever it held, but never filters the list.
         let searchable = self.config.show_sidebar_search && !devices && !nested;
         let tree_search = self.config.show_sidebar_search && (devices || nested);
@@ -300,12 +305,7 @@ impl HerdrWindow {
                         })),
                     })
                 });
-                let counted = personal.as_ref().and_then(|tree| {
-                    tree.label(endpoint_index, index, workspace_label(workspace, false))
-                });
-                let label = counted
-                    .as_deref()
-                    .unwrap_or_else(|| workspace_label(workspace, indented));
+                let label = workspace_label(workspace, indented);
                 let shown_status = if self.config.usage.inline {
                     displayed_workspace_status(&snapshot.workspaces, workspace, collapsed_repos)
                 } else {
@@ -388,29 +388,34 @@ impl HerdrWindow {
                 // A child's trunk runs on past its note and ports to the next
                 // sibling, as it runs through the row itself.
                 let trunk = rows.trunk_below(&format!("{endpoint_id}-{id}"), tree, &row_cx);
-                let ports = (self.config.show_listening_ports && !removing_row)
+                let chips = (self.config.show_listening_ports && !removing_row)
                     .then_some(daemon.as_ref())
                     .flatten()
                     .and_then(|daemon| self.listening_ports.get(daemon, &workspace.workspace_id))
                     .map(|listed| {
+                        let size = (font.size * 0.85).round();
                         div()
                             .debug_selector(|| format!("ports-{endpoint_id}-{id}"))
-                            .h(px(line_height(font)))
                             .flex_none()
-                            .w_full()
                             .min_w_0()
-                            .pl(px(under_left))
-                            .pr(px(content_x))
-                            .text_size(px((font.size * 0.85).round()))
+                            .text_size(px(size))
                             .child(crate::listening_ports::chips(
                                 listed,
                                 (&endpoint_id, &workspace.workspace_id),
                                 &self.tunnels,
                                 theme,
-                                (font.size * 0.85).round(),
+                                size,
                                 cx,
                             ))
                     });
+                // The tree keeps them in the row; the others give them a line.
+                let (inline_ports, ports) = match personal {
+                    Some(_) => (chips, None),
+                    None => (None, chips.map(|chips| {
+                        let line = chips.h(px(line_height(font))).w_full();
+                        line.pl(px(under_left)).pr(px(content_x))
+                    })),
+                };
                 let element = Cell::new(
                     rows,
                     RowData::Workspace(WorkspaceRow {
@@ -440,6 +445,9 @@ impl HerdrWindow {
                         removing: removing_row,
                         status: shown_status,
                         lines,
+                        ports: inline_ports.map(IntoElement::into_any_element),
+                        attention: personal.as_ref().map_or(0, |t| t.attention(endpoint_index, index)),
+                        more: personal.as_ref().map(|_| self.tree_more(&endpoint_id, &id, cx)),
                     }),
                     &row_cx,
                 )
