@@ -8,7 +8,7 @@ use crate::git_graph::{
     git::WorktreeCounts,
     history::History,
     model::WORKTREE_OID,
-    view::{GitGraphView, GraphLook, error_title},
+    view::{Connection, GitGraphView, GraphLook, error_title},
     worker::Reply,
 };
 use crate::{browser::checkout_path_ok, teleport::Host};
@@ -37,7 +37,7 @@ fn view_of<'a>(
     folder: &str,
 ) -> (Entity<GitGraphView>, &'a mut VisualTestContext) {
     let checkout = GraphCheckout::new(folder.into()).unwrap();
-    cx.add_window_view(|_, cx| GitGraphView::new(local(), checkout, look(), cx))
+    cx.add_window_view(|_, cx| GitGraphView::new(local(), checkout, look(), Connection::Online, cx))
 }
 
 /// Polls the view until it is no longer loading, for at most ten seconds.
@@ -100,13 +100,15 @@ fn view_shows_loading_then_rows_then_errors(cx: &mut TestAppContext) {
 
     let outside = fixture.temp.path().join("home");
     let checkout = GraphCheckout::new(outside.to_str().unwrap().into()).unwrap();
-    let failed = cx.update(|_, cx| cx.new(|cx| GitGraphView::new(local(), checkout, look(), cx)));
+    let failed = cx.update(|_, cx| {
+        cx.new(|cx| GitGraphView::new(local(), checkout, look(), Connection::Online, cx))
+    });
     settle(&failed, cx);
     failed.read_with(cx, |view, _| {
         assert!(view.history().is_none());
         let error = view.error().expect("an error");
         assert!(matches!(**error, Error::NotARepository), "{error:?}");
-        assert_eq!(error_title(error), "Not a Git repository");
+        assert_eq!(error_title(error, None), "Not a Git repository");
     });
 }
 

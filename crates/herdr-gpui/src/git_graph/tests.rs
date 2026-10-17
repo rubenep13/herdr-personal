@@ -22,6 +22,7 @@ mod layout;
 mod prefs;
 #[cfg(unix)]
 mod readonly;
+mod remote;
 mod rows;
 mod tab;
 mod text;
@@ -219,7 +220,13 @@ fn shown(
     use gpui::{px, size};
     let checkout = super::GraphCheckout::new("/repo".into()).unwrap();
     let (view, cx) = cx.add_window_view(|_, cx| {
-        super::view::GitGraphView::new(Err(super::Error::WorkerStopped), checkout, look(), cx)
+        super::view::GitGraphView::new(
+            Err(super::Error::WorkerStopped),
+            checkout,
+            look(),
+            super::view::Connection::Online,
+            cx,
+        )
     });
     cx.simulate_resize(size(px(1000.), px(height)));
     cx.update(|_, cx| {

@@ -2,7 +2,7 @@
 //! restoring it after a restart, and feeding it the window's look from the
 //! tick. The view itself is an entity that knows nothing of tabs.
 
-use super::{GitGraphView, GraphCheckout, GraphLook};
+use super::{GitGraphView, GraphCheckout, GraphLook, view::Connection};
 use crate::{
     HerdrWindow, NavigationTarget,
     browser::{Location, Pick, Slot, Store, Tab, TabId},
@@ -11,9 +11,10 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 
-/// An open Git graph tab's view.
+/// An open Git graph tab's view, and the host its repository is on.
 pub(crate) struct GitGraph {
     view: Entity<GitGraphView>,
+    endpoint: String,
 }
 
 #[cfg(test)]
@@ -113,6 +114,28 @@ impl HerdrWindow {
         }
     }
 
+    /// Whether the host at `index` can be asked anything: an SSH host only
+    /// while it is connected; this machine always, since Git runs here
+    /// whether or not its daemon answers.
+    fn graph_connection(&self, index: usize) -> Connection {
+        let Some(endpoint) = self.endpoints.get(index) else {
+            return Connection::Offline;
+        };
+        if !endpoint.connection.target.is_remote() {
+            return Connection::Online;
+        }
+        let live = if index == self.selected_endpoint {
+            &self.live
+        } else {
+            &endpoint.live
+        };
+        if live.status.is_connected() {
+            Connection::Online
+        } else {
+            Connection::Offline
+        }
+    }
+
     /// Makes `id`'s view from its tab, if the window has none yet.
     fn ensure_git_graph(&mut self, id: TabId, cx: &mut Context<Self>) {
         if self.git_graphs.contains_key(&id) {
@@ -125,11 +148,18 @@ impl HerdrWindow {
         else {
             return;
         };
-        let host = Host::new(&self.endpoints[self.selected_endpoint].connection.target)
-            .map_err(super::Error::from);
+        let endpoint = &self.endpoints[self.selected_endpoint];
+        let host = Host::new(&endpoint.connection.target).map_err(super::Error::from);
+        let remote = endpoint
+            .connection
+            .target
+            .is_remote()
+            .then(|| endpoint.label.clone());
+        let endpoint = endpoint.id.clone();
+        let connection = self.graph_connection(self.selected_endpoint);
         let look = self.graph_look();
-        let view = cx.new(|cx| GitGraphView::new(host, repo, look, cx));
-        self.git_graphs.insert(id, GitGraph { view });
+        let view = cx.new(|cx| GitGraphView::new(host, repo, look, connection, cx).remote(remote));
+        self.git_graphs.insert(id, GitGraph { view, endpoint });
     }
 
     /// Runs every window tick: views for restored tabs are made, closed
@@ -159,7 +189,11 @@ impl HerdrWindow {
         }
         let look = self.graph_look();
         for graph in self.git_graphs.values() {
+            let index = self.endpoints.iter().position(|e| e.id == graph.endpoint);
+            let connection =
+                index.map_or(Connection::Offline, |index| self.graph_connection(index));
             graph.view.update(cx, |view, cx| {
+                view.set_connection(connection, cx);
                 view.poll(cx);
                 view.set_look(look.clone(), cx);
             });

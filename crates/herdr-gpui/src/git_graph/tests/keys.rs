@@ -8,7 +8,7 @@ use crate::git_graph::{
     history::History,
     model::{Ref, RefKind},
     prefs::GraphPrefsStore,
-    view::GitGraphView,
+    view::{Connection, GitGraphView},
     worker::Request,
 };
 use crate::teleport::Host;
@@ -72,7 +72,9 @@ fn h_selects_head_and_c_copies_its_hash(cx: &mut TestAppContext) {
 fn r_reloads(cx: &mut TestAppContext) {
     let checkout = GraphCheckout::new("/nonexistent/graph-test".into()).unwrap();
     let local = Host::new(&ConnectTarget::Local).unwrap();
-    let (view, cx) = cx.add_window_view(|_, cx| GitGraphView::new(Ok(local), checkout, look(), cx));
+    let (view, cx) = cx.add_window_view(|_, cx| {
+        GitGraphView::new(Ok(local), checkout, look(), Connection::Online, cx)
+    });
     focus(&view, cx);
     let first = view.read_with(cx, |view, _| view.generation());
     cx.simulate_keystrokes("r");

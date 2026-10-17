@@ -41,6 +41,9 @@ pub(crate) struct Worker {
     cancelled: Arc<AtomicBool>,
     /// Why the thread is not there, reported once.
     failure: Option<Arc<Error>>,
+    /// Set when the thread ends, for tests that close a tab.
+    #[cfg(test)]
+    finished: Arc<AtomicBool>,
 }
 
 impl Worker {
@@ -49,9 +52,17 @@ impl Worker {
         let (outbox, replies) = mpsc::sync_channel(QUEUE);
         let cancelled = Arc::new(AtomicBool::new(false));
         let flag = cancelled.clone();
+        #[cfg(test)]
+        let finished = Arc::new(AtomicBool::new(false));
+        #[cfg(test)]
+        let done = finished.clone();
         let failure = std::thread::Builder::new()
             .name("git-graph".into())
-            .spawn(move || run(&host, &folder, &inbox, &outbox, &flag))
+            .spawn(move || {
+                run(&host, &folder, &inbox, &outbox, &flag);
+                #[cfg(test)]
+                done.store(true, Ordering::Release);
+            })
             .err()
             .map(|error| Arc::new(Error::Thread(error)));
         Self {
@@ -60,7 +71,14 @@ impl Worker {
             generation: 0,
             cancelled,
             failure,
+            #[cfg(test)]
+            finished,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn finished(&self) -> Arc<AtomicBool> {
+        self.finished.clone()
     }
 
     /// Queues `request` and returns its generation; replies to earlier

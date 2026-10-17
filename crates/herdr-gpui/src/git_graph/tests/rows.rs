@@ -11,7 +11,7 @@ use crate::git_graph::{
     history::History,
     layout::{Anchor, Point, Segment},
     model::{Ref, RefKind},
-    view::{GitGraphView, chip_icons},
+    view::{Connection, GitGraphView, chip_icons},
     worker::{Reply, Request},
 };
 use crate::{config::Theme, teleport::Host};
@@ -106,7 +106,9 @@ fn nodes_follow_the_commit_kind(cx: &mut TestAppContext) {
 fn scrolling_near_the_end_loads_more(cx: &mut TestAppContext) {
     let checkout = GraphCheckout::new("/nonexistent/graph-test".into()).unwrap();
     let local = Host::new(&ConnectTarget::Local).unwrap();
-    let (view, cx) = cx.add_window_view(|_, cx| GitGraphView::new(Ok(local), checkout, look(), cx));
+    let (view, cx) = cx.add_window_view(|_, cx| {
+        GitGraphView::new(Ok(local), checkout, look(), Connection::Online, cx)
+    });
     cx.simulate_resize(size(px(1000.), px(600.)));
     let first = view.read_with(cx, |view, _| view.generation());
     // The test answers the first load itself and never polls the worker.

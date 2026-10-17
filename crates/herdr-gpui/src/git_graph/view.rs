@@ -30,6 +30,13 @@ use std::{collections::HashMap, sync::Arc};
 /// Rows from the end at which the next page is asked for.
 const MORE_WITHIN: usize = 50;
 
+/// Whether the host the repository is on can be asked anything now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Connection {
+    Online,
+    Offline,
+}
+
 /// What the view draws with; the window replaces it when settings change.
 #[derive(Clone, Debug)]
 pub(crate) struct GraphLook {
@@ -53,6 +60,12 @@ pub(crate) struct GitGraphView {
     column_menu: bool,
     /// `None` when the host cannot run scripts; `error` says why.
     worker: Option<Worker>,
+    /// The host the worker reads on, for tests.
+    #[cfg(test)]
+    host: Option<Host>,
+    /// The SSH host's name, for messages; `None` for this machine.
+    remote: Option<String>,
+    connection: Connection,
     /// The generation and kind of the last request; older replies are stale.
     latest: (u64, Request),
     waiting: bool,
@@ -64,37 +77,78 @@ pub(crate) struct GitGraphView {
     hovered_chip: Option<(usize, usize)>,
 }
 
-/// The headline for a failure the tab shows instead of rows.
-pub(crate) fn error_title(error: &Error) -> &'static str {
-    match error {
-        Error::NotARepository => "Not a Git repository",
-        Error::GitMissing => "Git is not installed on this host",
-        _ => "Could not read the repository",
+/// The headline for a failure, on this machine or the SSH host `remote`.
+/// SSH's own failures name the host rather than reading as Git's.
+pub(crate) fn error_title(error: &Error, remote: Option<&str>) -> String {
+    use herdr_client::Error as Script;
+    let unreachable = |source: &Script| match source {
+        Script::ScriptConnect(_) => true,
+        // SSH exits 255 when it cannot connect; Git never does.
+        Script::ScriptExit { status, .. } => status.code() == Some(255),
+        _ => false,
+    };
+    match (error, remote) {
+        (Error::NotARepository, _) => "Not a Git repository".into(),
+        (Error::GitMissing, Some(host)) => format!("Git is not installed on {host}"),
+        (Error::GitMissing, None) => "Git is not installed on this machine".into(),
+        (Error::Script { source, .. }, Some(host)) if unreachable(source) => {
+            format!("Cannot reach {host}")
+        }
+        (
+            Error::Script {
+                source: Script::ScriptTimeout,
+                ..
+            },
+            host,
+        ) => format!("{} took too long to answer", host.unwrap_or("Git")),
+        (
+            Error::Script {
+                source: Script::ScriptOutputLimit,
+                ..
+            },
+            _,
+        ) => "The repository's history is too large to read at once".into(),
+        (
+            Error::Script {
+                source: Script::ScriptUnsupported,
+                ..
+            },
+            Some(_),
+        ) => "Remote Git graphs need macOS or Linux".into(),
+        (
+            Error::Script {
+                source: Script::ScriptUnsupported,
+                ..
+            },
+            None,
+        ) => "The Git graph needs macOS or Linux".into(),
+        (Error::Host(_), _) => "The Git graph needs a local or SSH host".into(),
+        _ => "Could not read the repository".into(),
     }
 }
 
 impl GitGraphView {
     /// A view of `checkout` read on `host`, or showing why it cannot be.
+    /// It reads once the host is online.
     pub(crate) fn new(
         host: Result<Host, Error>,
         checkout: GraphCheckout,
         look: GraphLook,
+        connection: Connection,
         cx: &mut Context<Self>,
     ) -> Self {
-        let (worker, error, latest) = match host {
-            Ok(host) => {
-                let mut worker = Worker::start(host, checkout.checkout.clone());
-                let generation = worker.send(Request::Load);
-                (Some(worker), None, generation)
-            }
-            Err(error) => (None, Some(Arc::new(error)), 0),
+        #[cfg(test)]
+        let kept = host.as_ref().ok().cloned();
+        let (worker, error) = match host {
+            Ok(host) => (Some(Worker::start(host, checkout.checkout.clone())), None),
+            Err(error) => (None, Some(Arc::new(error))),
         };
         let prefs = cx.observe_global::<GraphPrefsStore>(|this, cx| {
             this.prefs = GraphPrefsStore::get(cx);
             cx.notify();
         });
-        Self {
-            waiting: worker.is_some(),
+        let mut view = Self {
+            waiting: false,
             checkout,
             focus_handle: cx.focus_handle(),
             look,
@@ -104,12 +158,60 @@ impl GitGraphView {
             selected: None,
             column_menu: false,
             worker,
-            latest: (latest, Request::Load),
+            #[cfg(test)]
+            host: kept,
+            remote: None,
+            connection,
+            latest: (0, Request::Load),
             history: None,
             error,
             chip_widths: HashMap::new(),
             hovered_chip: None,
+        };
+        view.send(Request::Load);
+        view
+    }
+
+    /// Names the SSH host the repository is on, for messages.
+    pub(crate) fn remote(mut self, remote: Option<String>) -> Self {
+        self.remote = remote;
+        self
+    }
+
+    /// Follows the host's connection: nothing is asked of an offline host,
+    /// and the repository is read again when it comes back.
+    pub(crate) fn set_connection(&mut self, connection: Connection, cx: &mut Context<Self>) {
+        if connection == self.connection {
+            return;
         }
+        self.connection = connection;
+        if connection == Connection::Online {
+            self.send(Request::Load);
+        }
+        cx.notify();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn connection(&self) -> Connection {
+        self.connection
+    }
+
+    /// What the top bar's indicator says.
+    pub(crate) fn indicator(&self) -> &'static str {
+        match self.connection {
+            Connection::Online => "live",
+            Connection::Offline => "offline",
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn host(&self) -> Option<&Host> {
+        self.host.as_ref()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn worker_finished(&self) -> Option<Arc<std::sync::atomic::AtomicBool>> {
+        self.worker.as_ref().map(Worker::finished)
     }
 
     /// Takes the worker's news; whether anything changed.
@@ -151,6 +253,9 @@ impl GitGraphView {
     }
 
     fn send(&mut self, request: Request) {
+        if self.connection == Connection::Offline {
+            return;
+        }
         if let Some(worker) = self.worker.as_mut() {
             self.latest = (worker.send(request), request);
             self.waiting = true;
@@ -304,8 +409,15 @@ impl Render for GitGraphView {
         let theme = &self.look.theme;
         let body = match (&self.history, &self.error) {
             (None, Some(error)) => self.render_message(
-                error_title(error),
+                &error_title(error, self.remote.as_deref()),
                 Some(format!("{} \u{2014} {error}", self.checkout.checkout)),
+            ),
+            (None, None) if self.connection == Connection::Offline => self.render_message(
+                "Offline",
+                Some(format!(
+                    "{} is not connected",
+                    self.remote.as_deref().unwrap_or("The host")
+                )),
             ),
             (None, None) => self.render_message("Loading\u{2026}", None),
             (Some(history), _) if history.commits.is_empty() => {

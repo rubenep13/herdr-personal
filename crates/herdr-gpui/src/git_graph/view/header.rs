@@ -88,7 +88,10 @@ impl GitGraphView {
                     theme.muted
                 })))
         };
-        let live = theme.ink(theme.palette[2]);
+        let live = match self.connection {
+            super::Connection::Online => theme.ink(theme.palette[2]),
+            super::Connection::Offline => theme.muted,
+        };
         div()
             .debug_selector(|| "graph-bar".to_owned())
             .flex_none()
@@ -138,7 +141,7 @@ impl GitGraphView {
                     .text_size(px(11.5))
                     .text_color(rgb(theme.muted))
                     .child(div().size(px(7.)).rounded_full().bg(rgb(live)))
-                    .child("live"),
+                    .child(self.indicator()),
             )
             .child(
                 button("graph-reload", "icons/graph-refresh.svg", true)
