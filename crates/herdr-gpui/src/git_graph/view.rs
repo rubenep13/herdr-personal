@@ -7,6 +7,7 @@ mod header;
 mod keys;
 mod lanes;
 mod rows;
+mod worktree;
 
 #[cfg(test)]
 pub(crate) use chips::chip_icons;
@@ -253,7 +254,23 @@ impl GitGraphView {
                 truncated,
             } => self.receive_diff(
                 generation,
-                Some((&oid, &path)),
+                Some((&oid, &path, None)),
+                Ok(detail::DiffLines {
+                    lines,
+                    spans,
+                    truncated,
+                }),
+            ),
+            Reply::Worktree(status) => self.receive_worktree(generation, status),
+            Reply::WorktreeDiff {
+                section,
+                path,
+                lines,
+                spans,
+                truncated,
+            } => self.receive_diff(
+                generation,
+                Some((super::model::WORKTREE_OID, &path, Some(section))),
                 Ok(detail::DiffLines {
                     lines,
                     spans,

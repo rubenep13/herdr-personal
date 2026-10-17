@@ -7,12 +7,13 @@ use crate::{
     config::{Theme, mix},
     fonts::StyledFont,
     git_graph::{
-        detail::{CommitDetail, file_counts, file_label},
+        detail::{CommitDetail, FileChange, file_counts, file_label},
         error::Error,
         model::{CommitKind, WORKTREE_OID},
         prefs::PANEL_MIN,
         text::{author_colour, full_date, initials, relative_time},
         worker::Request,
+        worktree::{Section, WorktreeStatus},
     },
     panel_resize::RESIZE_HOVER,
     review::{Kind, Lines, highlight::Span},
@@ -43,8 +44,10 @@ pub(super) struct Panel {
     pub(super) oid: String,
     generation: u64,
     detail: Option<Arc<CommitDetail>>,
+    /// The uncommitted changes, when the panel shows the WIP row.
+    pub(super) worktree: Option<Arc<WorktreeStatus>>,
     error: Option<Arc<Error>>,
-    file: Option<usize>,
+    pub(super) file: Option<usize>,
     diff: Option<Diff>,
     scroll: ScrollHandle,
     diff_scroll: UniformListScrollHandle,
@@ -58,8 +61,10 @@ pub(super) struct DiffLines {
 }
 
 /// The chosen file's diff.
-struct Diff {
+pub(super) struct Diff {
     path: String,
+    /// Which side of an uncommitted file it shows.
+    section: Option<Section>,
     generation: u64,
     lines: Option<Arc<Lines>>,
     spans: Arc<Vec<Vec<Span>>>,
@@ -73,6 +78,7 @@ impl Panel {
             oid,
             generation,
             detail: None,
+            worktree: None,
             error: None,
             file: None,
             diff: None,
@@ -81,9 +87,17 @@ impl Panel {
         }
     }
 
+    pub(super) fn diff(&self) -> Option<&Diff> {
+        self.diff.as_ref()
+    }
+
+    pub(super) fn diff_shown(&self) -> bool {
+        self.diff.is_some()
+    }
+
     /// The generation of the request still out for it, of either kind.
     pub(super) fn waits_for(&self, generation: u64) -> Option<bool> {
-        if self.generation == generation && self.detail.is_none() {
+        if self.generation == generation && self.detail.is_none() && self.worktree.is_none() {
             return Some(true);
         }
         self.diff
@@ -114,7 +128,7 @@ impl GitGraphView {
             return;
         }
         let generation = if commit.kind == CommitKind::Worktree {
-            0
+            self.send(Request::Worktree)
         } else {
             self.send(Request::Detail(commit.oid.clone()))
         };
@@ -130,23 +144,40 @@ impl GitGraphView {
         true
     }
 
-    /// Asks for the diff of the panel's file `index`.
-    fn choose_file(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some((oid, file)) = self.panel.as_ref().and_then(|panel| {
-            let file = panel.detail.as_ref()?.files.get(index)?.clone();
-            Some((panel.oid.clone(), file))
+    /// Asks for the diff of the panel's file `index`: a commit's, or an
+    /// uncommitted one's in its section.
+    pub(super) fn choose_file(&mut self, index: usize, cx: &mut Context<Self>) {
+        let Some((oid, section, file)) = self.panel.as_ref().and_then(|panel| {
+            let (section, file) = match &panel.worktree {
+                Some(status) => {
+                    let (section, file) = status.files.get(index)?;
+                    (Some(*section), file.clone())
+                }
+                None => (None, panel.detail.as_ref()?.files.get(index)?.clone()),
+            };
+            Some((panel.oid.clone(), section, file))
         }) else {
             return;
         };
-        let generation = self.send(Request::Diff {
-            oid,
-            path: file.git_path.clone(),
-            old_path: file.git_old_path.clone(),
-        });
+        let path = file.git_path.clone();
+        let old_path = file.git_old_path.clone();
+        let generation = match section {
+            Some(section) => self.send(Request::WorktreeDiff {
+                section,
+                path,
+                old_path,
+            }),
+            None => self.send(Request::Diff {
+                oid,
+                path,
+                old_path,
+            }),
+        };
         if let Some(panel) = self.panel.as_mut() {
             panel.file = Some(index);
             panel.diff = Some(Diff {
                 path: file.git_path,
+                section,
                 generation,
                 lines: None,
                 spans: Arc::default(),
@@ -217,12 +248,31 @@ impl GitGraphView {
         true
     }
 
-    /// A diff for the panel's chosen file; `key` is the commit and path it
-    /// answers, unknown for a failure.
+    pub(super) fn receive_worktree(
+        &mut self,
+        generation: u64,
+        status: Arc<WorktreeStatus>,
+    ) -> bool {
+        let Some(panel) = self
+            .panel
+            .as_mut()
+            .filter(|panel| panel.oid == WORKTREE_OID)
+        else {
+            return false;
+        };
+        if generation < panel.generation {
+            return false;
+        }
+        panel.worktree = Some(status);
+        true
+    }
+
+    /// A diff for the panel's chosen file; `key` is the commit, path and
+    /// section it answers, unknown for a failure.
     pub(super) fn receive_diff(
         &mut self,
         generation: u64,
-        key: Option<(&str, &str)>,
+        key: Option<(&str, &str, Option<Section>)>,
         diff: Result<DiffLines, Arc<Error>>,
     ) -> bool {
         let Some(panel) = self.panel.as_mut() else {
@@ -233,7 +283,9 @@ impl GitGraphView {
             return false;
         };
         if generation < shown.generation
-            || key.is_some_and(|(answered, path)| answered != oid || path != shown.path)
+            || key.is_some_and(|(answered, path, section)| {
+                answered != oid || path != shown.path || section != shown.section
+            })
         {
             return false;
         }
@@ -303,7 +355,14 @@ impl GitGraphView {
                 this.close_detail(cx);
             }));
         let body = match (&panel.detail, &panel.error) {
-            _ if panel.oid == WORKTREE_OID => self.panel_note("Uncommitted changes"),
+            _ if panel.oid == WORKTREE_OID => match (&panel.worktree, &panel.error) {
+                (Some(status), _) => self.render_worktree(panel, status, cx),
+                (None, Some(error)) => self.panel_note(&crate::git_graph::view::error_title(
+                    error,
+                    self.remote.as_deref(),
+                )),
+                (None, None) => self.panel_note("Loading changes\u{2026}"),
+            },
             (Some(detail), _) => self.render_commit(panel, detail, cx),
             (None, Some(error)) => self.panel_note(&crate::git_graph::view::error_title(
                 error,
@@ -340,7 +399,7 @@ impl GitGraphView {
         )
     }
 
-    fn panel_note(&self, text: &str) -> AnyElement {
+    pub(super) fn panel_note(&self, text: &str) -> AnyElement {
         div()
             .px_4()
             .py_3()
@@ -462,44 +521,7 @@ impl GitGraphView {
             .overflow_hidden()
             .bg(rgb(theme.background))
             .children(detail.files.iter().enumerate().map(|(index, file)| {
-                let chosen = panel.file == Some(index);
-                let letter_colour = match file.kind {
-                    'A' => theme.ink(theme.palette[2]),
-                    'D' => theme.ink(theme.palette[1]),
-                    'R' | 'C' => theme.ink(theme.palette[4]),
-                    _ => theme.ink(theme.palette[3]),
-                };
-                div()
-                    .id(("graph-file", index))
-                    .debug_selector(move || format!("graph-file-{index}"))
-                    .h(px(26.))
-                    .px_2()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .cursor_pointer()
-                    .when(chosen, |el| el.bg(rgb(theme.active)))
-                    .hover(|style| style.bg(rgb(mix(theme.background, theme.foreground, 6))))
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(14.))
-                            .text_font(&self.look.mono)
-                            .font_weight(FontWeight::BOLD)
-                            .text_size(px(11.))
-                            .text_color(rgb(letter_colour))
-                            .child(file.kind.to_string()),
-                    )
-                    .child(div().flex_1().min_w_0().truncate().child(file_label(file)))
-                    .child(
-                        div()
-                            .flex_none()
-                            .text_font(&self.look.mono)
-                            .text_size(px(11.))
-                            .text_color(rgb(theme.muted))
-                            .child(file_counts(file)),
-                    )
-                    .on_click(cx.listener(move |this, _, _, cx| this.choose_file(index, cx)))
+                self.render_file(index, file, panel.file == Some(index), true, cx)
             }));
         let info = div()
             .id("graph-detail-info")
@@ -658,8 +680,70 @@ impl GitGraphView {
             .into_any_element()
     }
 
-    fn render_diff(&self, panel: &Panel, diff: &Diff, cx: &mut Context<Self>) -> AnyElement {
+    /// One file of a list, by its letter and name, with its line counts
+    /// when `counts`; a click shows its diff.
+    pub(super) fn render_file(
+        &self,
+        index: usize,
+        file: &FileChange,
+        chosen: bool,
+        counts: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = &self.look.theme;
+        let letter_colour = match file.kind {
+            'A' | '?' => theme.ink(theme.palette[2]),
+            'D' | 'U' => theme.ink(theme.palette[1]),
+            'R' | 'C' => theme.ink(theme.palette[4]),
+            _ => theme.ink(theme.palette[3]),
+        };
+        div()
+            .id(("graph-file", index))
+            .debug_selector(move || format!("graph-file-{index}"))
+            .h(px(26.))
+            .px_2()
+            .flex()
+            .items_center()
+            .gap_2()
+            .cursor_pointer()
+            .when(chosen, |el| el.bg(rgb(theme.active)))
+            .hover(|style| style.bg(rgb(mix(theme.background, theme.foreground, 6))))
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(14.))
+                    .text_font(&self.look.mono)
+                    .font_weight(FontWeight::BOLD)
+                    .text_size(px(11.))
+                    .text_color(rgb(letter_colour))
+                    .child(file.kind.to_string()),
+            )
+            .child(div().flex_1().min_w_0().truncate().child(file_label(file)))
+            .when(counts, |el| {
+                el.child(
+                    div()
+                        .flex_none()
+                        .text_font(&self.look.mono)
+                        .text_size(px(11.))
+                        .text_color(rgb(theme.muted))
+                        .child(file_counts(file)),
+                )
+            })
+            .on_click(cx.listener(move |this, _, _, cx| this.choose_file(index, cx)))
+            .into_any_element()
+    }
+
+    pub(super) fn render_diff(
+        &self,
+        panel: &Panel,
+        diff: &Diff,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = &self.look.theme;
+        let path = match diff.section {
+            Some(section) => format!("{} \u{00b7} {}", section.title(), diff.path),
+            None => diff.path.clone(),
+        };
         let title = div()
             .flex_none()
             .px_4()
@@ -668,7 +752,7 @@ impl GitGraphView {
             .text_size(px(12.))
             .text_color(rgb(theme.subtext()))
             .truncate()
-            .child(diff.path.clone());
+            .child(path);
         let body = match (&diff.lines, &diff.error) {
             (Some(lines), _) if lines.is_empty() => self.panel_note("No text changes."),
             (Some(lines), _) => uniform_list(

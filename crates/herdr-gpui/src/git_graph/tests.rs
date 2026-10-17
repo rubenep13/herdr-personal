@@ -28,6 +28,7 @@ mod rows;
 mod tab;
 mod text;
 mod worker;
+mod worktree;
 
 /// A commit with only the fields the lane engine reads.
 fn commit(oid: &str, parents: &[&str]) -> Commit {

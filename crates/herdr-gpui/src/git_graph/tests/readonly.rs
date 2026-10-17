@@ -111,6 +111,19 @@ fn the_reader_never_writes() {
     assert!(!page.commits.is_empty());
     let counts = repo.worktree(&cancelled).unwrap();
     assert_eq!(counts.unstaged, 1);
+    let status = repo.worktree_status(&cancelled).unwrap();
+    assert!(!status.files.is_empty());
+    for (section, file) in &status.files {
+        repo.worktree_diff(*section, &file.git_path, None, &cancelled)
+            .unwrap();
+    }
+    let detail = repo
+        .commit_detail(&page.commits[0].oid, &cancelled)
+        .unwrap();
+    if let Some(file) = detail.files.first() {
+        repo.file_diff(&detail.commit.oid, &file.git_path, None, &cancelled)
+            .unwrap();
+    }
 
     let after = fingerprint(fixture.path());
     let changed: Vec<&PathBuf> = before

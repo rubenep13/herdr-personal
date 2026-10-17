@@ -17,6 +17,7 @@ impl GitGraphView {
             ("j" | "down", false) => self.step(1, cx),
             ("k" | "up", false) => self.step(-1, cx),
             ("h", false) => self.select_head(cx),
+            ("w", false) => self.select_worktree(cx),
             ("c", false) => self.copy_hash(cx),
             ("r", false) => {
                 self.reload(cx);
@@ -73,6 +74,23 @@ impl GitGraphView {
             return false;
         };
         self.select_row(row, cx);
+        true
+    }
+
+    /// Selects the uncommitted changes' row, when there is one.
+    fn select_worktree(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(row) = self
+            .history
+            .as_ref()
+            .and_then(|history| history.row_of(crate::git_graph::model::WORKTREE_OID))
+        else {
+            return false;
+        };
+        if self.panel.is_some() {
+            self.open_detail(row, cx);
+        } else {
+            self.select_row(row, cx);
+        }
         true
     }
 

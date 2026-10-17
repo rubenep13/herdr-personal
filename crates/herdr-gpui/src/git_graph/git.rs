@@ -5,10 +5,11 @@
 //! optional locks, lazy fetches, hooks, a filesystem monitor, any transport
 //! or automatic maintenance, so reading never writes to the repository.
 
-use super::detail::{self, CommitDetail, DIFF_READ, DiffText};
+use super::detail::{self, CommitDetail, DIFF_READ, DiffText, MAX_DIFF_LINES};
 use super::error::{Error, Result};
 use super::model::{Commit, Ref};
 use super::parse;
+use super::worktree::{self, Section, WorktreeStatus};
 use crate::teleport::Host;
 use herdr_client::{ScriptLimits, shell_quote};
 use std::{
@@ -238,6 +239,47 @@ herdr_git diff-tree -r -M -p --no-color --src-prefix=a/ --dst-prefix=b/ "$@" -- 
         );
         let output = run(&self.host, &self.root, "diff-tree", &body, &[], cancelled)?;
         Ok(detail::file_diff(&output, path))
+    }
+
+    /// The uncommitted files by section, and the branch's upstream.
+    pub(crate) fn worktree_status(&self, cancelled: &AtomicBool) -> Result<WorktreeStatus> {
+        let body = "herdr_git status --porcelain=v2 --branch --untracked-files=all -z\n";
+        let output = run(&self.host, &self.root, "status", body, &[], cancelled)?;
+        worktree::parse(&output).ok_or(Error::Output {
+            operation: "status",
+        })
+    }
+
+    /// `path`'s uncommitted change in `section`: the index against HEAD for
+    /// staged, the working tree against the index for unstaged, and the
+    /// whole file as added for an untracked or conflicted one. Cut like a
+    /// commit's diff.
+    pub(crate) fn worktree_diff(
+        &self,
+        section: Section,
+        path: &str,
+        old_path: Option<&str>,
+        cancelled: &AtomicBool,
+    ) -> Result<DiffText> {
+        let quoted = shell_quote(path);
+        let paths = std::iter::once(path)
+            .chain(old_path)
+            .map(|path| shell_quote(&crate::review::literal(path)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let diff = "herdr_git diff -M --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/";
+        let body = match section {
+            Section::Staged => format!("{diff} --cached -- {paths} | head -n {DIFF_READ}\n"),
+            Section::Unstaged => format!("{diff} -- {paths} | head -n {DIFF_READ}\n"),
+            Section::Untracked | Section::Conflicted => {
+                format!("head -n {} -- {quoted}\n", MAX_DIFF_LINES + 1)
+            }
+        };
+        let output = run(&self.host, &self.root, "diff", &body, &[], cancelled)?;
+        Ok(match section {
+            Section::Staged | Section::Unstaged => detail::file_diff(&output, path),
+            Section::Untracked | Section::Conflicted => detail::whole_file(&output, path),
+        })
     }
 
     pub(crate) fn worktree(&self, cancelled: &AtomicBool) -> Result<WorktreeCounts> {

@@ -15,6 +15,7 @@ mod tab;
 pub(crate) mod text;
 pub(crate) mod view;
 pub(crate) mod worker;
+pub(crate) mod worktree;
 
 pub(crate) use checkout::GraphCheckout;
 pub(crate) use error::Error;

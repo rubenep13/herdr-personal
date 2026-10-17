@@ -204,6 +204,31 @@ pub(super) fn file_diff(output: &[u8], name: &str) -> DiffText {
     }
 }
 
+/// A file shown whole, every line added, from at most `MAX_DIFF_LINES + 1`
+/// of its lines; nothing for a binary one. Blocking: it runs on the
+/// worker.
+pub(super) fn whole_file(output: &[u8], name: &str) -> DiffText {
+    if output.contains(&0) {
+        return DiffText::default();
+    }
+    let text = String::from_utf8_lossy(output);
+    // `Lines::added` adds its own hunk header.
+    let keep = MAX_DIFF_LINES - 1;
+    let truncated = text.lines().count() > keep;
+    let kept: String = text
+        .lines()
+        .take(keep)
+        .flat_map(|line| [line, "\n"])
+        .collect();
+    let lines = Lines::added(&kept);
+    let spans = crate::review::highlight::colour(name, &lines, 0..lines.len());
+    DiffText {
+        lines,
+        spans,
+        truncated,
+    }
+}
+
 /// The first file's lines in a diff; none for a binary file.
 fn parse_files_first(text: &str) -> Lines {
     crate::review::parse_files(text)

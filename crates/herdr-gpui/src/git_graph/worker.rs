@@ -14,6 +14,7 @@ use super::{
     git::{PAGE, Repo, Snapshot, WorktreeCounts},
     history::History,
     model::Commit,
+    worktree::{Section, WorktreeStatus},
 };
 use crate::{
     review::{Lines, highlight::Span},
@@ -42,6 +43,14 @@ pub(crate) enum Request {
         path: String,
         old_path: Option<String>,
     },
+    /// The uncommitted files and the upstream.
+    Worktree,
+    /// One uncommitted file as it is in `section`.
+    WorktreeDiff {
+        section: Section,
+        path: String,
+        old_path: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -56,11 +65,21 @@ pub(crate) enum Reply {
         spans: Arc<Vec<Vec<Span>>>,
         truncated: bool,
     },
+    Worktree(Arc<WorktreeStatus>),
+    WorktreeDiff {
+        section: Section,
+        path: String,
+        lines: Arc<Lines>,
+        spans: Arc<Vec<Vec<Span>>>,
+        truncated: bool,
+    },
     /// The request of this generation failed, whatever its kind.
     Failed(Arc<Error>),
 }
 
-/// The newest request of each kind, waiting for the thread.
+/// The newest request of each kind, waiting for the thread. A commit's
+/// detail and the uncommitted changes' share a kind, as do their diffs:
+/// the panel shows one at a time.
 #[derive(Debug, Default)]
 pub(crate) struct Pending {
     history: Option<(u64, Request)>,
@@ -77,8 +96,10 @@ impl Pending {
                 let request = if reload { Request::Load } else { request };
                 self.history = Some((generation, request));
             }
-            Request::Detail(_) => self.detail = Some((generation, request)),
-            Request::Diff { .. } => self.diff = Some((generation, request)),
+            Request::Detail(_) | Request::Worktree => self.detail = Some((generation, request)),
+            Request::Diff { .. } | Request::WorktreeDiff { .. } => {
+                self.diff = Some((generation, request));
+            }
         }
     }
 
@@ -252,6 +273,29 @@ impl State<'_> {
                         .file_diff(&oid, &path, old_path.as_deref(), cancelled)?;
                 Ok(Reply::Diff {
                     oid,
+                    path,
+                    lines: Arc::new(diff.lines),
+                    spans: Arc::new(diff.spans),
+                    truncated: diff.truncated,
+                })
+            }
+            Request::Worktree => {
+                let status = self.repo(cancelled)?.worktree_status(cancelled)?;
+                Ok(Reply::Worktree(Arc::new(status)))
+            }
+            Request::WorktreeDiff {
+                section,
+                path,
+                old_path,
+            } => {
+                let diff = self.repo(cancelled)?.worktree_diff(
+                    section,
+                    &path,
+                    old_path.as_deref(),
+                    cancelled,
+                )?;
+                Ok(Reply::WorktreeDiff {
+                    section,
                     path,
                     lines: Arc::new(diff.lines),
                     spans: Arc::new(diff.spans),
