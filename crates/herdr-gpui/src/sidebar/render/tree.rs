@@ -191,6 +191,12 @@ fn droppable(dragged: &NodeId, target: &NodeId) -> bool {
 }
 
 impl HerdrWindow {
+    /// Whether the Tree layout draws a header for each host, which carries
+    /// the host's load and its new space button: only with more than one.
+    pub(crate) fn tree_host_headers(&self) -> bool {
+        self.config.layout.mode.nests_agents() && self.endpoints.len() > 1
+    }
+
     /// The hosts the tree lists, in device order, each with the state it
     /// draws from: the selected host's live copy, the others' own.
     pub(crate) fn tree_hosts(&self) -> Vec<HostInput<'_>> {
@@ -235,7 +241,7 @@ impl HerdrWindow {
             !query.trim().is_empty(),
             (
                 self.config.sidebar_style.hierarchy,
-                self.endpoints.len() > 1,
+                self.tree_host_headers(),
             ),
         )
     }

@@ -874,9 +874,10 @@ CPU use and a memory meter, each with its current share, and cores, load
 averages, memory in gigabytes, free space on the volume holding the home
 directory, and uptime in its tooltip. With more than one host, each
 host row in the sidebar shows its own: right-aligned gauges after the name in
-compact layouts, and the sparkline and meter on a second line otherwise. The
-Tree layout leaves the status bar out of it: each host's header shows its CPU
-and memory shares in place of the status bar's reading. This
+compact layouts, and the sparkline and meter on a second line otherwise. With
+more than one host, the Tree layout leaves the status bar out of it: each
+host's header shows its CPU and memory shares in place of the status bar's
+reading. This
 machine is read in process; each connected Linux or macOS remote host is read
 every two seconds over its own SSH shell, kept open while the host is connected
 (`/proc` on Linux; `vm_stat` and a one-second `iostat` on macOS; `df -Pk
@@ -1102,7 +1103,9 @@ agent_details = "herdr"  # "off" leaves out Herdr's extra agent rows
 
 `guide` runs a line down from the host's icon beside its rows, `indent` steps
 each level further in, and `block` sets each host and its rows in one rounded
-block. They decorate only hosts with a header.
+block. They decorate only hosts with a header. With a single host the tree
+draws no header, so the list keeps its `new` and `menu` footer and the status
+bar keeps the host's load.
 
 New installs start with `tree`: the first launch writes it into the new
 `config-gpui.local.toml`. Existing override files and migrated personal

@@ -4,7 +4,7 @@
 
 use super::{HISTORY, Reading, sample::Memory};
 use crate::{
-    config::{LayoutMode, Theme, status_bar::Detail},
+    config::{Theme, status_bar::Detail},
     usage::Host,
     window::HerdrWindow,
 };
@@ -26,9 +26,9 @@ const CRITICAL: f32 = 90.;
 
 impl HerdrWindow {
     /// The selected host's load; nothing while hidden or before the host's
-    /// first answer. The Tree layout shows each host's on its own row.
+    /// first answer. The Tree layout's host headers show each host's instead.
     pub(crate) fn render_system_load(&self) -> Option<impl IntoElement> {
-        if !self.config.show_system_load || self.config.layout.mode == LayoutMode::Tree {
+        if !self.config.show_system_load || self.tree_host_headers() {
             return None;
         }
         let host = self.selected_host()?;

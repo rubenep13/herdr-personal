@@ -96,6 +96,8 @@ mod tree_row_data;
 #[cfg(test)]
 mod tree_rows;
 #[cfg(test)]
+mod tree_single_host;
+#[cfg(test)]
 mod update_notes;
 #[cfg(test)]
 mod update_notes_scrollbar;

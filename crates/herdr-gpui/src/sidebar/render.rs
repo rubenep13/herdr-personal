@@ -747,8 +747,11 @@ impl HerdrWindow {
                                 None => list.child(spaces).children(pinned_host),
                             }),
                     )
-                    // The tree's host + and space ⋯ buttons stand in for these.
-                    .when(!nested, |section| section.child(self.list_footer(look, cx))),
+                    // The tree's host + and space ⋯ buttons stand in for these
+                    // while it draws host headers.
+                    .when(!self.tree_host_headers(), |section| {
+                        section.child(self.list_footer(look, cx))
+                    }),
             )
             .when(agents_panel, |sidebar| {
                 sidebar

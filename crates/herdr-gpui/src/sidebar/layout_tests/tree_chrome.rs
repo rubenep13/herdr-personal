@@ -60,7 +60,8 @@ fn menu_button_opens_the_compact_menu_anchored_to_it(cx: &mut gpui::TestAppConte
 
 #[gpui::test]
 fn tree_has_no_heading_row_or_new_menu_footer(cx: &mut gpui::TestAppContext) {
-    let (view, cx) = tree_window(cx, false);
+    // With host headers, whose + and the spaces' ⋯ stand in for the footer.
+    let (view, cx) = tree_window(cx, true);
     for gone in ["header-tree", "new-workspace", "sidebar-menu"] {
         assert!(cx.debug_bounds(gone).is_none(), "{gone}");
     }
