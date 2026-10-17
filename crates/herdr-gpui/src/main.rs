@@ -52,6 +52,7 @@ mod copy_mode;
 mod daemon;
 #[cfg(feature = "daytona")]
 mod daytona;
+mod design;
 mod devices_overview;
 mod diagnostics;
 mod dialog_input;

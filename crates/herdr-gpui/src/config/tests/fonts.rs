@@ -261,7 +261,7 @@ fn defaults_and_partial_settings() -> anyhow::Result<()> {
         "DejaVu Sans Mono",
         "DejaVu Sans Mono",
         "DejaVu Sans Mono",
-        "DejaVu Sans",
+        "Adwaita Sans",
     ];
     #[cfg(windows)]
     let families = [

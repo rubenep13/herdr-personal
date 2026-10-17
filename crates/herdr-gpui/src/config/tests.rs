@@ -43,6 +43,7 @@ mod terminal_padding;
 mod theme_files;
 mod themes;
 mod tree_options;
+mod ui_font;
 mod update_channel;
 mod usage_inline;
 mod zen;

@@ -380,9 +380,11 @@ size = 14
 # padding_y = [4, 8]
 
 [ui]
-# Default: ".SystemUIFont" on macOS and Windows, "DejaVu Sans" on Linux (or an installed
-# sans family such as Noto Sans when DejaVu is missing).
-# family = "DejaVu Sans"
+# Default: ".SystemUIFont" on macOS and Windows, "Adwaita Sans" on Linux (or
+# the first installed of Inter, DejaVu Sans, and Noto Sans when it is missing).
+# The tree sidebar, the main header, the tabs, and the status bar read in this
+# face, their names one point larger than size.
+# family = "Adwaita Sans"
 size = 12
 # fallback = ["Symbols Nerd Font Mono"]
 
