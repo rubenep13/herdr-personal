@@ -98,6 +98,7 @@ impl TabKind {
             Self::Review => "review",
             Self::Orchestrator => "orchestrator",
             Self::Devices => "devices",
+            Self::Graph => "graph",
             Self::Editor => "editor",
         }
     }
@@ -119,6 +120,8 @@ pub(crate) enum TabKind {
     Review,
     Orchestrator,
     Devices,
+    /// The repository's Git graph.
+    Graph,
     /// The workspace's VS Code tab.
     Editor,
 }

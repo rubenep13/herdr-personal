@@ -518,6 +518,7 @@ impl HerdrWindow {
         }
         if target.worktree.is_some() && self.orchestrator_host() {
             items.push((WorkspaceMenuAction::Orchestrator, "Orchestrator"));
+            items.push((WorkspaceMenuAction::GitGraph, "Git graph"));
         }
         if target.can_create() {
             items.push((Dialog(WorkspaceAction::OpenWorktree), "Open worktree..."));
@@ -743,6 +744,13 @@ impl HerdrWindow {
                     let workspace = target.id.clone();
                     let folder = self.workspace_folder(&workspace);
                     self.open_orchestrator_in(workspace, folder, window, cx);
+                }
+            }
+            WorkspaceMenuAction::GitGraph => {
+                if let Some(target) = &self.menu.target {
+                    let workspace = target.id.clone();
+                    let folder = self.workspace_folder(&workspace);
+                    self.open_git_graph_in(workspace, folder, window, cx);
                 }
             }
         }

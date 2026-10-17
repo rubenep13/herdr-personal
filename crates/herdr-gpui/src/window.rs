@@ -184,6 +184,9 @@ pub(crate) struct HerdrWindow {
     pub(crate) flash: Option<(Flash, std::time::Instant)>,
     pub(crate) focus: FocusHandle,
     pub(crate) git: git::Git,
+    /// Each Git graph tab's view, by its tab.
+    pub(crate) git_graphs:
+        std::collections::HashMap<crate::browser::TabId, crate::git_graph::GitGraph>,
     /// Unknown keys in the GUI config, ignored but reported; follows `config`.
     pub(crate) gui_config_diagnostic: crate::config_diagnostic::ConfigDiagnostic,
     pub(crate) held_keys: crate::terminal::HeldKeys,

@@ -285,7 +285,8 @@ impl Pages {
             | Location::Review { .. }
             | Location::Code { .. }
             | Location::Orchestrator { .. }
-            | Location::Devices => None,
+            | Location::Devices
+            | Location::GitGraph { .. } => None,
         };
         // Only a local page, which the agent wrote, gets `herdr.send`.
         let bridge = if root.is_some() {

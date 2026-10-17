@@ -67,9 +67,8 @@ mod fonts;
 mod git;
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "the Git graph tab wires it into the window")
+    expect(dead_code, reason = "the graph's rows draw the rest of the model")
 )]
-#[cfg_attr(test, allow(dead_code))]
 mod git_graph;
 mod github;
 mod group_menu;

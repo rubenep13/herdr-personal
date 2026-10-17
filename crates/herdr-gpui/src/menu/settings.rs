@@ -324,6 +324,7 @@ impl HerdrWindow {
                 | Command::CloseTab
                 | Command::NewBrowserTab
                 | Command::OpenOrchestrator
+                | Command::OpenGitGraph
                 | Command::SplitEditor
                 | Command::MoveTabPrevious
                 | Command::MoveTabNext

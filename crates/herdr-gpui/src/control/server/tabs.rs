@@ -60,6 +60,7 @@ fn kind(tab: &Tab) -> TabKind {
         Some(Location::Orchestrator { .. }) => TabKind::Orchestrator,
         Some(Location::Code { .. }) => TabKind::Code,
         Some(Location::Devices) => TabKind::Devices,
+        Some(Location::GitGraph { .. }) => TabKind::Graph,
     }
 }
 
@@ -79,6 +80,7 @@ fn location(tab: &Tab) -> Option<String> {
         Location::Orchestrator { repo } => repo.checkout.clone(),
         Location::Code { file } => file.path.clone(),
         Location::Devices => return None,
+        Location::GitGraph { repo } => repo.checkout.clone(),
     })
 }
 

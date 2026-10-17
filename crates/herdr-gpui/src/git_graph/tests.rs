@@ -20,7 +20,9 @@ mod git;
 mod layout;
 #[cfg(unix)]
 mod readonly;
+mod tab;
 mod text;
+mod worker;
 
 /// A commit with only the fields the lane engine reads.
 fn commit(oid: &str, parents: &[&str]) -> Commit {

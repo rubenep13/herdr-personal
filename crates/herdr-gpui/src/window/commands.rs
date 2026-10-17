@@ -268,6 +268,10 @@ impl HerdrWindow {
                 self.open_orchestrator(window, cx);
                 return;
             }
+            Command::OpenGitGraph => {
+                self.open_git_graph(window, cx);
+                return;
+            }
             Command::SplitEditor => {
                 self.split_active_group(window, cx);
                 return;

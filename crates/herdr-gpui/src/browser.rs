@@ -59,7 +59,9 @@ pub(crate) use groups::{GroupId, Pick, Shown, Slot};
 pub(crate) use layouts::Layouts;
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use location::PostedFrom;
-pub(crate) use location::{LocalFile, Location, OrchestratorRepo, ReviewCheckout};
+pub(crate) use location::{
+    LocalFile, Location, OrchestratorRepo, ReviewCheckout, checkout_name, checkout_path_ok,
+};
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use native::Pages;
 /// A page screenshot as PNG, for `browser screenshot`.

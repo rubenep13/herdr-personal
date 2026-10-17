@@ -674,6 +674,14 @@ impl Render for HerdrWindow {
                     self.render_orchestrator_tab(slot, &tab)
                 }
                 (Shown::Page(_), Some(tab))
+                    if matches!(
+                        tab.location,
+                        Some(crate::browser::Location::GitGraph { .. })
+                    ) =>
+                {
+                    self.render_git_graph_tab(slot, &tab)
+                }
+                (Shown::Page(_), Some(tab))
                     if tab
                         .location
                         .as_ref()

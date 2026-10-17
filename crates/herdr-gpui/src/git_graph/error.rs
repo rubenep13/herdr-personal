@@ -7,6 +7,8 @@ pub enum Error {
     GitMissing,
     #[error(transparent)]
     Host(#[from] crate::teleport::Error),
+    #[error("A Git graph needs an absolute folder")]
+    InvalidCheckout,
     #[error("This folder is not inside a Git repository")]
     NotARepository,
     #[error("Git {operation} gave output the graph could not read")]
@@ -17,6 +19,10 @@ pub enum Error {
         #[source]
         source: herdr_client::Error,
     },
+    #[error("Could not start the Git graph's reader")]
+    Thread(#[source] std::io::Error),
+    #[error("The Git graph's reader stopped")]
+    WorkerStopped,
     // keep-sorted end
 }
 

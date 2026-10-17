@@ -8,6 +8,7 @@ mod close;
 mod close_unconfirmed;
 mod dialog_layout;
 mod dispatch;
+mod git_graph;
 mod issues;
 mod merged_removal;
 mod naming;

@@ -29,6 +29,8 @@ enum Action {
     Review,
     /// The focused workspace's repository's issues, pull requests, and runs.
     Orchestrator,
+    /// The focused workspace's repository's history, drawn as a graph.
+    GitGraph,
     /// The workspace's VS Code tab, opened in this group.
     VsCode,
     /// One of the focused workspace's listening ports and where it opens.
@@ -54,6 +56,7 @@ impl Action {
             Self::NewBrowserTab => "New Browser Tab".into(),
             Self::Review => "Review Changes".into(),
             Self::Orchestrator => "Orchestrator".into(),
+            Self::GitGraph => "Git Graph".into(),
             Self::VsCode => "VS Code".into(),
             Self::Port { link, .. } => link.label().into(),
             Self::Close => "Close Tab".into(),
@@ -68,6 +71,7 @@ impl Action {
             Self::NewBrowserTab => Some("icons/globe.svg"),
             Self::Review => Some("icons/diff-unified.svg"),
             Self::Orchestrator => Some("icons/pulse.svg"),
+            Self::GitGraph => Some("icons/git-graph.svg"),
             Self::VsCode => Some("icons/vscode.svg"),
             Self::Port { .. } => Some("icons/arrow-right.svg"),
             Self::Split => Some("icons/split.svg"),
@@ -86,7 +90,11 @@ impl Action {
     /// Which run of rows this one belongs to; a rule separates runs.
     fn section(&self) -> u8 {
         match self {
-            Self::NewBrowserTab | Self::Review | Self::Orchestrator | Self::VsCode => 0,
+            Self::NewBrowserTab
+            | Self::Review
+            | Self::GitGraph
+            | Self::Orchestrator
+            | Self::VsCode => 0,
             Self::Port { .. } => 1,
             Self::Close | Self::CloseOthers | Self::CloseGroup => 2,
             Self::Split => 3,
@@ -120,6 +128,9 @@ impl HerdrWindow {
         let mut actions = vec![Action::NewBrowserTab];
         if self.git.tracked().is_some() {
             actions.push(Action::Review);
+        }
+        if self.can_open_git_graph() {
+            actions.push(Action::GitGraph);
         }
         if self.can_open_orchestrator() {
             actions.push(Action::Orchestrator);
@@ -183,6 +194,7 @@ impl HerdrWindow {
             Action::NewBrowserTab => self.open_browser_tab_in(group, window, cx),
             Action::Review => self.open_review(window, cx),
             Action::Orchestrator => self.open_orchestrator(window, cx),
+            Action::GitGraph => self.open_git_graph(window, cx),
             Action::VsCode => self.open_code(Some(group), window, cx),
             Action::Port { link, .. } => {
                 let Some((endpoint, workspace)) = self
