@@ -857,15 +857,16 @@ keeps its icon slot and draws its branch glyph there instead.
 ```toml
 [usage]
 show = true     # Native bottom-bar usage
-topbar = true   # Daemon toolbar text, including plugin percentages
+topbar = true   # Herdr's tab_bar_right text, including plugin percentages
 inline = true   # Daemon sidebar rows, styles, and custom tokens
 ```
 
-All three default to `true` and apply on config reload. Set `topbar`
-to `false` to hide daemon text without hiding the Git/account controls. Set
+All three default to `true` and apply on config reload. Herdr's
+`tab_bar_right` text sits muted at the status bar's right, or in the header
+while the status bar is hidden; set `topbar` to `false` to hide it. Set
 `inline` to `false` to use native sidebar layouts.
 These switches affect GPUI only; they do not change
-the daemon or its plugins. Header text uses GPUI's standard truncation: character boundaries, with trailing
+the daemon or its plugins. The text uses GPUI's standard truncation: character boundaries, with trailing
 space or punctuation trimmed before the ellipsis.
 
 The status bar shows the selected host's CPU and memory: a sparkline of recent
@@ -873,7 +874,9 @@ CPU use and a memory meter, each with its current share, and cores, load
 averages, memory in gigabytes, free space on the volume holding the home
 directory, and uptime in its tooltip. With more than one host, each
 host row in the sidebar shows its own: right-aligned gauges after the name in
-compact layouts, and the sparkline and meter on a second line otherwise. This
+compact layouts, and the sparkline and meter on a second line otherwise. The
+Tree layout leaves the status bar out of it: each host's header shows its CPU
+and memory shares in place of the status bar's reading. This
 machine is read in process; each connected Linux or macOS remote host is read
 every two seconds over its own SSH shell, kept open while the host is connected
 (`/proc` on Linux; `vm_stat` and a one-second `iostat` on macOS; `df -Pk

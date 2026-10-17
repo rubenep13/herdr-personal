@@ -72,6 +72,8 @@ mod split_pane;
 #[cfg(test)]
 mod status_bar;
 #[cfg(test)]
+mod status_bar_redesign;
+#[cfg(test)]
 mod status_icons;
 #[cfg(test)]
 mod sticky_hosts;

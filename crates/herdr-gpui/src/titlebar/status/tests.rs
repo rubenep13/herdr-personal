@@ -92,7 +92,7 @@ fn usage_display_switches_apply_independently_on_reload(cx: &mut TestAppContext)
             view.load_gui_config_with(move || Ok((config, theme)), cx);
         });
         cx.run_until_parked();
-        assert_eq!(cx.debug_bounds("titlebar-status").is_some(), topbar);
+        assert_eq!(cx.debug_bounds("status-segments").is_some(), topbar);
         assert!(cx.debug_bounds("titlebar-avatar").is_some());
         assert_eq!(cx.debug_bounds("line-herdr-2").is_some(), inline);
         assert_eq!(cx.debug_bounds("line-agent-p0-2").is_some(), inline);
@@ -105,6 +105,8 @@ fn header_keeps_controls_reachable(cx: &mut TestAppContext) {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.live.status = ConnectionStatus::Connected;
+            // The header carries Herdr's segments while the status bar is hidden.
+            view.status_bar_visible = false;
             let snapshot = std::sync::Arc::make_mut(view.live.snapshot.as_mut().unwrap());
             snapshot.tab_bar_right = vec![ClientShellTabStatusSegment {
                 text: "Account usage 25% weekly 10%".into(),

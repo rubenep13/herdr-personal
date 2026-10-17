@@ -16,6 +16,8 @@ pub(crate) const SELECTION_INSET: f32 = 8.;
 pub(crate) const SELECTION_RADIUS: f32 = 8.;
 /// The sidebar's header and the main header beside it.
 pub(crate) const HEADER_HEIGHT: f32 = 48.;
+/// The status bar along the window's foot, at the default `[ui]` size.
+pub(crate) const STATUS_BAR_HEIGHT: f32 = 30.;
 /// A square chrome button holding one icon, and its corners.
 pub(crate) const ICON_BUTTON: f32 = 28.;
 pub(crate) const ICON_BUTTON_RADIUS: f32 = 7.;

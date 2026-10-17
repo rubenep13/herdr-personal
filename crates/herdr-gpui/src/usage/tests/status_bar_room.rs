@@ -86,7 +86,11 @@ fn compact_usage_and_icon_buttons_give_the_bar_back(cx: &mut TestAppContext) {
             width("status-caffeine"),
         )
     };
-    let (detailed, theme, shortcuts, report, caffeine) = measure(&|_| {});
+    let (detailed, theme, shortcuts, report, caffeine) = measure(&|bar| {
+        bar.theme = Button::Label;
+        bar.shortcuts = Button::Label;
+        bar.report_issue = Button::Label;
+    });
     let detailed = detailed.unwrap();
     let (compact, ..) = measure(&|bar| bar.usage = Detail::Compact);
     let compact = compact.unwrap();

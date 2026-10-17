@@ -19,9 +19,9 @@ pub enum Detail {
 #[serde(rename_all = "lowercase")]
 pub enum Button {
     /// Icon and name.
-    #[default]
     Label,
     /// Icon alone, named by its tooltip.
+    #[default]
     Icon,
     Hidden,
 }

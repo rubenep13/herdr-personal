@@ -510,9 +510,9 @@ size = 12
 # The cup that keeps the display awake; it stays while holding, so it can stop.
 # keep_awake = true
 # Buttons: "label" for icon and name, "icon" for the icon alone, or "hidden".
-# theme = "label"
-# shortcuts = "label"
-# report_issue = "label"
+# theme = "icon"
+# shortcuts = "icon"
+# report_issue = "icon"
 
 # Zen mode (View > Toggle Zen Mode, or `toggle_zen_mode`) hides the
 # header, sidebar, tab strips, status bar, and notices, and every group but
@@ -541,7 +541,8 @@ size = 12
 # [usage]
 # Also under Settings > Status bar.
 # show = true
-# Daemon toolbar segments, including plugin usage percentages; independent of show.
+# Herdr's tab_bar_right segments, including plugin usage percentages, in the
+# status bar (in the header while the bar is hidden); independent of show.
 # topbar = true
 # Honor the daemon's [ui.sidebar] rows and plugin tokens; false uses native layouts.
 # inline = true

@@ -8,6 +8,7 @@ mod tabs;
 
 pub(crate) use decorations::controls;
 pub(crate) use decorations::frame;
+pub(crate) use status::segments;
 
 use crate::{HerdrWindow, fonts::StyledFont, menu::Page};
 use gpui::{prelude::*, *};

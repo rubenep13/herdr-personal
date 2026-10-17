@@ -176,9 +176,14 @@ impl HerdrWindow {
                     .flex()
                     .items_center()
                     .justify_end()
-                    .when(self.config.usage.topbar, |center| {
-                        center.child(status::render(&self.live, &self.config.ui, &self.theme))
-                    }),
+                    // Herdr's segments live in the status bar; they come up
+                    // here only while it is hidden, so they never go missing.
+                    .when(
+                        self.config.usage.topbar && !self.status_bar_visible,
+                        |center| {
+                            center.child(status::render(&self.live, &self.config.ui, &self.theme))
+                        },
+                    ),
             )
             .child(self.titlebar_end(window, cx));
         movable(header, window)

@@ -1,5 +1,6 @@
 //! Status bar checks.
 use super::*;
+use crate::config::status_bar::Button;
 
 pub(super) fn check_status_bar(
     view: &Entity<HerdrWindow>,
@@ -9,6 +10,10 @@ pub(super) fn check_status_bar(
     view.update(cx, |view, cx| {
         view.marked = "composition ".repeat(100);
         view.local_error = Some("long connection error ".repeat(100));
+        // Labelled buttons, which yield their text to the crowded bar.
+        let bar = &mut view.config.status_bar;
+        (bar.theme, bar.shortcuts, bar.report_issue) =
+            (Button::Label, Button::Label, Button::Label);
         cx.notify();
     });
     for width in [480., 800.] {
