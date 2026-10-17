@@ -241,3 +241,28 @@ fn folded_space_counts_attention_in_a_pill(cx: &mut gpui::TestAppContext) {
         "{texts:?}"
     );
 }
+
+#[gpui::test]
+fn long_model_and_summary_stay_inside_the_row(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = tree_window(cx, false);
+    let model = "claude-opus-with-a-model-name-long-enough-to-overrun-the-row";
+    edit_listing(&view, cx, |listing| {
+        listing.agents[0].tokens = vec![
+            ("model".into(), model.into()),
+            ("summary".into(), "fixing the sidebar".into()),
+        ];
+    });
+    edit(&view, cx, |view| {
+        view.config.sidebar_layout.agents =
+            toml::from_str(r#"rows = [["state_icon", "agent"], ["$model", "$summary"]]"#).unwrap();
+        view.sidebar_width = Some(220.);
+    });
+    let badge = cx.debug_bounds("agent-badge-p0").unwrap();
+    for selector in ["agent-details-p0", "agent-detail-p0-0", "agent-detail-p0-1"] {
+        let part = cx.debug_bounds(selector).unwrap();
+        assert!(
+            part.right() <= badge.left(),
+            "{selector} {part:?} {badge:?}"
+        );
+    }
+}

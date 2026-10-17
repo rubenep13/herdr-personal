@@ -395,12 +395,15 @@ impl RowLayout for Tree {
                             .items_center()
                             .gap(px(7.))
                             .min_w_0()
+                            // The first, a model, gives way only after the rest.
                             .children(details.iter().enumerate().map(|(index, detail)| {
                                 text(format!("agent-detail-{id}-{index}"), detail, scale.detail)
                                     .when(index == 0, |first| {
-                                        first.flex_none().text_color(rgb(theme.subtext()))
+                                        first.text_color(rgb(theme.subtext()))
                                     })
-                                    .when(index > 0, |rest| rest.text_color(rgb(theme.muted)))
+                                    .when(index > 0, |rest| {
+                                        rest.flex_shrink(1000.).text_color(rgb(theme.muted))
+                                    })
                             })),
                     )
                 });
