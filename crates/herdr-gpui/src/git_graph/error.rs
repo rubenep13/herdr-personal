@@ -13,6 +13,10 @@ pub enum Error {
     NotARepository,
     #[error("Git {operation} gave output the graph could not read")]
     Output { operation: &'static str },
+    #[error("the saved Git graph settings have no version")]
+    PrefsUnversioned,
+    #[error("the saved Git graph settings are version {0}, which this client does not know")]
+    PrefsVersion(u64),
     #[error("Git {operation} failed")]
     Script {
         operation: &'static str,

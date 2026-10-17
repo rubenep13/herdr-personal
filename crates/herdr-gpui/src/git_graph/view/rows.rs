@@ -6,7 +6,7 @@ use super::GitGraphView;
 use crate::{
     config::mix,
     git_graph::{
-        geometry::{AUTHOR_W, DATE_W, HEADER_H, MESSAGE_MIN, ROW_H, SHA_W, lane_colour},
+        geometry::{AUTHOR_W, DATE_W, MESSAGE_MIN, ROW_H, SHA_W, lane_colour},
         history::History,
         model::{Commit, CommitKind},
         text::{full_date, relative_time},
@@ -15,9 +15,11 @@ use crate::{
 };
 use gpui::{prelude::*, *};
 
-/// The message cell's tint, and while the pointer is over its row.
+/// The message cell's tint, while the pointer is over its row, and when
+/// its row is selected.
 const MESSAGE_TINT: u32 = 9;
 const MESSAGE_HOVER: u32 = 15;
+const MESSAGE_SELECTED: u32 = 30;
 
 /// Text shown on hover.
 fn hint(
@@ -38,7 +40,7 @@ fn hint(
 
 impl GitGraphView {
     /// The optional columns that are on, with their header and width.
-    fn optional_columns(&self) -> Vec<(&'static str, &'static str, f32)> {
+    pub(super) fn optional_columns(&self) -> Vec<(&'static str, &'static str, f32)> {
         [
             (self.prefs.author, "author", "Author", AUTHOR_W),
             (self.prefs.date, "date", "Date", DATE_W),
@@ -48,66 +50,6 @@ impl GitGraphView {
         .filter(|(on, ..)| *on)
         .map(|(_, key, label, width)| (key, label, width))
         .collect()
-    }
-
-    pub(super) fn render_columns(&self) -> AnyElement {
-        let theme = &self.look.theme;
-        let column = |key: &'static str, label: &'static str| {
-            div()
-                .debug_selector(move || format!("graph-col-{key}"))
-                .h_full()
-                .flex()
-                .items_center()
-                .px_2()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .child(label)
-        };
-        div()
-            .debug_selector(|| "graph-cols".to_owned())
-            .flex_none()
-            .h(px(HEADER_H))
-            .w_full()
-            .flex()
-            .bg(rgb(theme.surface))
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .text_color(rgb(theme.muted))
-            .text_size(px(10.5))
-            .line_height(px(HEADER_H))
-            .font_weight(FontWeight::SEMIBOLD)
-            .child(
-                column("refs", "BRANCH / TAG")
-                    .flex_none()
-                    .w(px(self.prefs.refs_width))
-                    .pl(px(16.)),
-            )
-            .child(
-                column("graph", "GRAPH")
-                    .flex_none()
-                    .w(px(self.graph_width()))
-                    .border_l_1()
-                    .border_color(rgb(theme.active)),
-            )
-            .child(
-                column("msg", "COMMIT MESSAGE")
-                    .flex_1()
-                    .min_w(px(MESSAGE_MIN))
-                    .border_l_1()
-                    .border_color(rgb(theme.active)),
-            )
-            .children(
-                self.optional_columns()
-                    .into_iter()
-                    .map(|(key, label, width)| {
-                        column(key, label)
-                            .flex_none()
-                            .w(px(width))
-                            .border_l_1()
-                            .border_color(rgb(theme.active))
-                    }),
-            )
-            .into_any_element()
     }
 
     pub(super) fn render_row(
@@ -168,6 +110,10 @@ impl GitGraphView {
             .w_full()
             .flex()
             .items_center()
+            .on_click(cx.listener(move |this, _, window, cx| {
+                window.focus(&this.focus_handle, cx);
+                this.select_row(row, cx);
+            }))
             .child(refs)
             .child(graph)
             .child(self.render_message_cell(history, commit, row, colour))
@@ -185,6 +131,11 @@ impl GitGraphView {
         colour: u32,
     ) -> AnyElement {
         let theme = &self.look.theme;
+        let tint = if self.selected_row() == Some(row) {
+            MESSAGE_SELECTED
+        } else {
+            MESSAGE_TINT
+        };
         let cell = div()
             .id(("graph-msg", row))
             .debug_selector(move || format!("graph-msg-{row}"))
@@ -199,9 +150,9 @@ impl GitGraphView {
             .whitespace_nowrap()
             .border_l_3()
             .border_color(rgb(colour))
-            .bg(rgb(mix(theme.background, colour, MESSAGE_TINT)))
+            .bg(rgb(mix(theme.background, colour, tint)))
             .group_hover("graph-row", |style| {
-                style.bg(rgb(mix(theme.background, colour, MESSAGE_HOVER)))
+                style.bg(rgb(mix(theme.background, colour, tint.max(MESSAGE_HOVER))))
             });
         if commit.kind == CommitKind::Worktree {
             let counts = history.worktree.unwrap_or_default();

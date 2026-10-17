@@ -13,8 +13,9 @@ use crate::git_graph::{
 };
 use gpui::{prelude::*, *};
 
-/// A row's tint.
+/// A row's tint, and a selected row's.
 pub(super) const BAND: f32 = 0.16;
+pub(super) const BAND_SELECTED: f32 = 0.42;
 /// Lines to commits that are not loaded.
 const DANGLING: f32 = 0.6;
 const DASH: [f32; 2] = [3., 4.];
@@ -120,7 +121,7 @@ impl GitGraphView {
         let painted = Paint {
             node_x,
             colour,
-            band: BAND,
+            band: self.band(row),
             leader,
             pieces,
         };

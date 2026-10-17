@@ -17,7 +17,9 @@ use std::{
 mod chips;
 #[cfg(unix)]
 mod git;
+mod keys;
 mod layout;
+mod prefs;
 #[cfg(unix)]
 mod readonly;
 mod rows;
@@ -189,4 +191,68 @@ impl Fixture {
 #[cfg(unix)]
 fn open_at(host: Host, folder: &Path) -> Repo {
     Repo::open(host, folder.to_str().unwrap(), &AtomicBool::new(false)).unwrap()
+}
+
+fn look() -> super::view::GraphLook {
+    let config = crate::config::Config::default();
+    super::view::GraphLook {
+        theme: crate::config::Theme::default(),
+        ui: config.ui.clone(),
+        mono: config.terminal.clone(),
+    }
+}
+
+fn draw(cx: &mut gpui::VisualTestContext) {
+    cx.update(|window, cx| crate::sidebar::layout_tests::full_draw(window, cx).clear(cx));
+}
+
+/// A view showing `history` in a window `height` pixels tall, with no
+/// worker behind it.
+fn shown(
+    cx: &mut gpui::TestAppContext,
+    history: super::history::History,
+    height: f32,
+) -> (
+    gpui::Entity<super::view::GitGraphView>,
+    &mut gpui::VisualTestContext,
+) {
+    use gpui::{px, size};
+    let checkout = super::GraphCheckout::new("/repo".into()).unwrap();
+    let (view, cx) = cx.add_window_view(|_, cx| {
+        super::view::GitGraphView::new(Err(super::Error::WorkerStopped), checkout, look(), cx)
+    });
+    cx.simulate_resize(size(px(1000.), px(height)));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let reply = super::worker::Reply::History(std::sync::Arc::new(history));
+            assert!(view.receive(0, reply, cx));
+        })
+    });
+    draw(cx);
+    (view, cx)
+}
+
+fn bounds(cx: &mut gpui::VisualTestContext, selector: &str) -> gpui::Bounds<gpui::Pixels> {
+    cx.debug_bounds(Box::leak(selector.to_owned().into_boxed_str()))
+        .unwrap_or_else(|| panic!("{selector} is drawn"))
+}
+
+fn drawn(cx: &mut gpui::VisualTestContext, selector: &str) -> bool {
+    cx.debug_bounds(Box::leak(selector.to_owned().into_boxed_str()))
+        .is_some()
+}
+
+/// `count` commits in a line, `c0` the newest.
+fn line(count: usize) -> Vec<Commit> {
+    (0..count)
+        .map(|row| {
+            let parent = format!("c{}", row + 1);
+            let parents: Vec<&str> = if row + 1 < count {
+                vec![&parent]
+            } else {
+                vec![]
+            };
+            commit(&format!("c{row}"), &parents)
+        })
+        .collect()
 }

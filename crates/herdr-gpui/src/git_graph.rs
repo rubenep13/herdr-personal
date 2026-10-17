@@ -9,7 +9,7 @@ pub(crate) mod history;
 pub(crate) mod layout;
 pub(crate) mod model;
 mod parse;
-mod prefs;
+pub(crate) mod prefs;
 mod tab;
 pub(crate) mod text;
 pub(crate) mod view;

@@ -2,6 +2,8 @@
 //! comes back. It knows nothing of tabs; the window feeds it from its tick.
 
 mod chips;
+mod header;
+mod keys;
 mod lanes;
 mod rows;
 
@@ -13,7 +15,7 @@ use super::{
     error::Error,
     geometry::{ROW_H, graph_width},
     history::History,
-    prefs::GraphPrefs,
+    prefs::{GraphPrefs, GraphPrefsStore},
     worker::{Reply, Request, Worker},
 };
 use crate::{
@@ -22,6 +24,7 @@ use crate::{
     teleport::Host,
 };
 use gpui::{prelude::*, *};
+use header::ColumnDrag;
 use std::{collections::HashMap, sync::Arc};
 
 /// Rows from the end at which the next page is asked for.
@@ -39,8 +42,15 @@ pub(crate) struct GitGraphView {
     checkout: GraphCheckout,
     pub(crate) focus_handle: FocusHandle,
     look: GraphLook,
+    /// The columns and widths every graph tab shares, kept in step with the
+    /// app's store.
     prefs: GraphPrefs,
+    _prefs: Subscription,
     scroll: UniformListScrollHandle,
+    /// The selected commit, by oid, so it survives a reload.
+    selected: Option<String>,
+    /// Whether the gear's menu is open.
+    column_menu: bool,
     /// `None` when the host cannot run scripts; `error` says why.
     worker: Option<Worker>,
     /// The generation and kind of the last request; older replies are stale.
@@ -79,13 +89,20 @@ impl GitGraphView {
             }
             Err(error) => (None, Some(Arc::new(error)), 0),
         };
+        let prefs = cx.observe_global::<GraphPrefsStore>(|this, cx| {
+            this.prefs = GraphPrefsStore::get(cx);
+            cx.notify();
+        });
         Self {
             waiting: worker.is_some(),
             checkout,
             focus_handle: cx.focus_handle(),
             look,
-            prefs: GraphPrefs::default(),
+            prefs: GraphPrefsStore::get(cx),
+            _prefs: prefs,
             scroll: UniformListScrollHandle::new(),
+            selected: None,
+            column_menu: false,
             worker,
             latest: (latest, Request::Load),
             history: None,
@@ -152,18 +169,44 @@ impl GitGraphView {
     }
 
     /// Reads the repository again.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the r key and the reload button ask for it")
-    )]
     pub(crate) fn reload(&mut self, cx: &mut Context<Self>) {
         self.send(Request::Load);
         cx.notify();
     }
 
-    #[cfg_attr(not(test), expect(dead_code, reason = "keys move the selection"))]
+    #[cfg(test)]
     pub(crate) fn scroll_to_row(&mut self, row: usize) {
         self.scroll.scroll_to_item(row, ScrollStrategy::Top);
+    }
+
+    /// The selected commit's row in the rows loaded.
+    pub(crate) fn selected_row(&self) -> Option<usize> {
+        let oid = self.selected.as_deref()?;
+        self.history.as_ref()?.row_of(oid)
+    }
+
+    /// Selects `row` and scrolls it into view.
+    fn select_row(&mut self, row: usize, cx: &mut Context<Self>) {
+        let Some(commit) = self
+            .history
+            .as_ref()
+            .and_then(|history| history.commits.get(row))
+        else {
+            return;
+        };
+        self.selected = Some(commit.oid.clone());
+        self.column_menu = false;
+        self.scroll.scroll_to_item(row, ScrollStrategy::Nearest);
+        cx.notify();
+    }
+
+    /// How strongly `row`'s band is tinted.
+    pub(crate) fn band(&self, row: usize) -> f32 {
+        if self.selected_row() == Some(row) {
+            lanes::BAND_SELECTED
+        } else {
+            lanes::BAND
+        }
     }
 
     pub(crate) fn set_look(&mut self, look: GraphLook, cx: &mut Context<Self>) {
@@ -273,7 +316,7 @@ impl Render for GitGraphView {
                 .min_h_0()
                 .flex()
                 .flex_col()
-                .child(self.render_columns())
+                .child(self.render_columns(cx))
                 .child(
                     uniform_list(
                         "graph-rows",
@@ -295,10 +338,18 @@ impl Render for GitGraphView {
                 )
                 .into_any_element(),
         };
+        let bar = self.render_bar(cx);
         div()
             .id("git-graph")
             .key_context("GitGraph")
             .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(Self::on_key))
+            .on_drag_move(
+                cx.listener(|this, event: &DragMoveEvent<ColumnDrag>, _, cx| {
+                    let x = f32::from(event.event.position.x - event.bounds.origin.x);
+                    this.drag_column(*event.drag(cx), x, cx);
+                }),
+            )
             .size_full()
             .flex()
             .flex_col()
@@ -308,6 +359,7 @@ impl Render for GitGraphView {
             .text_font(&self.look.ui)
             .text_size(px(self.look.ui.size))
             .line_height(px(ROW_H))
+            .child(bar)
             .child(body)
     }
 }

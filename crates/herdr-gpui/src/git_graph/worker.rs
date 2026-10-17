@@ -159,11 +159,13 @@ fn handle(
         }
     }
     let state = loaded.as_ref().ok_or(Error::WorkerStopped)?;
-    Ok(History::new(
+    let mut history = History::new(
         &state.commits,
         &state.snapshot.refs,
         state.snapshot.head.clone(),
         state.worktree,
         state.has_more,
-    ))
+    );
+    state.repo.root().clone_into(&mut history.root);
+    Ok(history)
 }

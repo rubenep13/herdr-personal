@@ -355,6 +355,12 @@ pub(crate) fn run() -> std::process::ExitCode {
     } else {
         crate::palette::Frecency::default()
     };
+    // Nor with the user's Git graph columns.
+    let git_graph_prefs = if mode == LaunchMode::Normal {
+        crate::git_graph::prefs::GraphPrefsStore::load()
+    } else {
+        crate::git_graph::prefs::GraphPrefsStore::default()
+    };
     // Nor with where the user's worktrees went.
     let dispatch_history = if mode == LaunchMode::Normal {
         crate::dispatch::History::load()
@@ -374,6 +380,7 @@ pub(crate) fn run() -> std::process::ExitCode {
             sidebar_tree.install(cx);
             palette_frecency.install(cx);
             dispatch_history.install(cx);
+            git_graph_prefs.install(cx);
             agent_skill.install_global(cx);
             keychain_grants.install(cx);
             // Only the user's own app answers agents; native test modes stay private.

@@ -23,10 +23,11 @@ pub(crate) struct History {
     pub(crate) commits: Vec<Commit>,
     pub(crate) layout: Layout,
     pub(crate) chips: HashMap<String, Vec<Chip>>,
-    #[expect(dead_code, reason = "the h key selects HEAD")]
     pub(crate) head: Option<String>,
     pub(crate) worktree: Option<WorktreeCounts>,
     pub(crate) has_more: bool,
+    /// The repository's top-level folder on its host; empty until read.
+    pub(crate) root: String,
     rows: HashMap<String, usize>,
     by_row: Vec<Vec<usize>>,
     long: Vec<usize>,
@@ -103,16 +104,13 @@ impl History {
             head,
             worktree,
             has_more,
+            root: String::new(),
             rows,
             by_row,
             long,
         }
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "selection follows a commit across reloads")
-    )]
     pub(crate) fn row_of(&self, oid: &str) -> Option<usize> {
         self.rows.get(oid).copied()
     }

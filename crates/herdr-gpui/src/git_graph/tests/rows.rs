@@ -6,77 +6,18 @@ use super::*;
 use crate::git_graph::{
     GraphCheckout,
     chips::{Chip, ChipKind},
-    error::Error,
     geometry::{GRAPH_PAD, LANE_W, ROW_H, Step, lane_colour, lane_x, row_y, segment_steps},
     git::WorktreeCounts,
     history::History,
     layout::{Anchor, Point, Segment},
     model::{Ref, RefKind},
-    view::{GitGraphView, GraphLook, chip_icons},
+    view::{GitGraphView, chip_icons},
     worker::{Reply, Request},
 };
 use crate::{config::Theme, teleport::Host};
-use gpui::{Bounds, Entity, Pixels, TestAppContext, VisualTestContext, px, size};
+use gpui::{TestAppContext, VisualTestContext, px, size};
 use herdr_client::ConnectTarget;
 use std::sync::Arc;
-
-fn look() -> GraphLook {
-    let config = crate::config::Config::default();
-    GraphLook {
-        theme: Theme::default(),
-        ui: config.ui.clone(),
-        mono: config.terminal.clone(),
-    }
-}
-
-fn draw(cx: &mut VisualTestContext) {
-    cx.update(|window, cx| crate::sidebar::layout_tests::full_draw(window, cx).clear(cx));
-}
-
-/// A view showing `history` in a window `height` pixels tall, with no
-/// worker behind it.
-fn shown(
-    cx: &mut TestAppContext,
-    history: History,
-    height: f32,
-) -> (Entity<GitGraphView>, &mut VisualTestContext) {
-    let checkout = GraphCheckout::new("/repo".into()).unwrap();
-    let (view, cx) = cx.add_window_view(|_, cx| {
-        GitGraphView::new(Err(Error::WorkerStopped), checkout, look(), cx)
-    });
-    cx.simulate_resize(size(px(1000.), px(height)));
-    cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
-            assert!(view.receive(0, Reply::History(Arc::new(history)), cx));
-        })
-    });
-    draw(cx);
-    (view, cx)
-}
-
-fn bounds(cx: &mut VisualTestContext, selector: &str) -> Bounds<Pixels> {
-    cx.debug_bounds(Box::leak(selector.to_owned().into_boxed_str()))
-        .unwrap_or_else(|| panic!("{selector} is drawn"))
-}
-
-fn drawn(cx: &mut VisualTestContext, selector: &str) -> bool {
-    cx.debug_bounds(Box::leak(selector.to_owned().into_boxed_str()))
-        .is_some()
-}
-
-fn line(count: usize) -> Vec<Commit> {
-    (0..count)
-        .map(|row| {
-            let parent = format!("c{}", row + 1);
-            let parents: Vec<&str> = if row + 1 < count {
-                vec![&parent]
-            } else {
-                vec![]
-            };
-            commit(&format!("c{row}"), &parents)
-        })
-        .collect()
-}
 
 fn merge_history() -> Vec<Commit> {
     vec![
