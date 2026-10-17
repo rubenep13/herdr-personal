@@ -5,7 +5,7 @@
 use super::{label_text, layout::SidebarLook, layouts::control, row::removing_dot, wash};
 use crate::{
     HerdrWindow,
-    config::Theme,
+    config::{Theme, TreeHierarchy},
     controls::Command,
     design::{ROW_HEIGHT, TypeScale},
     endpoint::{Endpoint, origin::Origin},
@@ -177,8 +177,13 @@ impl HerdrWindow {
             // the copy paints the sidebar's own background, and stops hover
             // and clicks but not the wheel reaching the rows beneath.
             .when(pinned, |row| {
-                row.bg(rgb(theme.sidebar_background()))
-                    .block_mouse_except_scroll()
+                // On a block, the copy is the block's top.
+                let row = if look.tree.hierarchy == TreeHierarchy::Block {
+                    super::render::pinned_block(row, theme)
+                } else {
+                    row.bg(rgb(theme.sidebar_background()))
+                };
+                row.block_mouse_except_scroll()
             })
             .map(|row| {
                 wash::HostMark::resolve(&self.config.sidebar_style, &endpoint.label, false, theme)

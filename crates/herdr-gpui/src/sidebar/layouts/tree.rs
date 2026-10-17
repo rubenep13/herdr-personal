@@ -245,6 +245,7 @@ impl RowLayout for Tree {
                 .child(removing_dot("worktree-removing", theme))
         } else {
             div()
+                .debug_selector(move || format!("space-icon-{id}"))
                 .flex_none()
                 .child(parts::icon("icons/folder.svg", FOLDER, theme.muted))
         };

@@ -496,8 +496,12 @@ pub(super) fn for_mode(mode: LayoutMode) -> SidebarLook {
 /// highlights as translucent as its backdrop's panels allow.
 pub(super) fn for_config(config: &crate::config::Config, fill: Fill) -> SidebarLook {
     let style = &config.sidebar_style;
+    let mut density = SidebarMetrics::for_mode(config.layout.mode);
+    if config.layout.mode == LayoutMode::Tree {
+        density.nest = super::render::space_nest(style.hierarchy);
+    }
     SidebarLook {
-        density: SidebarMetrics::for_mode(config.layout.mode).with(&style.overrides),
+        density: density.with(&style.overrides),
         mark: fill.mark(),
         tree: TreeLook {
             hierarchy: style.hierarchy,

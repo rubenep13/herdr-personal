@@ -26,7 +26,9 @@ use gpui::{prelude::*, *};
 
 mod agent_rows;
 mod device_tree;
+mod hierarchy;
 mod ports;
+pub(super) use hierarchy::{pinned_block, space_nest};
 pub(crate) mod tree;
 
 impl HerdrWindow {
@@ -142,6 +144,7 @@ impl HerdrWindow {
             if headed {
                 host_rows.push((endpoint_index, space_rows));
                 let header = self.host_row(endpoint, selected, look, width, false, cx);
+                let header = self.tree_header_item(personal.as_ref(), header, endpoint_index);
                 spaces = self.place_host_row(
                     spaces,
                     header,
@@ -191,7 +194,9 @@ impl HerdrWindow {
             };
             if let Some(filter) = personal
                 .as_ref()
-                .and_then(|_| self.tree_filter(&endpoint_id, snapshot, &row_cx))
+                .and_then(|tree| {
+                    self.tree_filter((tree, endpoint_index), &endpoint_id, snapshot, &row_cx)
+                })
                 .filter(|_| !(multi && endpoint.collapsed))
             {
                 spaces = spaces.child(filter);
@@ -581,6 +586,8 @@ impl HerdrWindow {
                         )
                         .into_any_element()
                 };
+                let element =
+                    self.tree_space_item(personal.as_ref(), element, (endpoint_index, index));
                 spaces = if carried {
                     // Painted last so it floats over the rows it passes, while
                     // its layout slot keeps the others' positions stable.
