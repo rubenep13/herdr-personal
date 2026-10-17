@@ -22,23 +22,12 @@ use gpui::{App, Menu, MenuItem, OsAction};
 #[cfg(feature = "qa-menu")]
 use herdr_client::protocol::SemanticNotificationKind;
 
-/// Only headings are needed while the Linux menus are closed.
-struct Headings(Vec<(gpui::SharedString, bool)>);
-impl gpui::Global for Headings {}
-
 /// Installs the menu bar, checking the layout the latest config picked.
 pub(crate) fn install(cx: &mut App) {
     let layout = cx
         .try_global::<crate::app::InitialAppearance>()
         .map_or_else(Layout::default, |appearance| appearance.config.layout);
-    let menus = menus(layout);
-    cx.set_global(Headings(
-        menus
-            .iter()
-            .map(|menu| (menu.name.clone(), menu.disabled))
-            .collect(),
-    ));
-    cx.set_menus(menus);
+    cx.set_menus(menus(layout));
 }
 
 /// View > Layout: Herdr's densities, their rounded versions, the layouts

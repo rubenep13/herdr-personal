@@ -1,4 +1,5 @@
-//! The personal tree: each host's spaces, and each space's agents under it.
+//! The personal tree: each host's spaces, and each space's agents under it,
+//! then, when asked, the space's tabs that no agent runs in.
 //!
 //! A pure projection of the snapshots the window already holds, with no GPUI,
 //! transport, or filesystem access. Hosts arrive in the device order the
@@ -9,7 +10,7 @@
 //! shares.
 
 use super::agents::sorted_agents;
-use crate::preferences::AgentSort;
+use crate::{config::TreeTabs, preferences::AgentSort};
 use herdr_client::{
     ConnectTarget,
     protocol::{AgentStatus, ClientShellAgent, ClientShellSnapshot},
@@ -82,6 +83,12 @@ pub(crate) enum NodeId {
         context: SnapshotKey,
         workspace: String,
     },
+    /// A tab no agent runs in. It keeps Herdr's order and is never moved.
+    Tab {
+        context: SnapshotKey,
+        workspace: String,
+        tab: String,
+    },
 }
 
 impl NodeId {
@@ -91,6 +98,7 @@ impl NodeId {
             Self::Agent { pane, .. } => Some(pane),
             Self::Host(_) => None,
             Self::Space { workspace, .. } => Some(workspace),
+            Self::Tab { tab, .. } => Some(tab),
         }
     }
 
@@ -109,12 +117,22 @@ impl NodeId {
                 context: context.clone(),
                 workspace: id.to_owned(),
             }),
+            Self::Tab {
+                context, workspace, ..
+            } => Some(Self::Tab {
+                context: context.clone(),
+                workspace: workspace.clone(),
+                tab: id.to_owned(),
+            }),
         }
     }
 
     pub(crate) fn parent(&self) -> Option<Self> {
         match self {
             Self::Agent {
+                context, workspace, ..
+            }
+            | Self::Tab {
                 context, workspace, ..
             } => Some(Self::Space {
                 context: context.clone(),
@@ -144,6 +162,8 @@ pub(crate) enum Entry {
     Agent(usize),
     Host,
     Space(usize),
+    /// A tab no agent runs in, by its index in the snapshot's tabs.
+    Tab(usize),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -162,11 +182,13 @@ pub(crate) struct TreeRow {
 
 /// The tree's rows, top to bottom. `query` keeps the nodes whose name holds
 /// it, with their ancestors, and their descendants for a host or space.
+/// `tabs` decides whether a space's agentless tabs follow its agents.
 pub(crate) fn project(
     hosts: &[HostInput<'_>],
     preferences: &TreePreferences,
     sort: AgentSort,
     query: &str,
+    tabs: TreeTabs,
 ) -> Vec<TreeRow> {
     let query = query.trim().to_lowercase();
     let matches = |text: &str| query.is_empty() || text.to_lowercase().contains(&query);
@@ -191,6 +213,10 @@ pub(crate) fn project(
                 boot_id: snapshot.boot_id.clone(),
             };
             let mut agents = agents_by_space(snapshot, sort);
+            let mut terminals = match tabs {
+                TreeTabs::All => agentless_tabs(snapshot),
+                TreeTabs::Agents => HashMap::new(),
+            };
             for (position, space) in ordered_spaces(snapshot, &context, &orders) {
                 let workspace = space.workspace_id.as_str();
                 let mut listed = agents.remove(workspace).unwrap_or_default();
@@ -215,7 +241,13 @@ pub(crate) fn project(
                                 .any(&matches)
                     })
                     .collect();
-                if !space_matches && found.is_empty() {
+                let found_tabs: Vec<_> = terminals
+                    .remove(workspace)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|(_, tab)| space_matches || matches(&tab.label))
+                    .collect();
+                if !space_matches && found.is_empty() && found_tabs.is_empty() {
                     continue;
                 }
                 shown = true;
@@ -251,6 +283,18 @@ pub(crate) fn project(
                     collapsed: false,
                     stale: !host.connected,
                 }));
+                rows.extend(found_tabs.into_iter().map(|(index, tab)| TreeRow {
+                    id: NodeId::Tab {
+                        context: context.clone(),
+                        workspace: workspace.to_owned(),
+                        tab: tab.tab_id.clone(),
+                    },
+                    host: host.index,
+                    entry: Entry::Tab(index),
+                    attention: 0,
+                    collapsed: false,
+                    stale: !host.connected,
+                }));
             }
         }
         if !host_matches && !shown {
@@ -272,7 +316,7 @@ pub(crate) fn children(
 ) -> Option<Vec<String>> {
     let orders = preferences.index();
     let (context, workspace) = match parent {
-        NodeId::Agent { .. } => return None,
+        NodeId::Agent { .. } | NodeId::Tab { .. } => return None,
         NodeId::Host(_) => (parent_context(hosts, parent)?, None),
         NodeId::Space { context, workspace } => (context.clone(), Some(workspace.as_str())),
     };
@@ -385,6 +429,29 @@ fn agents_by_space(
             .entry(agent.workspace_id.as_str())
             .or_default()
             .push((position, agent));
+    }
+    spaces
+}
+
+/// Each space's tabs that no agent of the snapshot runs in, in the
+/// snapshot's order with their index. Agents are counted before any plugin
+/// view filters them, so a tab whose agent a view hides is not a terminal.
+fn agentless_tabs(
+    snapshot: &ClientShellSnapshot,
+) -> HashMap<&str, Vec<(usize, &herdr_client::protocol::ClientShellTab)>> {
+    let busy: HashSet<_> = snapshot
+        .agents
+        .iter()
+        .map(|agent| agent.tab_id.as_str())
+        .collect();
+    let mut spaces: HashMap<&str, Vec<_>> = HashMap::new();
+    for (index, tab) in snapshot.tabs.iter().enumerate() {
+        if !busy.contains(tab.tab_id.as_str()) {
+            spaces
+                .entry(tab.workspace_id.as_str())
+                .or_default()
+                .push((index, tab));
+        }
     }
     spaces
 }

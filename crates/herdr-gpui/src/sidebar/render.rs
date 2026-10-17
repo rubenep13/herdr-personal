@@ -18,7 +18,7 @@ use super::{
     workspaces::{displayed_workspace_status, workspace_badge, workspace_label, workspace_note},
 };
 use crate::{
-    Command, HerdrWindow, NavigationTarget,
+    HerdrWindow, NavigationTarget,
     config::{FontConfig, Theme},
     fonts::StyledFont,
 };
@@ -26,6 +26,10 @@ use gpui::{prelude::*, *};
 
 mod agent_rows;
 mod device_tree;
+mod footer;
+mod hierarchy;
+mod ports;
+pub(super) use hierarchy::{pinned_block, space_nest};
 pub(crate) mod tree;
 
 impl HerdrWindow {
@@ -45,7 +49,13 @@ impl HerdrWindow {
         let layout = look.density;
         let content_x = look.content_x();
         let view = cx.entity().downgrade();
-        let font = &self.config.sidebar;
+        // The tree reads in the interface face, as the rest of the main window.
+        let nested = self.config.layout.mode.nests_agents();
+        let font = if nested {
+            &self.config.ui
+        } else {
+            &self.config.sidebar
+        };
         let spaces_custom = self.config.usage.inline
             && self.config.sidebar_layout.spaces != crate::config::SpaceLayout::default();
         let theme = &self.theme;
@@ -59,7 +69,6 @@ impl HerdrWindow {
         // replace the list, gives way to it; one setting hides either.
         let devices = !self.config.layout.mode.lists_workspaces();
         // The Tree layout narrows in place too, keeping each match's parents.
-        let nested = self.config.layout.mode.nests_agents();
         // A hidden field keeps whatever it held, but never filters the list.
         let searchable = self.config.show_sidebar_search && !devices && !nested;
         let tree_search = self.config.show_sidebar_search && (devices || nested);
@@ -136,6 +145,7 @@ impl HerdrWindow {
             if headed {
                 host_rows.push((endpoint_index, space_rows));
                 let header = self.host_row(endpoint, selected, look, width, false, cx);
+                let header = self.tree_header_item(personal.as_ref(), header, endpoint_index);
                 spaces = self.place_host_row(
                     spaces,
                     header,
@@ -185,7 +195,9 @@ impl HerdrWindow {
             };
             if let Some(filter) = personal
                 .as_ref()
-                .and_then(|_| self.tree_filter(&endpoint_id, snapshot, &row_cx))
+                .and_then(|tree| {
+                    self.tree_filter((tree, endpoint_index), &endpoint_id, snapshot, &row_cx)
+                })
                 .filter(|_| !(multi && endpoint.collapsed))
             {
                 spaces = spaces.child(filter);
@@ -300,12 +312,7 @@ impl HerdrWindow {
                         })),
                     })
                 });
-                let counted = personal.as_ref().and_then(|tree| {
-                    tree.label(endpoint_index, index, workspace_label(workspace, false))
-                });
-                let label = counted
-                    .as_deref()
-                    .unwrap_or_else(|| workspace_label(workspace, indented));
+                let label = workspace_label(workspace, indented);
                 let shown_status = if self.config.usage.inline {
                     displayed_workspace_status(&snapshot.workspaces, workspace, collapsed_repos)
                 } else {
@@ -388,29 +395,20 @@ impl HerdrWindow {
                 // A child's trunk runs on past its note and ports to the next
                 // sibling, as it runs through the row itself.
                 let trunk = rows.trunk_below(&format!("{endpoint_id}-{id}"), tree, &row_cx);
-                let ports = (self.config.show_listening_ports && !removing_row)
-                    .then_some(daemon.as_ref())
-                    .flatten()
-                    .and_then(|daemon| self.listening_ports.get(daemon, &workspace.workspace_id))
-                    .map(|listed| {
-                        div()
-                            .debug_selector(|| format!("ports-{endpoint_id}-{id}"))
-                            .h(px(line_height(font)))
-                            .flex_none()
-                            .w_full()
-                            .min_w_0()
-                            .pl(px(under_left))
-                            .pr(px(content_x))
-                            .text_size(px((font.size * 0.85).round()))
-                            .child(crate::listening_ports::chips(
-                                listed,
-                                (&endpoint_id, &workspace.workspace_id),
-                                &self.tunnels,
-                                theme,
-                                (font.size * 0.85).round(),
-                                cx,
-                            ))
-                    });
+                let chips = (!removing_row)
+                    .then(|| self.space_port_chips(daemon.as_ref(), (&endpoint_id, &id), font, cx))
+                    .flatten();
+                // The tree keeps them in the row; the others give them a line.
+                let (inline_ports, ports) = match personal {
+                    Some(_) => (chips, None),
+                    None => (
+                        None,
+                        chips.map(|chips| {
+                            let line = chips.h(px(line_height(font))).w_full();
+                            line.pl(px(under_left)).pr(px(content_x))
+                        }),
+                    ),
+                };
                 let element = Cell::new(
                     rows,
                     RowData::Workspace(WorkspaceRow {
@@ -440,6 +438,13 @@ impl HerdrWindow {
                         removing: removing_row,
                         status: shown_status,
                         lines,
+                        ports: inline_ports.map(IntoElement::into_any_element),
+                        attention: personal
+                            .as_ref()
+                            .map_or(0, |t| t.attention(endpoint_index, index)),
+                        more: personal
+                            .as_ref()
+                            .map(|_| self.tree_more(&endpoint_id, &id, cx)),
                     }),
                     &row_cx,
                 )
@@ -582,6 +587,8 @@ impl HerdrWindow {
                         )
                         .into_any_element()
                 };
+                let element =
+                    self.tree_space_item(personal.as_ref(), element, (endpoint_index, index));
                 spaces = if carried {
                     // Painted last so it floats over the rows it passes, while
                     // its layout slot keeps the others' positions stable.
@@ -711,29 +718,20 @@ impl HerdrWindow {
                     })
                     .min_h_0()
                     .overflow_hidden()
-                    // With search on, the heading is its field.
-                    .child(
-                        searchable
-                            .then_some(super::search::Heading::Spaces)
-                            .or(tree_search.then_some(if nested {
-                                super::search::Heading::Tree
-                            } else {
-                                super::search::Heading::DeviceTree
-                            }))
-                            .and_then(|heading| self.search_heading(heading, look, window, cx))
-                            .unwrap_or_else(|| {
-                                header(
-                                    match (devices, nested) {
-                                        (true, _) => "devices",
-                                        (_, true) => "tree",
-                                        _ => "spaces",
-                                    },
-                                    font,
-                                    theme,
-                                    look,
-                                )
-                            }),
-                    )
+                    // With search on, the heading is its field. The tree has
+                    // none: its search lives in the sidebar's header.
+                    .when(!nested, |section| {
+                        section.child(
+                            searchable
+                                .then_some(super::search::Heading::Spaces)
+                                .or(tree_search.then_some(super::search::Heading::DeviceTree))
+                                .and_then(|heading| self.search_heading(heading, look, window, cx))
+                                .unwrap_or_else(|| {
+                                    let label = if devices { "devices" } else { "spaces" };
+                                    header(label, font, theme, look)
+                                }),
+                        )
+                    })
                     // The wrapper clips the pinned header as the next host's
                     // pushes it up, so it never paints over the title above.
                     .child(
@@ -749,42 +747,11 @@ impl HerdrWindow {
                                 None => list.child(spaces).children(pinned_host),
                             }),
                     )
-                    .child(
-                        div()
-                            .flex_none()
-                            .h(px(line_height(font) + 2. * layout.footer_padding()))
-                            .px(px(content_x))
-                            .flex()
-                            .items_center()
-                            // Menu hugs the sidebar's edge, as in the terminal client.
-                            .justify_between()
-                            .text_color(rgb(theme.muted))
-                            .gap(px(20.))
-                            .child(
-                                div()
-                                    .id("new-workspace")
-                                    .cursor_pointer()
-                                    .hover(|s| s.text_color(rgb(theme.foreground)))
-                                    .child("new")
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.command(Command::Workspace, window, cx)
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .id("sidebar-menu")
-                                    .debug_selector(|| "sidebar-menu".into())
-                                    .cursor_pointer()
-                                    .hover(|s| s.text_color(rgb(theme.foreground)))
-                                    .child(label_text("menu"))
-                                    .on_click(cx.listener(
-                                        |this, event: &ClickEvent, window, cx| {
-                                            this.menu.anchor = event.position();
-                                            this.open_menu(window, cx);
-                                        },
-                                    )),
-                            ),
-                    ),
+                    // The tree's host + and space ⋯ buttons stand in for these
+                    // while it draws host headers.
+                    .when(!self.tree_host_headers(), |section| {
+                        section.child(self.list_footer(look, cx))
+                    }),
             )
             .when(agents_panel, |sidebar| {
                 sidebar

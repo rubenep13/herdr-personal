@@ -13,6 +13,12 @@
 >   since Herdr may reuse public IDs after a restart.
 > - A space's menu can start an installed agent in a new tab of that space
 >   through the official `herdr agent start` CLI, locally or over SSH.
+> - A redesigned main window: a sidebar header and a main header in place of
+>   the title bar and Linux menu bar, tree rows with host headers, folders and
+>   agent tiles, tab strips under the header, and a quieter status bar. Its
+>   options (`[sidebar] hierarchy`, `tree_tabs`, `state_text`,
+>   `agent_details`; `[tabs] content`, `position`) are described in the
+>   [crate README](crates/herdr-gpui/README.md#title-bar).
 > - `scripts/personal-tree-qa.sh /absolute/path/to/herdr` opens it against an
 >   isolated daemon with sample agents for manual QA.
 >

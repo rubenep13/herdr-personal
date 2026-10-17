@@ -1,182 +1,65 @@
-//! Menu bar and bounded, scrollable dropdown presentation.
+//! The application menu's button and its bounded, scrollable dropdown.
 
 use super::*;
 use crate::fonts::StyledFont;
 use gpui::prelude::*;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum BarLayer {
-    Base,
-    Overlay,
-}
-
 impl HerdrWindow {
-    fn compact_application_bar(&self, window: &Window) -> bool {
-        // Reserve space for all three window buttons and their padding before
-        // deciding whether the headings fit beside them.
-        let controls = if matches!(window.window_decorations(), Decorations::Client { .. }) {
-            112.
-        } else {
-            0.
-        };
-        window.viewport_size().width < px(560. * self.config.ui.size / 12. + controls)
-    }
-
-    pub(crate) fn render_application_bar(
-        &self,
-        window: &Window,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
-        self.application_bar(BarLayer::Base, window, cx)
-    }
-
-    fn application_bar(
-        &self,
-        layer: BarLayer,
-        window: &Window,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
-        if cx.try_global::<super::super::Headings>().is_none() {
-            super::super::install(cx);
-        }
-        let headings = &cx.global::<super::super::Headings>().0;
-        let compact = self.compact_application_bar(window);
-        let entries: Vec<_> = if compact {
-            vec![(None, SharedString::from("Menu"), false)]
-        } else {
-            headings
-                .iter()
-                .enumerate()
-                .map(|(i, (name, disabled))| (Some(i), name.clone(), *disabled))
-                .collect()
-        };
-        let geometry = self.menu.application_bar.bar.clone();
-        let buttons = &self.menu.application_bar.buttons;
-        // Only the in-flow bar owns anchor measurements. Its overlay copy
-        // must never replace those with geometry from a different frame.
-        let measure = layer == BarLayer::Base;
-        if measure {
-            buttons
-                .borrow_mut()
-                .resize(entries.len(), Bounds::default());
-        }
-        let font = &self.config.ui;
+    /// The button that opens the application menu where Linux has no global
+    /// menu bar: the menus' names drop down under it, each opening in place.
+    /// It records where it was painted, so the list drops from it wherever
+    /// the window's chrome puts it.
+    pub(crate) fn application_menu_button(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        let bar = self.menu.application_bar.bar.clone();
+        let buttons = self.menu.application_bar.buttons.clone();
         let theme = &self.theme;
-        let height = if matches!(window.window_decorations(), Decorations::Client { .. }) {
-            (font.line_height() + 8.).max(crate::titlebar::HEIGHT)
-        } else {
-            font.line_height() + 8.
-        };
-        let bar = div()
-            .id("application-menu-bar")
-            .debug_selector(|| "application-menu-bar".into())
+        let active = theme.active;
+        div()
+            .id("app-menu-button")
+            .debug_selector(|| "app-menu-button".into())
             .relative()
-            .flex()
+            .size(px(crate::design::ICON_BUTTON))
             .flex_none()
+            .flex()
             .items_center()
-            .w_full()
-            .h(px(height))
-            .px(px(6.))
-            // The overlay copy lies on the one in the window, so only that
-            // one takes the window's translucency.
-            .bg(match layer {
-                BarLayer::Base => self.fill().panel(theme.surface),
-                BarLayer::Overlay => rgb(theme.surface).into(),
+            .justify_center()
+            .rounded(px(crate::design::ICON_BUTTON_RADIUS))
+            .cursor_pointer()
+            .when(self.menu.application.is_some(), |button| {
+                button.bg(rgb(active))
             })
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .text_font(font)
-            .text_size(px(font.size))
-            .text_color(rgb(theme.foreground))
-            .occlude()
-            .on_click(|_, _, cx| cx.stop_propagation())
-            .when(measure, |bar| {
-                bar.child(
-                    canvas(move |bounds, _, _| geometry.set(bounds), |_, _, _, _| {})
-                        .absolute()
-                        .inset_0(),
-                )
-            })
-            .children(
-                entries
-                    .into_iter()
-                    .enumerate()
-                    .map(|(slot, (index, name, disabled))| {
-                        let buttons = buttons.clone();
-                        let selector = format!("application-menu-{name}");
-                        let active = self
-                            .menu
-                            .application
-                            .as_ref()
-                            .is_some_and(|menu| compact || menu.path.first().copied() == index);
-                        div()
-                            .id(SharedString::from(selector.clone()))
-                            .debug_selector(move || selector.clone())
-                            .relative()
-                            .flex_none()
-                            .h_full()
-                            .px(px(10.))
-                            // Menu presses must never start a window move or
-                            // open the compositor's title-bar context menu.
-                            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                            .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
-                            .flex()
-                            .items_center()
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .when(active, |button| button.bg(rgb(theme.active)))
-                            .when(disabled, |button| button.text_color(rgb(theme.muted)))
-                            .when(!disabled, |button| {
-                                button.cursor_pointer().hover(|s| s.bg(rgb(theme.active)))
-                            })
-                            .child(name)
-                            .when(measure, |button| {
-                                button.child(
-                                    canvas(
-                                        move |bounds, _, _| {
-                                            if let Some(button) = buttons.borrow_mut().get_mut(slot)
-                                            {
-                                                *button = bounds;
-                                            }
-                                        },
-                                        |_, _, _, _| {},
-                                    )
-                                    .absolute()
-                                    .inset_0(),
-                                )
-                            })
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                cx.stop_propagation();
-                                if disabled {
-                                    return;
-                                }
-                                if this.menu.application.as_ref().is_some_and(|menu| {
-                                    compact || menu.path.first().copied() == index
-                                }) {
-                                    this.dismiss_menu(window, cx);
-                                } else {
-                                    this.open_application_menu(index, window, cx);
-                                }
-                            }))
-                            .on_hover(cx.listener(move |this, hovered, window, cx| {
-                                if *hovered
-                                    && !disabled
-                                    && !compact
-                                    && this
-                                        .menu
-                                        .application
-                                        .as_ref()
-                                        .is_some_and(|menu| menu.path.first().copied() != index)
-                                {
-                                    this.open_application_menu(index, window, cx);
-                                }
-                            }))
-                    }),
+            .hover(move |style| style.bg(rgb(active)))
+            // A press must never start a window move or open the
+            // compositor's title-bar menu.
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
+            .child(
+                svg()
+                    .path("icons/menu.svg")
+                    .size(px(16.))
+                    .text_color(rgb(theme.muted)),
             )
-            .child(div().flex_1().h_full().min_w(px(24.)))
-            .children(crate::titlebar::controls(window, theme, |window, _| {
-                window.remove_window();
-            }));
-        crate::titlebar::movable(bar, window)
+            .child(
+                canvas(
+                    move |bounds, _, _| {
+                        bar.set(bounds);
+                        let mut buttons = buttons.borrow_mut();
+                        buttons.clear();
+                        buttons.push(bounds);
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .inset_0(),
+            )
+            .on_click(cx.listener(|this, _, window, cx| {
+                cx.stop_propagation();
+                if this.menu.application.is_some() {
+                    this.dismiss_menu(window, cx);
+                } else {
+                    this.open_application_menu(None, window, cx);
+                }
+            }))
     }
 
     fn application_shortcut(&self, action: &dyn Action, cx: &App) -> String {
@@ -203,12 +86,8 @@ impl HerdrWindow {
             .unwrap_or_default()
     }
 
-    pub(crate) fn render_application_menu(
-        &self,
-        window: &Window,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
-        let mut overlay = div()
+    pub(crate) fn render_application_menu(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+        let overlay = div()
             .id("application-menu-overlay")
             .debug_selector(|| "application-menu-overlay".into())
             .absolute()
@@ -236,17 +115,12 @@ impl HerdrWindow {
         };
         let bar = self.menu.application_bar.bar.get();
         let content = self.menu.application_bar.content.get();
-        let compact = self.compact_application_bar(window);
         let button = self
             .menu
             .application_bar
             .buttons
             .borrow()
-            .get(if compact {
-                0
-            } else {
-                menu.path.first().copied().unwrap_or(0)
-            })
+            .first()
             .copied()
             .unwrap_or(bar);
         let font = &self.config.ui;
@@ -388,12 +262,6 @@ impl HerdrWindow {
                 .absolute()
                 .inset_0(),
             );
-        // Repeat the bar above the occluding layer, so switching headings never
-        // clicks through the dismissal layer into unrelated window controls.
-        // The overlay fills the same content root as the underlying bar. Lay out
-        // this copy there too: using cached bounds would feed its stale geometry
-        // back into the next frame after a resize or decoration inset change.
-        overlay = overlay.child(self.application_bar(BarLayer::Overlay, window, cx));
         overlay.child(
             anchored()
                 .position(point(

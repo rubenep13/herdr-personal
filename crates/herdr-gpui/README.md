@@ -857,15 +857,16 @@ keeps its icon slot and draws its branch glyph there instead.
 ```toml
 [usage]
 show = true     # Native bottom-bar usage
-topbar = true   # Daemon toolbar text, including plugin percentages
+topbar = true   # Herdr's tab_bar_right text, including plugin percentages
 inline = true   # Daemon sidebar rows, styles, and custom tokens
 ```
 
-All three default to `true` and apply on config reload. Set `topbar`
-to `false` to hide daemon text without hiding the Git/account controls. Set
+All three default to `true` and apply on config reload. Herdr's
+`tab_bar_right` text sits muted at the status bar's right, or in the header
+while the status bar is hidden; set `topbar` to `false` to hide it. Set
 `inline` to `false` to use native sidebar layouts.
 These switches affect GPUI only; they do not change
-the daemon or its plugins. Header text uses GPUI's standard truncation: character boundaries, with trailing
+the daemon or its plugins. The text uses GPUI's standard truncation: character boundaries, with trailing
 space or punctuation trimmed before the ellipsis.
 
 The status bar shows the selected host's CPU and memory: a sparkline of recent
@@ -873,7 +874,10 @@ CPU use and a memory meter, each with its current share, and cores, load
 averages, memory in gigabytes, free space on the volume holding the home
 directory, and uptime in its tooltip. With more than one host, each
 host row in the sidebar shows its own: right-aligned gauges after the name in
-compact layouts, and the sparkline and meter on a second line otherwise. This
+compact layouts, and the sparkline and meter on a second line otherwise. With
+more than one host, the Tree layout leaves the status bar out of it: each
+host's header shows its CPU and memory shares in place of the status bar's
+reading. This
 machine is read in process; each connected Linux or macOS remote host is read
 every two seconds over its own SSH shell, kept open while the host is connected
 (`/proc` on Linux; `vm_stat` and a one-second `iostat` on macOS; `df -Pk
@@ -1020,7 +1024,7 @@ top-level line there (before any table headers):
 layout = "compact"
 ```
 
-**Settings > Sidebar > Layout preset** lists all nine choices. Choosing a layout
+**Settings > Sidebar > Layout preset** lists every layout. Choosing a layout
 applies it live to the app windows, like themes, without writing on each click.
 Only the final choice is saved when Settings closes, **Save now** is pressed, or
 the app quits.
@@ -1074,8 +1078,37 @@ agents, or workspaces match every word typed. The
 [Devices overview](#devices-overview) shows the same devices with their
 activity and load.
 
-New installs start with `comfortable-rounded`: the first launch writes it into
-the new `config-gpui.local.toml`. Existing override files and migrated personal
+The `tree` layout nests each host's spaces, and each space's agents, under
+it, in an order and with folds of your own; Herdr's workspace order never
+changes. It reads in the `[ui]` face. With more than one host, each host has
+a header: how it is reached (This machine, SSH, Tailscale, WSL, or the cloud
+provider), a connection dot, and its CPU and memory shares, which give way to
+fold and new-space buttons under the pointer. A space shows a folder, its
+branch, and its listening ports as small `:3000` labels; folded, a small pill
+counts its agents that need attention. An agent takes two lines, its title
+over its kind, beside its agent's logo on a tile, with its state as a badge at
+the row's end; the extra agent rows of Herdr's own `[ui.sidebar.agents]`
+config, such as a model and a summary, add a third. Tabs no agent runs in
+follow their space's agents as a name over "Terminal". The magnifier in the
+sidebar's header opens the search field; Escape clears and closes it. Its
+options live under `[sidebar]`:
+
+```toml
+[sidebar]
+hierarchy = "guide"      # "guide", "indent", or "block"
+tree_tabs = "all"        # "agents" leaves out tabs no agent runs in
+state_text = false       # name each agent's state beside its badge
+agent_details = "herdr"  # "off" leaves out Herdr's extra agent rows
+```
+
+`guide` runs a line down from the host's icon beside its rows, `indent` steps
+each level further in, and `block` sets each host and its rows in one rounded
+block. They decorate only hosts with a header. With a single host the tree
+draws no header, so the list keeps its `new` and `menu` footer and the status
+bar keeps the host's load.
+
+New installs start with `tree`: the first launch writes it into the new
+`config-gpui.local.toml`. Existing override files and migrated personal
 configs are left alone, so current users keep the managed `normal` default.
 Remove that line to follow the managed default.
 
@@ -1315,24 +1348,34 @@ audio deduplication. Native playback and device-switch/unplug behavior require m
 
 ## Title Bar
 
-With Herdr's tab bar at the top (`ui.tab_bar_position = "top"`, the default),
-the tab row is the title bar, as in Chrome or Conductor, and the window draws
-no separate header. Strips along the top grow to the header's 34px. The
-sidebar column starts with a row holding the traffic-light clearance, the
-sidebar toggle, and Back and Forward; with the sidebar collapsed to its rail or hidden, the leftmost
-group's strip leads with whatever clearance the column leaves and the toggle.
-The rightmost group's strip ends with the header's status text, Git button,
-account, and window controls. Every strip keeps at least 40px of empty room
-after its tabs that moves the window, so the window stays movable however many
-tabs a strip holds; tabs beyond the strip's width scroll as before. A bottom
-tab bar, or a lone tab hidden by `hide_tab_bar_when_single_tab`, brings back
-the full-width header described below, and so does a window with no strips.
-The worktree banner moves to the window's foot in this layout so it never sits
-under the traffic lights.
+The window has two 48px headers side by side. The sidebar's header holds the
+traffic-light clearance on macOS, the sidebar toggle, and at its end the
+sidebar's tools: the Tree layout's search and, on Linux, the ≡ button that
+opens the application menu. The main header, over the content column, holds
+Back and Forward, the focused tab's name with its agent's mark and where it
+lives (`host › space`), Git, the account, and on Linux and Windows the window
+controls. While the sidebar is collapsed to its rail or hidden, the ≡ button
+moves to the main header, and so does the toggle while the sidebar is hidden
+or, on macOS, too narrow beside the traffic lights. The main header drops Back and Forward
+when it has less than 320px to itself, and the tab's name under 440px, so the
+account and window controls stay reachable. Pressing either header moves the
+window.
 
-Back and Forward follow the sidebar toggle, in the header or in the expanded
-sidebar's first row; a sidebar dragged too narrow for them, or collapsed,
-hands them to the leftmost strip with the toggle. They walk the panes this connection has
+Tab strips sit under the main header in a 40px subheader, plain text with the
+chosen tab in the text colour over a short accent line; a tab's close button
+shows on the chosen tab and under the pointer. `[tabs]` chooses what a tab
+shows and where the strips go:
+
+```toml
+[tabs]
+content = "name"        # "agent" adds the agent's logo, "status" also its state
+position = "subheader"  # "bottom", or "herdr" to follow ui.tab_bar_position
+```
+
+A tab with no agent shows a terminal icon and never a state. Tabs use the
+`[ui]` family at 13px unless `[tabs]` sets its own family or size.
+
+Back and Forward walk the panes this connection has
 focused, across tabs and workspaces, the way a browser walks its pages: going
 somewhere new drops what was ahead, closed panes are stepped over, and the
 trail (at most 100 panes) starts over when the daemon restarts. `back`
@@ -1340,23 +1383,17 @@ trail (at most 100 panes) starts over when the daemon restarts. `back`
 mouse's side buttons anywhere in the window. Each platform draws the pair its
 own way: macOS joins two chevrons in one segmented bezel as Finder and Xcode
 do, Windows uses Fluent's subtle arrow buttons as File Explorer does, and
-Linux uses GNOME's flat rounded header bar buttons. A header narrower than
-320px leaves them out so the account and window controls stay reachable, and
-a strip squeezed by the sidebar, a panel, or a split gives up its tabs' room
-first, then drops the pair whole before the trailing controls would be
-pushed out.
+Linux uses GNOME's flat rounded header bar buttons.
 
 macOS keeps `Some(TitlebarOptions)` and the native Herdr window title/traffic lights,
-with transparent chrome and lights positioned at (9, 9) logical pixels. A full-width
-34px header blends `theme.surface` roughly 10% toward white, subtly lifting dark
-themes while keeping light themes light. It sits above the sidebar and tabs: 80px
-of traffic-light clearance, an empty flexible center, and a 40px upper-right slot.
-The slot centers a 16px circular user avatar with a 12px SVG in a 28px hover target, tinted from
+with transparent chrome and lights positioned at (9, 9) logical pixels, over the
+sidebar's header, which keeps 80px clear for them (the main header does while
+the sidebar is hidden). The account slot centers a 16px circular user avatar with a 12px SVG in a 28px hover target, tinted from
 the theme foreground. This profile control opens native GitHub sign-in and shows
 the authenticated user's avatar when connected. It consumes clicks so
 double-clicking it does not invoke the title-bar action.
 The header and clearance remain in fullscreen so the body layout stays stable.
-On Windows and Linux the main window shows the same header below the native
+On Windows and Linux the main window shows the same headers below the native
 frame, with an 8px lead in place of the traffic-light clearance; Settings,
 Logs, and the mockup board rely on the native frame alone.
 
@@ -1372,8 +1409,8 @@ around the window carries a shadow and the resize handles; edges the
 compositor tiles lose both, so a maximized window fills the screen. X11 and
 compositors with server-side decorations keep their native frame.
 
-Linked-worktree builds add a full-width, 22px amber banner below
-the macOS header (above the body on Linux), with the compile-time branch or short
+Linked-worktree builds add a 22px amber banner across the content column,
+under the main header, with the compile-time branch or short
 SHA and optional open PR number, clickable to open that PR on GitHub. The branch
 truncates while the PR stays visible. It participates in the root flex
 layout, so terminal painting,
@@ -3662,9 +3699,10 @@ GPUI native action/menu/keybinding patterns.
 
 - macOS defaults to Menlo and the system font; Windows defaults to Cascadia Mono
   (Consolas when missing) and the system font; Linux defaults to DejaVu Sans Mono
-  and DejaVu Sans, or, when DejaVu is not installed, the first installed common
-  monospace and sans family (JetBrains Mono, Noto, Liberation, Ubuntu, any other
-  `Mono` family). No bundled Nerd Font.
+  and Adwaita Sans, or, when one is not installed, the first installed common
+  family (JetBrains Mono, Noto, Liberation, Ubuntu, or any other `Mono` family
+  for terminals; Inter, DejaVu Sans, Noto Sans, or Cantarell for the
+  interface). No bundled Nerd Font.
   Private-use icons may be missing. Fonts and palettes are configured locally,
   not synchronized from the host terminal's theme.
 - No draggable scrollback UI, split dragging,
@@ -3768,13 +3806,12 @@ the separate downloadable build-time Metal compiler. Integrated Linux ARM64
 compilation, Clippy, default/all-feature tests, and release CLI checks were
 verified in Ubuntu 24.04, not native desktop rendering or input. Linux uses
 [Ctrl+Shift application shortcuts](#keyboard-shortcuts); explicitly configured
-`cmd` bindings still mean Super. Linux shows an **in-window menu
-bar** using the same Herdr, File, Edit, View, Terminal, and Window definitions as
-macOS (plus QA in `qa-menu` builds). It remains visible with the sidebar hidden
-and collapses to **Menu** in narrow windows. In client-decorated windows, the
-minimize, maximize, and close buttons share its right edge. Drag the empty
-menu-bar background to move the window; it also supports the title bar's
-double-click and right-click behavior. Press **F10** to open a menu; arrows
+`cmd` bindings still mean Super. Linux shows an **in-window application
+menu** behind the ≡ button at the end of the sidebar's header (in the main
+header while the sidebar is collapsed or hidden), using the same Herdr, File,
+Edit, View, Terminal, and Window definitions as macOS (plus QA in `qa-menu`
+builds). In client-decorated windows, the minimize, maximize, and close
+buttons end the main header. Press **F10** to open the menu; arrows
 navigate, Enter selects, and Escape or F10 dismisses. Submenus open in the same
 panel; their back header returns to the parent. The menu shows current layout
 checkmarks and configured shortcuts, and restores the previous input focus on
@@ -3789,8 +3826,8 @@ sizes, but does not validate OS IME candidate-window delivery or live daemon
 worktree creation/close.
 They do not replace an interactive smoke test against a live daemon.
 
-On an active Linux desktop, exercise the menu bar in an isolated, daemon-free
-native window with:
+On an active Linux desktop, exercise the application menu in an isolated,
+daemon-free native window with:
 
 ```sh
 cargo test --locked -p herdr-gpui --features integration-test --test live_gui native_application_menus -- --ignored --nocapture --test-threads=1

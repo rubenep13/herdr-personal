@@ -94,7 +94,15 @@ fn a_large_tree_projects_within_a_frame() {
     let mut rows = 0;
     for _ in 0..200 {
         let start = Instant::now();
-        rows = std::hint::black_box(grouped(&hosts, &preferences, "")).len();
+        // The default lists every tab, the most rows a tree can project.
+        rows = std::hint::black_box(project(
+            &hosts,
+            &preferences,
+            AgentSort::Grouped,
+            "",
+            TreeTabs::All,
+        ))
+        .len();
         times.push(start.elapsed());
     }
     times.sort();

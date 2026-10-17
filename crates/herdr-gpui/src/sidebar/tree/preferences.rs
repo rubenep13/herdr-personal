@@ -32,6 +32,8 @@ pub enum Error {
     TooManyEntries,
     #[error("That row is no longer listed.")]
     Unlisted,
+    #[error("Tabs without an agent keep Herdr's order.")]
+    Unmovable,
     #[error("The saved sidebar order has no version.")]
     Unversioned,
     #[error("The saved sidebar order has version {0}, which this client cannot read.")]
@@ -247,6 +249,12 @@ impl TreePreferences {
         anchor: &NodeId,
         before: bool,
     ) -> Result<(), Error> {
+        if [node, anchor]
+            .iter()
+            .any(|id| matches!(id, NodeId::Tab { .. }))
+        {
+            return Err(Error::Unmovable);
+        }
         let parent = node.parent().ok_or(Error::HostOrder)?;
         if anchor.parent().as_ref() != Some(&parent) || node == anchor {
             return Err(Error::NotSiblings);
@@ -316,6 +324,7 @@ impl TreePreferences {
                 });
             }
             NodeId::Host(_) => return Err(Error::HostOrder),
+            NodeId::Tab { .. } => return Err(Error::Unmovable),
         }
         Ok(())
     }

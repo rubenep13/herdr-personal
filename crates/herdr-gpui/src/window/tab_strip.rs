@@ -4,26 +4,23 @@
 
 mod dividers;
 
-use super::{HerdrWindow, tab_drag::StripDrag};
+use super::{HerdrWindow, tab_drag::StripDrag, tab_look::Lead};
 use crate::{
     TAB_HEIGHT, TAB_WIDTH,
     browser::{Fold, GroupId, Leaving, Listed, Pick, Shown, Slot, ThumbDrag},
     controls::Command,
     fonts::StyledFont,
     herdr_settings::TabBarPosition,
-    sidebar::{Indicators, status_indicator},
-    titlebar::Ends,
 };
 use gpui::{prelude::*, *};
-use herdr_client::protocol::AgentStatus;
 
 pub(super) use dividers::{Reach, native_page};
 
-/// The gap between a Herdr tab's status indicator and its title.
-const DOT_GAP: f32 = 6.;
+/// The gap between a tab's title and its close button.
+pub(super) const CLOSE_GAP: f32 = 10.;
 
-/// How large the mark after a zoomed tab's title draws, `DOT_GAP` after it.
-const ZOOM_ICON: f32 = 11.;
+/// How large the mark after a zoomed tab's title draws, a lead's gap after it.
+pub(super) const ZOOM_ICON: f32 = 11.;
 
 /// How tall the thumb along a scrolling strip's foot draws.
 const THUMB_HEIGHT: f32 = 4.;
@@ -35,26 +32,17 @@ const LIFT_GROW: f32 = 5.;
 const THUMB_ALPHA: u32 = 0x80;
 const THUMB_HELD_ALPHA: u32 = 0xc0;
 
-/// What a tab draws before its title.
+/// Where a window's tab strips sit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Lead {
-    Nothing,
-    /// A Herdr tab whose agents report a status.
-    Status,
-    /// A browser tab's globe.
-    Globe,
+pub(crate) enum Placement {
+    /// Under the main header, atop each group.
+    Subheader,
+    /// At the foot of each group.
+    Bottom,
 }
 
-impl Lead {
-    /// Unknown is what a tab without an agent reports, so it draws nothing
-    /// rather than the sidebar's small grey dot.
-    fn of(status: AgentStatus) -> Self {
-        match status {
-            AgentStatus::Unknown => Self::Nothing,
-            _ => Self::Status,
-        }
-    }
-}
+/// The subheader's height, which a larger tab font still grows.
+const SUBHEADER_HEIGHT: f32 = 40.;
 
 /// What a group without tabs says, where its tab would show.
 const NO_TABS: &str =
@@ -78,17 +66,14 @@ impl HerdrWindow {
 
     /// How wide a tab with `label` draws, as its padding, gaps, close
     /// button, and whatever leads its title add up around the shaped text.
-    fn tab_width(
-        &self,
-        label: &SharedString,
-        lead: Lead,
-        zoomed: bool,
-        indicators: Indicators,
-        window: &Window,
-    ) -> f32 {
+    fn tab_width(&self, label: &SharedString, lead: Lead, zoomed: bool, window: &Window) -> f32 {
+        // At the chosen tab's weight, so choosing a tab never cuts its name
+        // or changes its width.
+        let mut font = self.config.tabs.font();
+        font.weight = FontWeight(font.weight.0.max(super::tab_look::CHOSEN_WEIGHT.0));
         let run = TextRun {
             len: label.len(),
-            font: self.config.tabs.font(),
+            font,
             color: black(),
             background_color: None,
             underline: None,
@@ -100,16 +85,20 @@ impl HerdrWindow {
                 .shape_line(label.clone(), px(self.config.tabs.size), &[run], None)
                 .width,
         );
-        // Padding, the gap before the close button, the button, the rule;
-        // a status dot or a browser tab's globe, and its gap.
+        // Padding and the gap before the close button, then what leads the
+        // title: an agent's mark, its state, or a browser tab's globe.
         let chrome = match lead {
-            Lead::Nothing => 12. + 10.,
-            Lead::Status => 12. + indicators.width(&self.config.tabs) + DOT_GAP + 10.,
-            Lead::Globe => 10. + 12. + 6. + 6.,
+            Lead::Globe => 10. + lead.width() + 6.,
+            lead => 12. + lead.width() + CLOSE_GAP,
         };
-        let zoom = if zoomed { DOT_GAP + ZOOM_ICON } else { 0. };
-        // GPUI rounds the text element's intrinsic width up during layout.
-        (chrome + zoom + text.ceil() + 18. + 3. + 1.).max(TAB_WIDTH)
+        let zoom = if zoomed {
+            super::tab_look::LEAD_GAP + ZOOM_ICON
+        } else {
+            0.
+        };
+        // The close button and the padding after it; GPUI rounds the text
+        // element's intrinsic width up during layout.
+        (chrome + zoom + text.ceil() + 18. + 3.).max(TAB_WIDTH)
     }
 
     /// A closed tab where it stood, narrowing and fading out.
@@ -136,31 +125,15 @@ impl HerdrWindow {
 
     /// Height of a group's tab strip, which grows with the tab font.
     pub(crate) fn tab_strip_height(&self) -> f32 {
-        crate::titlebar::strip_height(
-            (self.config.tabs.size * 1.6 + 4.).max(TAB_HEIGHT),
-            self.tab_bar_position() == TabBarPosition::Top,
-        )
+        (self.config.tabs.size * 1.6 + 4.)
+            .max(TAB_HEIGHT)
+            .max(SUBHEADER_HEIGHT)
     }
 
-    /// `ends` says which of the header's parts the strip carries, when it
-    /// stands in for the header.
-    fn render_tab_strip(
-        &mut self,
-        slot: Slot,
-        ends: Option<Ends>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Div {
+    /// A group's strip: its tabs, a new tab button, and the group's
+    /// actions, as the subheader or at the group's foot.
+    fn render_tab_strip(&mut self, slot: Slot, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let pick = self.group_pick(slot.id);
-        let indicators = Indicators::new(
-            self.settings.shared.as_ref(),
-            self.config.status_icons,
-            matches!(
-                cx.window_appearance(),
-                WindowAppearance::Light | WindowAppearance::VibrantLight
-            ),
-            &self.theme,
-        );
         // What the strip lists, measured, so the ones that just opened grow
         // in and the ones that just closed shrink out where they stood.
         let now = std::time::Instant::now();
@@ -179,7 +152,7 @@ impl HerdrWindow {
                                 Pick::Herdr(t.tab_id.clone()),
                                 SharedString::from(t.label.clone()),
                             ),
-                            Lead::of(t.agent_status),
+                            self.tab_lead_kind(t),
                             t.zoomed,
                         )
                     })
@@ -195,7 +168,7 @@ impl HerdrWindow {
             )
             .filter(|((pick, _), _, _)| self.group_lists(slot.id, pick))
             .map(|((pick, label), lead, zoomed)| Listed {
-                width: self.tab_width(&label, lead, zoomed, indicators, window),
+                width: self.tab_width(&label, lead, zoomed, window),
                 pick,
                 label,
             })
@@ -220,130 +193,16 @@ impl HerdrWindow {
             .text_size(px(self.config.tabs.size))
             .overflow_x_scroll()
             .track_scroll(&scroll)
-            .bg(self.fill().over(self.theme.surface, self.theme.surface))
             .text_color(rgb(self.theme.foreground));
         if let Some(snapshot) = &self.live.snapshot {
             for tab in snapshot.tabs.iter().filter(|t| {
                 Some(&t.workspace_id) == snapshot.focused_workspace_id.as_ref()
                     && self.group_lists(slot.id, &Pick::Herdr(t.tab_id.clone()))
             }) {
-                let id = tab.tab_id.clone();
-                let context_id = id.clone();
-                let close_id = id.clone();
-                let selected = matches!(&pick, Some(Pick::Herdr(picked)) if *picked == id);
-                let (background, text) = self.tab_colors(selected, slot.id);
+                let selected = matches!(&pick, Some(Pick::Herdr(picked)) if *picked == tab.tab_id);
                 built.push((
-                    Pick::Herdr(id.clone()),
-                    div()
-                        .id(SharedString::from(format!("tab-{id}")))
-                        .debug_selector({
-                            let id = id.clone();
-                            move || slot.selector(&format!("tab-{id}"))
-                        })
-                        .pl(px(12.))
-                        // The close button hugs the tab's inner right edge, well
-                        // clear of the label it would otherwise crowd.
-                        .pr(px(3.))
-                        .py(px(2.))
-                        // Even cells divided by a single rule, as in the reference UI.
-                        .min_w(px(TAB_WIDTH))
-                        .map(|tab| self.grow_tab(tab, slot.id, &Pick::Herdr(id.clone())))
-                        .border_r_1()
-                        .border_color(rgb(self.theme.active))
-                        .flex_none()
-                        .flex()
-                        .items_center()
-                        .gap(px(10.))
-                        .cursor_pointer()
-                        .bg(self.fill().over(self.theme.surface, background))
-                        .text_color(rgb(text))
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap(px(DOT_GAP))
-                                .when(Lead::of(tab.agent_status) == Lead::Status, |title| {
-                                    title.child(
-                                        status_indicator(
-                                            tab.agent_status,
-                                            &self.config.tabs,
-                                            indicators,
-                                        )
-                                        .mt_0()
-                                        .debug_selector({
-                                            let id = id.clone();
-                                            move || slot.selector(&format!("tab-status-{id}"))
-                                        }),
-                                    )
-                                })
-                                .child(tab.label.clone())
-                                // Herdr's " Z": one pane fills the tab, the
-                                // rest are hidden behind it.
-                                .when(tab.zoomed, |title| {
-                                    title.child(
-                                        svg()
-                                            .path("icons/zoom.svg")
-                                            .debug_selector({
-                                                let id = id.clone();
-                                                move || slot.selector(&format!("tab-zoom-{id}"))
-                                            })
-                                            .flex_none()
-                                            .size(px(ZOOM_ICON))
-                                            .text_color(rgb(text)),
-                                    )
-                                }),
-                        )
-                        .child(
-                            div()
-                                .id("close-tab")
-                                .debug_selector({
-                                    let id = id.clone();
-                                    move || slot.selector(&format!("close-tab-{id}"))
-                                })
-                                .size(px(18.))
-                                .flex_none()
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .rounded(px(crate::config::corners::CONTROL))
-                                .hover(move |s| s.bg(rgba((text << 8) | 0x24)))
-                                .child(
-                                    svg()
-                                        .path("icons/close.svg")
-                                        .debug_selector({
-                                            let id = id.clone();
-                                            move || slot.selector(&format!("close-tab-icon-{id}"))
-                                        })
-                                        .size(px(12.))
-                                        .text_color(rgb(text)),
-                                )
-                                .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                                    cx.stop_propagation();
-                                })
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    let pick = Pick::Herdr(close_id.clone());
-                                    this.close_strip_tab(pick, window, cx);
-                                })),
-                        )
-                        .on_mouse_down(
-                            MouseButton::Right,
-                            cx.listener(move |this, event: &MouseDownEvent, window, cx| {
-                                cx.stop_propagation();
-                                this.open_tab_menu(
-                                    &context_id,
-                                    Some(slot.id),
-                                    event.position,
-                                    window,
-                                    cx,
-                                );
-                                this.menu.opening_right_click =
-                                    this.menu.page == Some(crate::menu::Page::Tab);
-                            }),
-                        )
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.choose_herdr_tab(slot.id, &id, window, cx);
-                        })),
+                    Pick::Herdr(tab.tab_id.clone()),
+                    self.herdr_tab(slot, tab, selected, cx),
                 ));
             }
         }
@@ -431,19 +290,25 @@ impl HerdrWindow {
                     )
                     .on_drag(ThumbDrag(slot.id), |_, _, _, cx| cx.new(|_| EmptyView))
             }));
+        let bottom = self.tab_placement() == Placement::Bottom;
         div()
+            .debug_selector(move || slot.selector("tab-strip"))
             .flex()
             .flex_none()
+            .items_center()
             .relative()
-            .bg(self.fill().panel(self.theme.surface))
+            .pl(px(8.))
+            .pr(px(4.))
+            .bg(self.fill().panel(self.theme.background))
             .text_color(rgb(self.theme.foreground))
+            .map(|strip| match bottom {
+                false => strip.border_b_1(),
+                true => strip.border_t_1(),
+            })
+            .border_color(rgb(self.theme.active))
             .when(self.tab_drag_in(slot.id), |strip| {
                 strip.child(self.tab_drag_listeners(cx))
             })
-            .children(
-                ends.filter(|ends| ends.leading)
-                    .and_then(|_| self.strip_leading(window, cx)),
-            )
             // Tabs size to their content and shrink when the row is full, so
             // the button sits after the last tab instead of at the far right
             // of the window.
@@ -452,10 +317,8 @@ impl HerdrWindow {
                 div()
                     .id(SharedString::from(slot.selector("new-tab")))
                     .debug_selector(move || slot.selector("new-tab"))
-                    .w(px(34.))
-                    .min_h(px(TAB_HEIGHT))
-                    .border_r_1()
-                    .border_color(rgb(self.theme.active))
+                    .size(px(crate::design::ICON_BUTTON))
+                    .rounded(px(crate::design::ICON_BUTTON_RADIUS))
                     .flex_none()
                     .flex()
                     .items_center()
@@ -477,7 +340,7 @@ impl HerdrWindow {
                         this.command(Command::Tab, window, cx);
                     })),
             )
-            .child(self.strip_room(ends, window))
+            .child(div().flex_1().min_w_0())
             .child(self.strip_button(
                 slot,
                 "split-editor",
@@ -494,9 +357,6 @@ impl HerdrWindow {
                     this.open_group_menu(slot.id, event.position(), window, cx);
                 },
             ))
-            .when(ends.is_some_and(|ends| ends.trailing), |strip| {
-                strip.child(self.strip_trailing(window, cx))
-            })
     }
 
     /// Closes a strip's tab as its close button does: a page at once and a
@@ -783,22 +643,20 @@ impl HerdrWindow {
                 && self.group_tabs(group, cx).len() <= 1
     }
 
-    /// One group: its strip above or below what it shows, as Herdr's
-    /// `tab_bar_position` places it. Pressing anywhere in it makes it the
-    /// group in use. `ends` is set while the strips stand in for the header.
-    /// `reach` is how far its dividers' grips lie over it.
+    /// One group: its strip above or below what it shows, as
+    /// [`Self::tab_placement`] places it. Pressing anywhere in it makes it the
+    /// group in use. `reach` is how far its dividers' grips lie over it.
     pub(super) fn render_group(
         &mut self,
         slot: Slot,
         body: AnyElement,
-        ends: Option<Ends>,
         reach: Reach,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let strip = (!self.strip_hidden(slot.id, cx))
-            .then(|| self.render_tab_strip(slot, ends, window, cx));
-        let bottom = self.tab_bar_position() == TabBarPosition::Bottom;
+        let strip =
+            (!self.strip_hidden(slot.id, cx)).then(|| self.render_tab_strip(slot, window, cx));
+        let bottom = self.tab_placement() == Placement::Bottom;
         // Zen mode draws the one group in use across the whole row, at once
         // even while it is still opening.
         let zen = self.zen_layout();
@@ -895,7 +753,7 @@ impl HerdrWindow {
             .flex_col()
             .border_l_1()
             .border_color(rgb(self.theme.active))
-            .when(self.tab_bar_position() == TabBarPosition::Bottom, |group| {
+            .when(self.tab_placement() == Placement::Bottom, |group| {
                 group.flex_col_reverse()
             })
             .child(

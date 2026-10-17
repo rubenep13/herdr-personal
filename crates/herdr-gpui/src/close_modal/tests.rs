@@ -70,9 +70,8 @@ fn tab_icon_bounds_and_inactive_cross_confirmation(cx: &mut TestAppContext) {
         cx.update(|window, cx| window.draw(cx).clear(cx));
         let button = cx.debug_bounds("new-tab").unwrap();
         let icon = cx.debug_bounds("new-tab-icon").unwrap();
-        assert!(button.size.width >= px(34.));
-        // As tall as the strip, which stands in for the title bar.
-        assert_eq!(button.size.height, px(crate::titlebar::HEIGHT));
+        let side = px(crate::design::ICON_BUTTON);
+        assert_eq!(button.size, size(side, side));
         assert_eq!(icon.size, size(px(14.), px(14.)));
         // Centred within the content box, which the divider insets by a pixel.
         assert!((button.center().x - icon.center().x).abs() <= px(1.));
@@ -88,17 +87,22 @@ fn tab_icon_bounds_and_inactive_cross_confirmation(cx: &mut TestAppContext) {
     let original_focus = view.read_with(cx, |view, _| {
         view.live.snapshot.as_ref().unwrap().focused_tab_id.clone()
     });
+    // An inactive tab shows its cross under the pointer.
+    let tab = cx.debug_bounds("tab-inactive").unwrap();
+    cx.simulate_mouse_move(tab.center(), None, Modifiers::default());
+    cx.update(|window, cx| window.draw(cx).clear(cx));
     let button = cx.debug_bounds("close-tab-inactive").unwrap();
     let icon = cx.debug_bounds("close-tab-icon-inactive").unwrap();
     assert_eq!(button.size, size(px(18.), px(18.)));
     assert_eq!(icon.size, size(px(12.), px(12.)));
     assert_eq!(button.center(), icon.center());
-    // Hugging the tab's inner right edge, clear of the label beside it:
-    // three pixels of padding inside the one-pixel divider.
-    let tab = cx.debug_bounds("tab-inactive").unwrap();
-    assert_eq!(tab.right() - button.right(), px(4.));
+    // Hugging the tab's inner right edge, clear of the label beside it.
+    assert_eq!(tab.right() - button.right(), px(3.));
     assert!(button.left() - tab.left() >= px(24.));
     for fence in ["cancel", "selection", "generation", "boot"] {
+        // The dialog covered the tab; pointing at it again shows its cross.
+        cx.simulate_mouse_move(tab.center(), None, Modifiers::default());
+        cx.update(|window, cx| window.draw(cx).clear(cx));
         cx.simulate_mouse_down(button.center(), MouseButton::Left, Modifiers::default());
         cx.simulate_mouse_up(button.center(), MouseButton::Left, Modifiers::default());
         view.read_with(cx, |view, _| {

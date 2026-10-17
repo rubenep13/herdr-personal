@@ -30,6 +30,7 @@ pub(crate) mod status_bar;
 mod status_icons;
 #[cfg(any(feature = "boat", feature = "coder", feature = "daytona"))]
 mod table;
+mod tabs_style;
 pub(crate) use sidebar_style::parse_hex;
 mod theme;
 mod updates;
@@ -73,7 +74,9 @@ pub(crate) use sidebar::{
     SidebarScope, SpaceLayout, SpaceToken, TokenStyle,
 };
 pub(crate) use sidebar_style::DeviceFooter;
-pub use sidebar_style::{SelectMode, SidebarOverrides, SidebarStyle};
+pub use sidebar_style::{
+    AgentDetails, SelectMode, SidebarOverrides, SidebarStyle, TreeHierarchy, TreeTabs,
+};
 pub use status_bar::StatusBar;
 pub use status_icons::StatusIcons;
 use std::{
@@ -82,6 +85,7 @@ use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
 };
+pub use tabs_style::{TabContent, TabPlacement, TabsStyle};
 pub use theme::Theme;
 pub(crate) use theme::ThemeName;
 pub(crate) use theme::mix;
@@ -195,6 +199,8 @@ pub struct Config {
     /// Drawn status icons in place of Herdr's dots or symbols; `None` follows Herdr.
     pub status_icons: Option<StatusIcons>,
     pub tabs: FontConfig,
+    /// What each tab shows and where the tab strips sit.
+    pub tabs_style: TabsStyle,
     pub terminal: FontConfig,
     /// Blank space around every terminal's cells.
     pub terminal_padding: Padding,
@@ -440,9 +446,10 @@ impl Default for Config {
             sound: SoundConfig::default(),
             status_bar: StatusBar::default(),
             status_icons: None,
-            // Tabs are terminal chrome, so they read in the monospace face the
-            // sidebar and terminal use, as they do in the reference UI.
-            tabs: font(monospace, 12.0),
+            // Tabs name what the window shows, so they read in the interface
+            // face at the main window's name size, as its header does.
+            tabs: font(ui, 13.0),
+            tabs_style: TabsStyle::default(),
             terminal: font(monospace, 14.0),
             terminal_padding: Padding::default(),
             theme: "Default".into(),
@@ -499,7 +506,7 @@ struct Settings {
     sound: SoundConfig,
     status_bar: StatusBar,
     status_icons: Option<StatusIcons>,
-    tabs: FontSettings,
+    tabs: tabs_style::TabsSettings,
     terminal: FontSettings,
     theme: Option<String>,
     ui: FontSettings,
@@ -788,7 +795,7 @@ impl Config {
         unknown_keys.extend(
             [
                 ("sidebar", &mut settings.sidebar.font),
-                ("tabs", &mut settings.tabs),
+                ("tabs", &mut settings.tabs.font),
                 ("ui", &mut settings.ui),
             ]
             .into_iter()
@@ -887,6 +894,7 @@ impl Config {
         // keep-sorted end
         config.status_bar = settings.status_bar;
         config.status_icons = settings.status_icons;
+        config.tabs_style = settings.tabs.style;
         config.zen = settings.zen.try_into()?;
         settings.backdrop.validate()?;
         config.backdrop = settings.backdrop;
@@ -900,7 +908,7 @@ impl Config {
         config.keep_selection_after_copy = settings.keep_selection_after_copy.unwrap_or(true);
         for (name, font, settings) in [
             ("sidebar", &mut config.sidebar, settings.sidebar.font),
-            ("tabs", &mut config.tabs, settings.tabs),
+            ("tabs", &mut config.tabs, settings.tabs.font),
             ("terminal", &mut config.terminal, settings.terminal),
             ("ui", &mut config.ui, settings.ui),
         ] {

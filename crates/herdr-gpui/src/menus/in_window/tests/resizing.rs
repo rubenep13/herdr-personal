@@ -12,7 +12,7 @@ impl Render for InsetWindow {
 }
 
 #[gpui::test]
-fn open_menu_bar_follows_resizes_and_content_insets(cx: &mut TestAppContext) {
+fn open_menu_follows_its_button_through_resizes_and_insets(cx: &mut TestAppContext) {
     let (root, cx) = cx.add_window_view(|window, cx| InsetWindow {
         view: cx.new(|cx| {
             let view = fixture_window(window, cx);
@@ -24,16 +24,11 @@ fn open_menu_bar_follows_resizes_and_content_insets(cx: &mut TestAppContext) {
     let view = root.read_with(cx, |root, _| root.view.clone());
     cx.simulate_resize(size(px(1200.), px(700.)));
     draw(cx);
-    let button = cx.debug_bounds("application-menu-File").unwrap();
+    let button = cx.debug_bounds("app-menu-button").unwrap();
     cx.simulate_click(button.center(), Modifiers::none());
     draw(cx);
 
-    for (width, inset, heading) in [
-        (360., 0., "application-menu-Menu"),
-        (1200., 11., "application-menu-File"),
-        (360., 11., "application-menu-Menu"),
-        (1200., 0., "application-menu-File"),
-    ] {
+    for (width, inset) in [(360., 0.), (1200., 11.), (360., 11.), (1200., 0.)] {
         root.update(cx, |root, cx| {
             root.inset = px(inset);
             cx.notify();
@@ -41,23 +36,14 @@ fn open_menu_bar_follows_resizes_and_content_insets(cx: &mut TestAppContext) {
         cx.simulate_resize(size(px(width), px(700.)));
         for _ in 0..5 {
             draw(cx);
-            let bar = cx.debug_bounds("application-menu-bar").unwrap();
-            assert_eq!(bar.origin, point(px(inset), px(inset)));
-            assert_eq!(bar.size.width, px(width - 2. * inset));
-            assert!(bar.contains(&cx.debug_bounds(heading).unwrap().center()));
+            let button = cx.debug_bounds("app-menu-button").unwrap();
             view.read_with(cx, |view, _| {
                 assert_eq!(view.menu.page, Some(Page::Application));
-                let measured = view.menu.application_bar.bar.get();
-                assert_eq!(measured.origin, bar.origin);
-                assert_eq!(measured.size.width, bar.size.width);
+                assert_eq!(view.menu.application_bar.bar.get(), button);
             });
+            let panel = cx.debug_bounds("application-menu-panel").unwrap();
+            assert!((panel.top() - button.bottom()).abs() <= px(1.));
+            assert!(panel.left() >= px(inset) && panel.right() <= px(width - inset));
         }
-        let panel = cx.debug_bounds("application-menu-panel").unwrap();
-        assert!(panel.left() >= px(inset) && panel.right() <= px(width - inset));
     }
-
-    // The resized heading still receives clicks through the modal overlay.
-    let button = cx.debug_bounds("application-menu-File").unwrap();
-    cx.simulate_click(button.center(), Modifiers::none());
-    assert!(view.read_with(cx, |view, _| view.menu.page.is_none()));
 }

@@ -165,7 +165,11 @@ impl SettingsWindow {
             edit,
         } = button;
         let shown = current.shown();
-        let toggled = if shown { Button::Hidden } else { Button::Label };
+        let toggled = if shown {
+            Button::Hidden
+        } else {
+            Button::default()
+        };
         ui::row(&self.theme, id, title)
             .control(ui::segmented(
                 &self.theme,

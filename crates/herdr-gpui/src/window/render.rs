@@ -40,7 +40,7 @@ impl HerdrWindow {
         Some(
             div()
                 .absolute()
-                .top(px(self.tab_strip_height() + 8.))
+                .top(px(self.chrome_top() + 8.))
                 .left(px(8.))
                 .right(px(8.))
                 .flex()
@@ -645,9 +645,6 @@ impl Render for HerdrWindow {
             .then(|| self.active_group())
             .flatten();
         let mut terminal = Some(terminal);
-        let merged = slots
-            .first()
-            .is_some_and(|first| self.tabs_in_titlebar(first.id, cx));
         let count = slots.len();
         let mut groups = Vec::with_capacity(count);
         for (slot, shown) in slots.into_iter().zip(shown) {
@@ -705,9 +702,8 @@ impl Render for HerdrWindow {
                 },
                 _ => self.render_stand_in(slot, &shown, owns_keyboard, cx),
             };
-            let ends = merged.then(|| crate::titlebar::Ends::of(slot.index, count));
             let reach = Reach::of(&pages, slot.index);
-            groups.push(self.render_group(slot, body, ends, reach, window, cx));
+            groups.push(self.render_group(slot, body, reach, window, cx));
         }
         let content = self.render_groups(groups, cx);
         let content = self.zen_column(content);
@@ -834,19 +830,8 @@ impl Render for HerdrWindow {
             .text_color(rgb(self.theme.foreground))
             .text_font(&self.config.ui)
             .text_size(px(self.config.ui.size))
-            .when(cfg!(target_os = "linux") && !zen, |root| {
-                root.child(self.render_application_bar(window, cx))
-            })
-            .when(!merged && !zen, |root| {
-                root.child(self.render_titlebar(window, cx))
-            })
             .when(zen, |root| {
                 root.children(crate::titlebar::zen_inset(fill.ground(), window))
-            })
-            // Under the traffic lights a banner would hide them, so with no
-            // header it moves to the window's foot.
-            .when(!merged && !zen, |root| {
-                root.children(self.render_worktree_banner())
             })
             .child(
                 div()
@@ -856,11 +841,8 @@ impl Render for HerdrWindow {
                     .min_h_0()
                     .relative()
                     .children(sidebar.map(|(sidebar, width)| {
-                        let column = match merged {
-                            true => self.sidebar_column(sidebar, window, cx).into_any_element(),
-                            false => sidebar.into_any_element(),
-                        };
-                        self.sliding_sidebar(column, width)
+                        let column = self.sidebar_column(sidebar, window, cx);
+                        self.sliding_sidebar(column.into_any_element(), width)
                     }))
                     .child(
                         div()
@@ -870,14 +852,16 @@ impl Render for HerdrWindow {
                             .min_w_0()
                             .min_h_0()
                             .relative()
+                            .when(!zen, |column| {
+                                column
+                                    .child(self.main_header(window, cx))
+                                    .children(self.render_worktree_banner())
+                            })
                             .child(content)
                             .children(self.render_notices(cx))
                             .children(self.zen_status_bar(cx)),
                     ),
             )
-            .when(merged && !zen, |root| {
-                root.children(self.render_worktree_banner())
-            })
             .children(self.render_tab_ghost(cx))
             .children(self.render_toasts(window, cx))
             .children(self.render_file_transfer(window, cx))

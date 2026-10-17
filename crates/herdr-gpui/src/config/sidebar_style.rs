@@ -1,6 +1,6 @@
 //! The `[sidebar]` table beyond its font: spacing that overrides the layout
-//! preset, a colour per host, how a selection marks its host's group, and
-//! when the device footer is drawn.
+//! preset, a colour per host, how a selection marks its host's group, when
+//! the device footer is drawn, and how the tree layout draws its rows.
 
 use super::fonts::FontSettings;
 use crate::{Error, Result};
@@ -97,6 +97,42 @@ impl DeviceFooter {
     }
 }
 
+/// How the tree layout shows that spaces belong to their host.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TreeHierarchy {
+    /// Each level steps further in, with more air between hosts.
+    Indent,
+    /// Each host and its rows sit in one rounded block.
+    Block,
+    /// A thin line runs down from the host's icon beside its rows.
+    #[default]
+    Guide,
+}
+
+/// Which of a space's tabs the tree layout lists.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TreeTabs {
+    /// Agents, then the tabs no agent runs in.
+    #[default]
+    All,
+    /// Only the agents.
+    Agents,
+}
+
+/// What the tree layout shows under an agent's name and kind.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AgentDetails {
+    /// The extra agent rows Herdr's config defines, such as the model and
+    /// the summary.
+    #[default]
+    Herdr,
+    /// Nothing more.
+    Off,
+}
+
 /// Sidebar styling the config file adds to a layout preset.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SidebarStyle {
@@ -105,6 +141,14 @@ pub struct SidebarStyle {
     pub device_footer: DeviceFooter,
     /// A colour per host, keyed by the host's display name, as `0xRRGGBB`.
     pub hosts: BTreeMap<String, u32>,
+    /// How the tree layout nests spaces under their host.
+    pub hierarchy: TreeHierarchy,
+    /// Whether the tree layout lists tabs without an agent.
+    pub tree_tabs: TreeTabs,
+    /// Whether an agent row names its state in words beside its badge.
+    pub state_text: bool,
+    /// Whether an agent row adds Herdr's extra agent lines.
+    pub agent_details: AgentDetails,
 }
 
 /// `#rgb` or `#rrggbb`, in either case.
@@ -131,6 +175,10 @@ pub(super) struct SidebarSettings {
     pub(super) select: SelectMode,
     pub(super) device_footer: DeviceFooter,
     pub(super) hosts: BTreeMap<String, String>,
+    pub(super) hierarchy: TreeHierarchy,
+    pub(super) tree_tabs: TreeTabs,
+    pub(super) state_text: bool,
+    pub(super) agent_details: AgentDetails,
 }
 
 impl SidebarSettings {
@@ -154,6 +202,10 @@ impl SidebarSettings {
             select: self.select,
             device_footer: self.device_footer,
             hosts,
+            hierarchy: self.hierarchy,
+            tree_tabs: self.tree_tabs,
+            state_text: self.state_text,
+            agent_details: self.agent_details,
         })
     }
 }
@@ -189,6 +241,10 @@ impl<'de> Deserialize<'de> for SidebarSettings {
                         "select" => settings.select = map.next_value()?,
                         "device_footer" => settings.device_footer = map.next_value()?,
                         "hosts" => settings.hosts = map.next_value()?,
+                        "hierarchy" => settings.hierarchy = map.next_value()?,
+                        "tree_tabs" => settings.tree_tabs = map.next_value()?,
+                        "state_text" => settings.state_text = map.next_value()?,
+                        "agent_details" => settings.agent_details = map.next_value()?,
                         _ => {
                             map.next_value::<serde::de::IgnoredAny>()?;
                         }

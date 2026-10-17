@@ -43,6 +43,8 @@ mod tab_drag;
 #[cfg(target_os = "macos")]
 mod tab_float;
 mod tab_ghost;
+mod tab_look;
+pub(crate) use tab_look::tab_agent;
 mod tab_strip;
 mod tab_tear;
 mod toasts;
@@ -308,9 +310,6 @@ pub(crate) struct HerdrWindow {
     /// Starts as `config.status_bar.show`; Toggle Status Bar flips it for the
     /// session, and a reload that changes the setting applies it again.
     pub(crate) status_bar_visible: bool,
-    /// Whether the leftmost strip gave Back and Forward their full width
-    /// when it was last laid out; see `HerdrWindow::strip_leading`.
-    pub(crate) strip_navigation_fits: bool,
     /// Notified in place of this view by a surface-only update, which redraws
     /// the window while the cached sidebar keeps its layout.
     pub(crate) surface_signal: Entity<SurfaceSignal>,

@@ -26,9 +26,9 @@ const CRITICAL: f32 = 90.;
 
 impl HerdrWindow {
     /// The selected host's load; nothing while hidden or before the host's
-    /// first answer.
+    /// first answer. The Tree layout's host headers show each host's instead.
     pub(crate) fn render_system_load(&self) -> Option<impl IntoElement> {
-        if !self.config.show_system_load {
+        if !self.config.show_system_load || self.tree_host_headers() {
             return None;
         }
         let host = self.selected_host()?;

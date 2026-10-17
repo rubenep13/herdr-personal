@@ -437,7 +437,7 @@ impl HerdrWindow {
                             position,
                             ToastHerdrPosition::TopLeft | ToastHerdrPosition::TopRight
                         ),
-                        |d| d.top(px(72.)),
+                        |d| d.top(px(self.chrome_top() + 8.)),
                     )
                     .when(
                         matches!(

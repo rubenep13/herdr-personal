@@ -179,6 +179,9 @@ fn cells_hand_their_state_and_data_to_the_layout() {
             removing: false,
             status: snapshot.workspaces[0].agent_status,
             lines: vec![],
+            ports: None,
+            attention: 0,
+            more: None,
         })
     };
     let _ = Cell::new(&recorder, workspace(), &cx).row();
@@ -188,6 +191,7 @@ fn cells_hand_their_state_and_data_to_the_layout() {
         RowData::Agent(AgentRow {
             key: "agent-p0".into(),
             name: "Claude Code",
+            kind: None,
             icon: crate::icons::AgentIcon::Generic,
             status: AgentStatus::Working,
             place: None,

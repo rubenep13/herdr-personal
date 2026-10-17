@@ -44,18 +44,6 @@ impl Style {
         }
     }
 
-    /// The pair's whole width, margins and divider included.
-    pub(crate) fn width(self) -> f32 {
-        let button = f32::from(self.button().0.width);
-        let pair = match self {
-            // The bezel's 1px border on each side, and the hairline.
-            Self::Segmented => 2. + 1. + 2. * button,
-            Self::Fluent => 4. + 2. * button,
-            Self::Adwaita => 6. + 2. * button,
-        };
-        LEADING_MARGIN + pair + NAVIGATION_MARGIN
-    }
-
     fn icon(self, step: Step) -> &'static str {
         match (self, step) {
             (Self::Fluent, Step::Back) => "icons/arrow-left.svg",

@@ -9,7 +9,7 @@ use crate::{
 /// Three spaces with the fixture's two agents, in the Tree layout: `p0`
 /// under `w0`, `p1` under `w1`, `w2` empty. `remote` adds a second host
 /// with the same IDs, so every row names its host in its selector.
-fn tree_window(
+pub(super) fn tree_window(
     cx: &mut gpui::TestAppContext,
     remote: bool,
 ) -> (Entity<HerdrWindow>, &mut gpui::VisualTestContext) {
@@ -52,7 +52,7 @@ fn tree_window(
     (view, cx)
 }
 
-fn draw(cx: &mut gpui::VisualTestContext) {
+pub(super) fn draw(cx: &mut gpui::VisualTestContext) {
     cx.run_until_parked();
     cx.update(|window, cx| full_draw(window, cx).clear(cx));
 }
@@ -110,8 +110,9 @@ fn steps(
 #[gpui::test]
 fn agents_nest_under_their_space_under_their_host(cx: &mut gpui::TestAppContext) {
     let (_view, cx) = tree_window(cx, true);
-    assert!(cx.debug_bounds("header-tree").is_some());
-    assert!(cx.debug_bounds("tree-search").is_some());
+    // The search waits behind its button in the sidebar's header.
+    assert!(cx.debug_bounds("header-tree").is_none());
+    assert!(cx.debug_bounds("sidebar-search-button").is_some());
     // The agents sit in the tree, so the separate panel is gone.
     assert!(cx.debug_bounds("header-agents").is_none());
     assert!(cx.debug_bounds("agents-section").is_none());
@@ -140,7 +141,7 @@ fn an_agent_steps_in_from_its_space_and_names_only_itself(cx: &mut gpui::TestApp
     let agent = cx.debug_bounds("name-agent-p0").unwrap();
     let detail = cx.debug_bounds("detail-agent-p0").unwrap();
     assert!(agent.left() > space.left(), "{agent:?} {space:?}");
-    // The agent leads its row; its state follows on the line under it.
+    // The tab names the row; the agent's kind follows on the line under it.
     assert!(agent.bottom() <= detail.top(), "{agent:?} {detail:?}");
 }
 
@@ -163,7 +164,7 @@ fn folding_a_space_hides_its_agents_and_counts_their_attention(cx: &mut gpui::Te
     assert!(cx.debug_bounds("row-agent-p0").is_none());
     assert!(cx.debug_bounds("row-agent-p1").is_some());
     // The folded space shows how many agents want attention, in its own row.
-    assert!(cx.debug_bounds("name-herdr \u{00b7} 1").is_some());
+    assert!(cx.debug_bounds("attention-w0").is_some());
     assert_eq!(steps(&view, cx, true), ["0:p1"]);
     // Unfolding through its control shows the agent again.
     cx.update(|_, cx| {

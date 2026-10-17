@@ -314,6 +314,21 @@ size = 12
 # keep their shortcuts and command palette entries, and Devices Overview in
 # the palette still offers Add Device.
 # device_footer = "always"
+# How the tree layout shows that spaces belong to their host: "guide" (a thin
+# line runs down from the host's icon beside its spaces and agents), "indent"
+# (each level steps further in), or "block" (each host and its rows sit in one
+# rounded block). Default "guide". Only the tree layout reads this key.
+# hierarchy = "guide"
+# Which tabs the tree layout lists under each space: "all" (its agents, then
+# the tabs no agent runs in) or "agents" (only the agents). Default "all".
+# tree_tabs = "all"
+# Name an agent's state in words beside its badge in the tree layout. The
+# badge already shows it, so the default is false.
+# state_text = false
+# What the tree layout shows under an agent's tab name and kind: "herdr" (the
+# extra agent rows Herdr's sidebar config defines, such as the model and the
+# summary) or "off". Default "herdr".
+# agent_details = "herdr"
 
 # A colour per host, keyed by the host's name in the sidebar, as #rgb or
 # #rrggbb. It washes the host's header, its workspace rows, and its agents'
@@ -323,12 +338,20 @@ size = 12
 # "Mac mini" = "#5a3a3a"
 
 [tabs]
-# Default: "Menlo" on macOS, "Cascadia Mono" on Windows (Consolas when
-# missing), "DejaVu Sans Mono" on Linux (or an installed monospace family such
-# as JetBrains Mono when DejaVu is missing).
-# family = "DejaVu Sans Mono"
-size = 12
+# Default: the [ui] family: ".SystemUIFont" on macOS and Windows, "Adwaita
+# Sans" on Linux (or the first installed of Inter, DejaVu Sans, and Noto Sans
+# when it is missing).
+# family = "Adwaita Sans"
+size = 13
 # fallback = ["Symbols Nerd Font Mono"]
+# What each tab shows besides its name: "name" (nothing more), "agent" (its
+# agent's logo, or a terminal icon for a tab without one), or "status" (the
+# logo and the agent's state badge). Default "name".
+# content = "name"
+# Where the tab strips sit: "subheader" (under the main header), "bottom" (at
+# the foot, above the status bar), or "herdr" (where Herdr's
+# tab_bar_position puts them). Default "subheader".
+# position = "subheader"
 
 [terminal]
 # Default: "Menlo" on macOS, "Cascadia Mono" on Windows (Consolas when
@@ -357,9 +380,11 @@ size = 14
 # padding_y = [4, 8]
 
 [ui]
-# Default: ".SystemUIFont" on macOS and Windows, "DejaVu Sans" on Linux (or an installed
-# sans family such as Noto Sans when DejaVu is missing).
-# family = "DejaVu Sans"
+# Default: ".SystemUIFont" on macOS and Windows, "Adwaita Sans" on Linux (or
+# the first installed of Inter, DejaVu Sans, and Noto Sans when it is missing).
+# The tree sidebar, the main header, the tabs, and the status bar read in this
+# face, their names one point larger than size.
+# family = "Adwaita Sans"
 size = 12
 # fallback = ["Symbols Nerd Font Mono"]
 
@@ -485,9 +510,9 @@ size = 12
 # The cup that keeps the display awake; it stays while holding, so it can stop.
 # keep_awake = true
 # Buttons: "label" for icon and name, "icon" for the icon alone, or "hidden".
-# theme = "label"
-# shortcuts = "label"
-# report_issue = "label"
+# theme = "icon"
+# shortcuts = "icon"
+# report_issue = "icon"
 
 # Zen mode (View > Toggle Zen Mode, or `toggle_zen_mode`) hides the
 # header, sidebar, tab strips, status bar, and notices, and every group but
@@ -516,7 +541,8 @@ size = 12
 # [usage]
 # Also under Settings > Status bar.
 # show = true
-# Daemon toolbar segments, including plugin usage percentages; independent of show.
+# Herdr's tab_bar_right segments, including plugin usage percentages, in the
+# status bar (in the header while the bar is hidden); independent of show.
 # topbar = true
 # Honor the daemon's [ui.sidebar] rows and plugin tokens; false uses native layouts.
 # inline = true

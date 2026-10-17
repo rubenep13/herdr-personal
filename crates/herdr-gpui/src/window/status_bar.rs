@@ -15,9 +15,9 @@ const STATUS_GLYPH: f32 = 16.;
 const MODEL_WIDTH: f32 = 160.;
 
 impl HerdrWindow {
-    /// The bar's height, which grows with the UI font.
+    /// The bar's height, which grows with a large UI font.
     pub(super) fn status_bar_height(&self) -> f32 {
-        (self.config.ui.size * 1.5 + 4.).max(22.)
+        (self.config.ui.size * 1.5 + 4.).max(crate::design::STATUS_BAR_HEIGHT)
     }
 
     pub(super) fn render_status_bar(&self, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -101,6 +101,7 @@ impl HerdrWindow {
                         )
                     }),
             )
+            .children(self.render_herdr_segments())
             .children(self.render_listening_ports(cx))
             .children(self.render_system_load())
             .children(self.render_network_quality(cx))
@@ -162,6 +163,21 @@ impl HerdrWindow {
                         this.open_app_update(false, window, cx);
                     })),
             )
+    }
+
+    /// Herdr's `tab_bar_right` segments, muted, as `[usage] topbar` asks.
+    fn render_herdr_segments(&self) -> Option<Div> {
+        let text = crate::titlebar::segments(&self.live, &self.theme)
+            .filter(|_| self.config.usage.topbar)?;
+        Some(
+            div()
+                .debug_selector(|| "status-segments".into())
+                .flex_shrink_1()
+                .min_w_0()
+                .truncate()
+                .text_color(rgb(self.theme.muted))
+                .child(text),
+        )
     }
 
     /// The focused agent's model, from the `model` and `effort` tokens its
@@ -381,10 +397,13 @@ impl HerdrWindow {
             .hover(|s| s.bg(rgb(self.theme.active)))
             .child(icon);
         match style {
-            Button::Label => button
-                .flex_shrink_1()
-                .min_w(px(33.))
-                .child(div().min_w_0().truncate().child(label)),
+            Button::Label => button.flex_shrink_1().min_w(px(33.)).child(
+                div()
+                    .debug_selector(move || format!("{id}-label"))
+                    .min_w_0()
+                    .truncate()
+                    .child(label),
+            ),
             Button::Icon | Button::Hidden => button.flex_none().h_full().tooltip(self.hint(label)),
         }
     }

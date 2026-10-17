@@ -15,7 +15,7 @@ fn status_bar_items_default_to_the_full_bar() -> anyhow::Result<()> {
         assert!(config.status_bar.show);
         assert_eq!(config.status_bar.usage, Detail::Detailed);
         assert!(config.status_bar.keep_awake);
-        assert_eq!(config.status_bar.theme, Button::Label);
+        assert_eq!(config.status_bar.theme, Button::Icon);
     }
     Ok(())
 }

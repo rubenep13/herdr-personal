@@ -7,6 +7,7 @@ use crate::{
     HerdrWindow,
     config::{FontConfig, StatusIcons, Theme},
     herdr_settings::{IndicatorStyle, Settings},
+    icons::AgentIcon,
 };
 use gpui::{prelude::*, *};
 use herdr_client::protocol::{AgentStatus, ClientShellAgent, ClientShellSnapshot};
@@ -143,6 +144,27 @@ pub(super) fn agent_names(agent: &ClientShellAgent) -> [Option<&str>; 4] {
         agent.agent.as_deref(),
         agent.title.as_deref(),
     ]
+}
+
+/// What the tree names an agent's row by: the tab it runs in, which the user
+/// named, then the agent's kind. An agent whose tab the snapshot does not
+/// list leads with its own name.
+pub(super) fn tree_agent_titles<'a>(
+    agent: &'a ClientShellAgent,
+    snapshot: &'a ClientShellSnapshot,
+) -> (&'a str, &'a str) {
+    let title = snapshot
+        .tabs
+        .iter()
+        .find(|tab| tab.tab_id == agent.tab_id && tab.workspace_id == agent.workspace_id)
+        .map_or_else(|| agent_name(agent), |tab| tab.label.as_str());
+    let kind = agent
+        .display_agent
+        .as_deref()
+        .map(str::trim)
+        .filter(|kind| !kind.is_empty())
+        .unwrap_or_else(|| AgentIcon::from_identity(agent.agent.as_deref()).label());
+    (title, kind)
 }
 
 /// Where an agent runs: its workspace, and its tab when that earns a place,

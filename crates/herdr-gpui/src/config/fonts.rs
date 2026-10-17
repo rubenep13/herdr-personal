@@ -148,7 +148,7 @@ pub(super) struct DefaultFonts {
 /// over the Noto fonts it also ships; the Nerd Font build also covers icons.
 pub(super) const LINUX_FONTS: DefaultFonts = DefaultFonts {
     monospace: "DejaVu Sans Mono",
-    sans: "DejaVu Sans",
+    sans: "Adwaita Sans",
     monospace_alternatives: &[
         "JetBrainsMono Nerd Font",
         "JetBrains Mono",
@@ -161,6 +161,8 @@ pub(super) const LINUX_FONTS: DefaultFonts = DefaultFonts {
         "Hack",
     ],
     sans_alternatives: &[
+        "Inter",
+        "DejaVu Sans",
         "Noto Sans",
         "Cantarell",
         "Ubuntu",

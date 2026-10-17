@@ -255,23 +255,23 @@ fn fallback_lists_are_validated_per_face() {
 
 #[test]
 fn defaults_and_partial_settings() -> anyhow::Result<()> {
-    // Sidebar, tabs, terminal, ui: only the status bar and modals are sans.
+    // Sidebar, tabs, terminal, ui: the tabs read in the interface face.
     #[cfg(target_os = "linux")]
     let families = [
         "DejaVu Sans Mono",
+        "Adwaita Sans",
         "DejaVu Sans Mono",
-        "DejaVu Sans Mono",
-        "DejaVu Sans",
+        "Adwaita Sans",
     ];
     #[cfg(windows)]
     let families = [
         "Cascadia Mono",
-        "Cascadia Mono",
+        ".SystemUIFont",
         "Cascadia Mono",
         ".SystemUIFont",
     ];
     #[cfg(not(any(target_os = "linux", windows)))]
-    let families = ["Menlo", "Menlo", "Menlo", ".SystemUIFont"];
+    let families = ["Menlo", ".SystemUIFont", "Menlo", ".SystemUIFont"];
 
     for config in [
         Config::default(),
@@ -287,7 +287,7 @@ fn defaults_and_partial_settings() -> anyhow::Result<()> {
         for ((font, family), size) in [config.sidebar, config.tabs, config.terminal, config.ui]
             .into_iter()
             .zip(families)
-            .zip([12.0, 12.0, 14.0, 12.0])
+            .zip([12.0, 13.0, 14.0, 12.0])
         {
             assert_eq!(font.family, family);
             assert_eq!(font.size, size);
@@ -302,7 +302,7 @@ fn defaults_and_partial_settings() -> anyhow::Result<()> {
         for ((font, family), size) in [config.sidebar, config.tabs, config.terminal, config.ui]
             .into_iter()
             .zip(families)
-            .zip([12.0, 12.0, 14.0, 12.0])
+            .zip([12.0, 13.0, 14.0, 12.0])
         {
             assert_eq!(
                 font.family,

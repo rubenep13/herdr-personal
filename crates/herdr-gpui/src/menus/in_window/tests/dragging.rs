@@ -1,31 +1,39 @@
 use super::*;
 
-/// Observe presses reaching the bar itself. The headless platform does
-/// not implement compositor moves; button presses must be stopped before the
-/// title-bar handler, while the empty background must allow that handler to run.
+/// Observes presses reaching the chrome around the menu button. The
+/// headless platform does not implement compositor moves; the button must
+/// stop its presses before a title bar's move handler, while the chrome
+/// around it still gets its own.
 struct PressObserver {
     view: Entity<HerdrWindow>,
     presses: Rc<RefCell<Vec<MouseButton>>>,
 }
 
 impl Render for PressObserver {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let left = self.presses.clone();
         let right = self.presses.clone();
-        self.view.update(cx, |view, cx| {
-            view.render_application_bar(window, cx)
-                .on_mouse_down(MouseButton::Left, move |event, _, _| {
-                    left.borrow_mut().push(event.button)
-                })
-                .on_mouse_down(MouseButton::Right, move |event, _, _| {
-                    right.borrow_mut().push(event.button)
-                })
-        })
+        let button = self
+            .view
+            .update(cx, |view, cx| view.application_menu_button(cx));
+        div()
+            .debug_selector(|| "menu-button-chrome".into())
+            .size_full()
+            .flex()
+            .items_start()
+            .p(px(20.))
+            .on_mouse_down(MouseButton::Left, move |event, _, _| {
+                left.borrow_mut().push(event.button)
+            })
+            .on_mouse_down(MouseButton::Right, move |event, _, _| {
+                right.borrow_mut().push(event.button)
+            })
+            .child(button)
     }
 }
 
 #[gpui::test]
-fn background_presses_reach_window_chrome_but_menu_buttons_do_not(cx: &mut TestAppContext) {
+fn chrome_presses_reach_the_window_but_the_menu_button_keeps_its_own(cx: &mut TestAppContext) {
     let presses = Rc::new(RefCell::new(Vec::new()));
     let observed = presses.clone();
     let (root, cx) = cx.add_window_view(|window, cx| PressObserver {
@@ -37,51 +45,27 @@ fn background_presses_reach_window_chrome_but_menu_buttons_do_not(cx: &mut TestA
         presses: observed,
     });
     let view = root.read_with(cx, |root, _| root.view.clone());
-    for (width, selector) in [
-        (1200., "application-menu-Herdr Personal Dev"),
-        (360., "application-menu-Menu"),
-    ] {
-        cx.simulate_resize(size(px(width), px(500.)));
-        draw(cx);
-        presses.borrow_mut().clear();
-        let bar = cx.debug_bounds("application-menu-bar").unwrap();
-        cx.simulate_click(
-            point(bar.right() - px(12.), bar.center().y),
-            Modifiers::none(),
-        );
-        assert_eq!(*presses.borrow(), [MouseButton::Left]);
-        assert!(view.read_with(cx, |view, _| view.menu.page.is_none()));
+    cx.simulate_resize(size(px(400.), px(300.)));
+    draw(cx);
+    let chrome = cx.debug_bounds("menu-button-chrome").unwrap();
+    cx.simulate_click(chrome.center(), Modifiers::none());
+    assert_eq!(*presses.borrow(), [MouseButton::Left]);
+    assert!(view.read_with(cx, |view, _| view.menu.page.is_none()));
 
-        let button = cx.debug_bounds(selector).unwrap();
-        cx.simulate_click(button.center(), Modifiers::none());
-        draw(cx);
-        assert_eq!(*presses.borrow(), [MouseButton::Left]);
-        assert_eq!(
-            view.read_with(cx, |view, _| view.menu.page),
-            Some(Page::Application)
-        );
-
-        // The bar rendered while a menu is open must also isolate presses.
-        let button = cx.debug_bounds(selector).unwrap();
-        cx.simulate_event(MouseDownEvent {
-            position: button.center(),
-            button: MouseButton::Right,
-            modifiers: Modifiers::none(),
-            click_count: 1,
-            first_mouse: false,
-        });
-        cx.simulate_event(MouseUpEvent {
-            position: button.center(),
-            button: MouseButton::Right,
-            modifiers: Modifiers::none(),
-            click_count: 1,
-        });
-        assert_eq!(*presses.borrow(), [MouseButton::Left]);
-        assert_eq!(
-            view.read_with(cx, |view, _| view.menu.page),
-            Some(Page::Application)
-        );
-        cx.update(|window, cx| view.update(cx, |view, cx| view.dismiss_menu(window, cx)));
-        draw(cx);
-    }
+    let button = cx.debug_bounds("app-menu-button").unwrap();
+    cx.simulate_click(button.center(), Modifiers::none());
+    draw(cx);
+    assert_eq!(*presses.borrow(), [MouseButton::Left]);
+    assert_eq!(
+        view.read_with(cx, |view, _| view.menu.page),
+        Some(Page::Application)
+    );
+    cx.simulate_event(MouseDownEvent {
+        position: button.center(),
+        button: MouseButton::Right,
+        modifiers: Modifiers::none(),
+        click_count: 1,
+        first_mouse: false,
+    });
+    assert_eq!(*presses.borrow(), [MouseButton::Left]);
 }

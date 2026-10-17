@@ -1,4 +1,5 @@
-//! Daemon status text in the native header.
+//! Herdr's status segments, its `tab_bar_right`: in the status bar, or in
+//! the main header while the bar is hidden.
 
 use crate::{
     LiveState,
@@ -54,14 +55,27 @@ impl StatusText {
     }
 }
 
-pub(super) fn render(live: &LiveState, font: &FontConfig, theme: &Theme) -> Div {
+/// Herdr's segments as one line, with its accents where Herdr puts them;
+/// `None` while it shows none or the daemon is not connected.
+pub(crate) fn segments(live: &LiveState, theme: &Theme) -> Option<StyledText> {
     let status = StatusText::live(live);
+    if status.text.is_empty() {
+        return None;
+    }
     let accent = HighlightStyle {
         color: Some(rgb(theme.text_on(theme.primary())).into()),
         background_color: Some(rgb(theme.primary()).into()),
         font_weight: Some(FontWeight::BOLD),
         ..Default::default()
     };
+    Some(
+        StyledText::new(status.text)
+            .with_highlights(status.accents.into_iter().map(|range| (range, accent))),
+    )
+}
+
+/// The segments in the main header, while the status bar is hidden.
+pub(super) fn render(live: &LiveState, font: &FontConfig, theme: &Theme) -> Div {
     div()
         .debug_selector(|| "titlebar-status".into())
         .size_full()
@@ -78,10 +92,7 @@ pub(super) fn render(live: &LiveState, font: &FontConfig, theme: &Theme) -> Div 
                 .min_w_0()
                 .truncate()
                 .text_align(TextAlign::Right)
-                .child(
-                    StyledText::new(status.text)
-                        .with_highlights(status.accents.into_iter().map(|range| (range, accent))),
-                ),
+                .children(segments(live, theme)),
         )
 }
 

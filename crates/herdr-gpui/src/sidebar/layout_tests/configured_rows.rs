@@ -19,9 +19,11 @@ fn configured_sidebar_rows_render_all_lines_within_the_row(cx: &mut gpui::TestAp
     });
     cx.simulate_resize(size(px(800.), px(900.)));
     cx.run_until_parked();
+    // The Tree draws its own rows, taking only the extra details Herdr's
+    // agent rows name (`tree_rows`), so it is not one of these.
     for mode in LayoutMode::ALL
         .into_iter()
-        .filter(|mode| mode.lists_workspaces())
+        .filter(|mode| mode.lists_workspaces() && !mode.nests_agents())
     {
         for width in [160., 320.] {
             view.update(cx, |view, cx| {

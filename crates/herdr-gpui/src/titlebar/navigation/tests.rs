@@ -57,8 +57,10 @@ fn can(view: &Entity<HerdrWindow>, cx: &mut VisualTestContext) -> (bool, bool) {
     })
 }
 
+/// Back and Forward lead the main header, level with the sidebar's toggle
+/// in the header beside it.
 #[gpui::test]
-fn back_and_forward_follow_the_sidebar_toggle(cx: &mut TestAppContext) {
+fn back_and_forward_lead_the_main_header(cx: &mut TestAppContext) {
     let (_, cx) = window(cx);
     let bar = cx.debug_bounds("titlebar").unwrap();
     let toggle = cx.debug_bounds("toggle-sidebar").unwrap();
@@ -73,8 +75,8 @@ fn back_and_forward_follow_the_sidebar_toggle(cx: &mut TestAppContext) {
     }
     assert!(back.left() >= toggle.right());
     assert!(forward.left() >= back.right());
-    // Close enough to read as one group with the toggle.
-    assert!(back.left() - toggle.right() <= px(12.));
+    // First in the header, as the toggle is in the sidebar's.
+    assert!(back.left() - bar.left() <= px(20.), "{back:?} {bar:?}");
     // A window too narrow for them keeps the account reachable instead.
     cx.simulate_resize(size(px(240.), px(600.)));
     draw(cx);

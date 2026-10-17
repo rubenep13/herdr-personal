@@ -4,12 +4,15 @@
 //! each space, folding a space, and dragging a row among its siblings,
 //! which only ever changes this client's own order.
 
+use super::hierarchy::{self, Place};
 use crate::{
-    HerdrWindow,
+    HerdrWindow, NavigationTarget,
+    config::{Theme, TreeHierarchy},
     sidebar::{
-        cell::{Fold, RowContext},
+        cell::{ClickHandler, Fold, RowContext, RowState},
         label_text,
         layout::SidebarLook,
+        layouts::tab_row,
         tree::{
             self, EndpointKey, Entry, HostInput, NodeId, SnapshotKey, TreePreferences, TreeRow,
             storage::TreeState,
@@ -18,7 +21,7 @@ use crate::{
     window::Flash,
 };
 use gpui::{prelude::*, *};
-use herdr_client::protocol::ClientShellSnapshot;
+use herdr_client::protocol::{ClientShellSnapshot, ClientShellTab};
 use std::collections::HashMap;
 
 /// The projected tree, grouped the way the spaces list draws it.
@@ -29,32 +32,88 @@ pub(in crate::sidebar) struct TreeLayout {
     /// A search is narrowing the tree, which then shows inside folds and
     /// takes no drags.
     searching: bool,
+    /// Each host's last row, by endpoint index, where its decoration closes.
+    last: HashMap<usize, NodeId>,
+    hierarchy: TreeHierarchy,
+    /// Host headers are drawn, so rows are decorated as their host's.
+    headed: bool,
 }
 
 struct TreeSpace {
     row: TreeRow,
-    agents: Vec<TreeRow>,
+    /// Its agents, then its agentless tabs when the tree lists them.
+    children: Vec<TreeRow>,
 }
 
 impl TreeLayout {
-    fn new(rows: Vec<TreeRow>, searching: bool) -> Self {
+    fn new(
+        rows: Vec<TreeRow>,
+        searching: bool,
+        (hierarchy, headed): (TreeHierarchy, bool),
+    ) -> Self {
         let mut hosts: HashMap<usize, Vec<TreeSpace>> = HashMap::new();
+        let mut last = HashMap::new();
         for row in rows {
+            last.insert(row.host, row.id.clone());
             let spaces = hosts.entry(row.host).or_default();
             match row.entry {
                 Entry::Host => {}
                 Entry::Space(_) => spaces.push(TreeSpace {
                     row,
-                    agents: Vec::new(),
+                    children: Vec::new(),
                 }),
-                Entry::Agent(_) => {
+                Entry::Agent(_) | Entry::Tab(_) => {
                     if let Some(space) = spaces.last_mut() {
-                        space.agents.push(row);
+                        space.children.push(row);
                     }
                 }
             }
         }
-        Self { hosts, searching }
+        Self {
+            hosts,
+            searching,
+            last,
+            hierarchy,
+            headed,
+        }
+    }
+
+    /// `element`, the row of `node` on endpoint `host` at `level`, as an item
+    /// of the list.
+    pub(in crate::sidebar) fn item(
+        &self,
+        element: impl IntoElement,
+        (host, node, level): (usize, &NodeId, u8),
+        theme: &Theme,
+    ) -> Div {
+        let last = self.last(host) == Some(node);
+        self.decorate(element, (level, &item_key(node), last), theme)
+    }
+
+    /// `element` decorated as an item at `level` named `key`, closing its
+    /// host's run when `last`. Without host headers nothing marks a host, so
+    /// it stays as it is.
+    fn decorate(
+        &self,
+        element: impl IntoElement,
+        (level, key, last): (u8, &str, bool),
+        theme: &Theme,
+    ) -> Div {
+        if !self.headed {
+            return div().w_full().flex_none().child(element);
+        }
+        let place = Place {
+            level,
+            first: level == 0,
+            last,
+        };
+        hierarchy::item(element, place, self.hierarchy, key, theme)
+    }
+
+    /// The last row the tree lists for `host`: its header when it lists
+    /// nothing under it.
+    pub(in crate::sidebar) fn last(&self, host: usize) -> Option<&NodeId> {
+        self.last.get(&host)
     }
 
     pub(in crate::sidebar) fn lists(&self, host: usize) -> bool {
@@ -83,17 +142,25 @@ impl TreeLayout {
             .find(|space| space.row.entry == Entry::Space(workspace))
     }
 
-    /// A folded space's name with how many of its agents want attention, so
-    /// the count shows without unfolding it or moving the rows below.
-    pub(in crate::sidebar) fn label(
-        &self,
-        host: usize,
-        workspace: usize,
-        name: &str,
-    ) -> Option<String> {
-        let space = self.space(host, workspace)?;
-        (space.row.collapsed && space.row.attention > 0)
-            .then(|| format!("{name} \u{00b7} {}", space.row.attention))
+    /// How many agents of a folded space want attention, so the count shows
+    /// in its row without unfolding it; none while it is open.
+    pub(in crate::sidebar) fn attention(&self, host: usize, workspace: usize) -> usize {
+        self.space(host, workspace)
+            .filter(|space| space.row.collapsed)
+            .map_or(0, |space| space.row.attention)
+    }
+}
+
+/// What names a row's decoration for probes: its endpoint and its own ID,
+/// which repeat across hosts only together.
+fn item_key(node: &NodeId) -> String {
+    match node {
+        NodeId::Host(endpoint) => endpoint.clone(),
+        NodeId::Space { context, workspace } => {
+            format!("{}-{workspace}", context.endpoint.endpoint_id)
+        }
+        NodeId::Agent { context, pane, .. } => format!("{}-{pane}", context.endpoint.endpoint_id),
+        NodeId::Tab { context, tab, .. } => format!("{}-{tab}", context.endpoint.endpoint_id),
     }
 }
 
@@ -124,6 +191,12 @@ fn droppable(dragged: &NodeId, target: &NodeId) -> bool {
 }
 
 impl HerdrWindow {
+    /// Whether the Tree layout draws a header for each host, which carries
+    /// the host's load and its new space button: only with more than one.
+    pub(crate) fn tree_host_headers(&self) -> bool {
+        self.config.layout.mode.nests_agents() && self.endpoints.len() > 1
+    }
+
     /// The hosts the tree lists, in device order, each with the state it
     /// draws from: the selected host's live copy, the others' own.
     pub(crate) fn tree_hosts(&self) -> Vec<HostInput<'_>> {
@@ -153,11 +226,40 @@ impl HerdrWindow {
     pub(crate) fn tree_rows(&self, query: &str, cx: &App) -> Vec<TreeRow> {
         let default = TreePreferences::default();
         let preferences = TreeState::of(cx).map_or(&default, TreeState::preferences);
-        tree::project(&self.tree_hosts(), preferences, self.agent_sort, query)
+        tree::project(
+            &self.tree_hosts(),
+            preferences,
+            self.agent_sort,
+            query,
+            self.config.sidebar_style.tree_tabs,
+        )
     }
 
     pub(in crate::sidebar) fn tree_layout(&self, query: &str, cx: &App) -> TreeLayout {
-        TreeLayout::new(self.tree_rows(query, cx), !query.trim().is_empty())
+        TreeLayout::new(
+            self.tree_rows(query, cx),
+            !query.trim().is_empty(),
+            (
+                self.config.sidebar_style.hierarchy,
+                self.tree_host_headers(),
+            ),
+        )
+    }
+
+    /// The header of endpoint `host` as an item of the tree's list; any
+    /// other layout's as it is.
+    pub(in crate::sidebar) fn tree_header_item(
+        &self,
+        tree: Option<&TreeLayout>,
+        header: Stateful<Div>,
+        host: usize,
+    ) -> Stateful<Div> {
+        let (Some(tree), Some(endpoint)) = (tree, self.endpoints.get(host)) else {
+            return header;
+        };
+        let node = NodeId::Host(endpoint.id.clone());
+        tree.item(header, (host, &node, 0), &self.theme)
+            .id(SharedString::from(format!("tree-item-{}", endpoint.id)))
     }
 
     /// The fold control of space `workspace` of endpoint `host`, while it has
@@ -177,7 +279,7 @@ impl HerdrWindow {
         else {
             return None;
         };
-        if !space.row.collapsed && space.agents.is_empty() {
+        if !space.row.collapsed && space.children.is_empty() {
             return None;
         }
         let collapsed = space.row.collapsed;
@@ -223,16 +325,32 @@ impl HerdrWindow {
             theme: row_cx.theme,
             look,
             width: row_cx.width,
-            nest: row_cx.nest + look.nest_indent(),
+            nest: row_cx.nest + hierarchy::agent_step(look.tree.hierarchy),
             mark: row_cx.mark,
             host: None,
         };
         let draggable = !tree.searching && tree::manual(snapshot, self.agent_sort);
         let mut count = 0;
         let mut focused = None;
-        for row in &space.agents {
-            let Entry::Agent(index) = row.entry else {
-                continue;
+        for row in &space.children {
+            let index = match row.entry {
+                Entry::Agent(index) => index,
+                Entry::Tab(index) => {
+                    let Some(tab) = snapshot.tabs.get(index) else {
+                        continue;
+                    };
+                    let selected = host == self.selected_endpoint
+                        && tab.focused
+                        && snapshot.focused_workspace_id.as_deref() == Some(&tab.workspace_id);
+                    if selected {
+                        focused = Some(count);
+                    }
+                    let cell = self.tab_cell(host, tab, selected, &nested, cx);
+                    list = list.child(tree.item(cell, (host, &row.id, 2), &self.theme));
+                    count += 1;
+                    continue;
+                }
+                Entry::Host | Entry::Space(_) => continue,
             };
             let Some(agent) = snapshot.agents.get(index) else {
                 continue;
@@ -246,10 +364,84 @@ impl HerdrWindow {
             let gap = self.agent_row_gap(count);
             let cell = self.agent_cell(host, agent, snapshot, &nested, lines, gap, cx);
             let label = crate::sidebar::agent_name(agent);
-            list = list.child(self.tree_drag(cell, draggable.then_some(&row.id), label, cx));
+            let cell = self.tree_drag(cell, draggable.then_some(&row.id), label, cx);
+            list = list.child(tree.item(cell, (host, &row.id, 2), &self.theme));
             count += 1;
         }
         (list, count, focused)
+    }
+
+    /// The row of a tab no agent runs in, which shows the tab when clicked
+    /// and offers the tab's menu on a right click.
+    fn tab_cell(
+        &self,
+        host: usize,
+        tab: &ClientShellTab,
+        selected: bool,
+        row_cx: &RowContext,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let endpoint = self
+            .endpoints
+            .get(host)
+            .map(|endpoint| endpoint.id.clone())
+            .unwrap_or_default();
+        let selector = format!("tab-row-{endpoint}-{}", tab.tab_id);
+        let (menu_endpoint, menu_tab) = (endpoint.clone(), tab.tab_id.clone());
+        let id = tab.tab_id.clone();
+        let state = RowState {
+            selected,
+            ..RowState::default()
+        };
+        tab_row((&tab.tab_id, &tab.label), state, row_cx)
+            .id(SharedString::from(selector.clone()))
+            .debug_selector(move || selector)
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    if this.navigate_endpoint(&menu_endpoint, NavigationTarget::Tab(&menu_tab), cx)
+                    {
+                        this.open_tab_menu(&menu_tab, None, event.position, window, cx);
+                    }
+                }),
+            )
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.navigate_endpoint(&endpoint, NavigationTarget::Tab(&id), cx);
+                window.focus(&this.focus, cx);
+            }))
+    }
+
+    /// What a space row's menu button does: select the space and open its
+    /// menu where the button was clicked, as a right click on the row does.
+    pub(in crate::sidebar) fn tree_more(
+        &self,
+        endpoint: &str,
+        workspace: &str,
+        cx: &mut Context<Self>,
+    ) -> Box<ClickHandler> {
+        let (endpoint, workspace) = (endpoint.to_owned(), workspace.to_owned());
+        Box::new(cx.listener(move |this, event: &ClickEvent, window, cx| {
+            if this.navigate_endpoint(&endpoint, NavigationTarget::Workspace(&workspace), cx) {
+                this.open_workspace_menu(&workspace, event.position(), window, cx);
+            }
+        }))
+    }
+
+    /// The space row of `workspace` of endpoint `host` as an item of the
+    /// tree's list; any other layout's as it is.
+    pub(in crate::sidebar) fn tree_space_item(
+        &self,
+        tree: Option<&TreeLayout>,
+        element: AnyElement,
+        (host, workspace): (usize, usize),
+    ) -> AnyElement {
+        match tree.and_then(|tree| Some((tree, tree.space(host, workspace)?))) {
+            Some((tree, space)) => tree
+                .item(element, (host, &space.row.id, 1), &self.theme)
+                .into_any_element(),
+            None => element,
+        }
     }
 
     /// The space row of `workspace`, dragged among its siblings while no
@@ -400,20 +592,22 @@ impl HerdrWindow {
     /// whose order also holds while it does.
     pub(in crate::sidebar) fn tree_filter(
         &self,
+        (tree, index): (&TreeLayout, usize),
         host: &str,
         snapshot: &ClientShellSnapshot,
         row_cx: &RowContext,
     ) -> Option<Div> {
         let label = snapshot.agent_view_label.as_deref()?;
-        Some(
-            div()
-                .debug_selector(|| format!("tree-filter-{host}"))
-                .w_full()
-                .pl(px(row_cx.look.content_x() + row_cx.nest))
-                .text_color(rgb(self.theme.muted))
-                .truncate()
-                .child(label_text(&format!("view: {label}"))),
-        )
+        // It closes its host's run only when nothing is listed after it.
+        let last = matches!(tree.last(index), Some(NodeId::Host(_)) | None);
+        let line = div()
+            .debug_selector(|| format!("tree-filter-{host}"))
+            .w_full()
+            .pl(px(row_cx.look.content_x() + row_cx.nest))
+            .text_color(rgb(self.theme.muted))
+            .truncate()
+            .child(label_text(&format!("view: {label}")));
+        Some(tree.decorate(line, (1, &format!("{host}-filter"), last), &self.theme))
     }
 }
 

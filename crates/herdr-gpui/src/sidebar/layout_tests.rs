@@ -72,6 +72,8 @@ mod split_pane;
 #[cfg(test)]
 mod status_bar;
 #[cfg(test)]
+mod status_bar_redesign;
+#[cfg(test)]
 mod status_icons;
 #[cfg(test)]
 mod sticky_hosts;
@@ -82,7 +84,19 @@ mod superset_dots;
 #[cfg(test)]
 mod text_width;
 #[cfg(test)]
+mod tree_chrome;
+#[cfg(test)]
+mod tree_hierarchy;
+#[cfg(test)]
+mod tree_host;
+#[cfg(test)]
 mod tree_layout;
+#[cfg(test)]
+mod tree_row_data;
+#[cfg(test)]
+mod tree_rows;
+#[cfg(test)]
+mod tree_single_host;
 #[cfg(test)]
 mod update_notes;
 #[cfg(test)]
@@ -552,7 +566,6 @@ pub(crate) fn fixture_window(window: &mut Window, cx: &mut Context<HerdrWindow>)
         activation_deadline: None,
         pending_navigation: None,
         arrival: None,
-        strip_navigation_fits: true,
         pending_toast: None,
         toasts_hidden: false,
         pending_releases: Vec::new(),

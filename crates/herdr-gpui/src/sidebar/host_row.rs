@@ -54,6 +54,9 @@ impl HerdrWindow {
         pinned: bool,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
+        if self.config.layout.mode.nests_agents() {
+            return self.tree_host_row(endpoint, selected, look, width, pinned, cx);
+        }
         let font = &self.config.sidebar;
         let theme = &self.theme;
         let layout = look.density;
