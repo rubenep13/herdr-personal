@@ -118,6 +118,7 @@ fn catalog_has_all_native_commands_and_gpui_shortcuts() {
         (About, &[]),
         (NewBrowserTab, &["cmd-shift-b"]),
         (OpenOrchestrator, &[]),
+        (OpenGitGraph, &[]),
         (InstallBrowserSkill, &[]),
         (SplitEditor, &["cmd-\\"]),
         (OpenCode, &[]),

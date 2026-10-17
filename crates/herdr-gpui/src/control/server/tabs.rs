@@ -43,6 +43,8 @@ pub(super) fn serve(
         TabOp::Devices => arrive::devices(&caller, incoming, watches, cx),
         TabOp::Orchestrator { repo } => arrive::orchestrator(&caller, repo, incoming, watches, cx),
         TabOp::Review => arrive::review(&caller, incoming, watches, cx),
+        TabOp::Graph => arrive::graph(&caller, incoming, watches, cx),
+        TabOp::GraphClose => incoming.respond(arrive::graph_close(&caller, cx)),
     }
 }
 
@@ -60,6 +62,7 @@ fn kind(tab: &Tab) -> TabKind {
         Some(Location::Orchestrator { .. }) => TabKind::Orchestrator,
         Some(Location::Code { .. }) => TabKind::Code,
         Some(Location::Devices) => TabKind::Devices,
+        Some(Location::GitGraph { .. }) => TabKind::Graph,
     }
 }
 
@@ -79,6 +82,7 @@ fn location(tab: &Tab) -> Option<String> {
         Location::Orchestrator { repo } => repo.checkout.clone(),
         Location::Code { file } => file.path.clone(),
         Location::Devices => return None,
+        Location::GitGraph { repo } => repo.checkout.clone(),
     })
 }
 

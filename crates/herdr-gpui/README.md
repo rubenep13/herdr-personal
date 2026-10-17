@@ -1935,6 +1935,55 @@ for pull requests on that host; GitLab remotes and GitHub Enterprise are listed
 as not supported yet. The window button in the tab's header moves the view into
 a window of its own.
 
+## Git Graph
+
+The Git Graph row of a group's "…" menu, the Git graph row of a workspace's
+popover, the Open Git Graph command (no default shortcut), or
+`herdr-gpui graph` opens a tab with the history of the workspace's
+repository drawn as a graph, the way [herdr-git-graph](https://github.com/rubenep13/herdr-git-graph)
+draws it: lanes in the theme's colours, author bubbles, merge dots, branch and
+tag labels, and the uncommitted changes on top. The repository is the one the
+focused pane's folder is in (else the folder the workspace's tabs start in),
+fixed when the tab opens; a workspace has one graph tab. It works for the local
+session and saved SSH hosts, not with `--socket` or WSL.
+
+It is read-only. Git runs without optional locks, hooks, a filesystem monitor,
+lazy fetches, transports or automatic maintenance, and with inherited `GIT_*`
+variables cleared, so showing a repository never changes it. The tips are its
+branches, remote branches, tags, stashes and `HEAD`, never the app's hidden
+checkpoint refs.
+
+- History loads 500 commits at a time as you scroll; only the rows in view are
+  drawn. The label column, the graph, and the optional Author, Date and SHA
+  columns (the gear in the column headers) resize by their edges; these
+  choices are shared by every graph tab and kept between runs.
+- Enter, or a click on a row, opens a panel with the commit's message, author,
+  date, parents (which jump to their row), labels, and the files it changed
+  against its first parent; choosing one shows its diff, cut at 4000 lines.
+  The WIP row shows the uncommitted changes by section (Conflicts, Staged,
+  Unstaged, Untracked) with the upstream and how far ahead or behind it is.
+- `/` searches messages, authors and hashes; n and N walk the results.
+- While the tab is shown, it checks the repository every 2 seconds (5 on an
+  SSH host, through one shell kept open) and reloads when the refs, `HEAD` or
+  the working tree changed, keeping the selected commit. The indicator says
+  live, reconnecting after a failed check, or offline while the host is.
+
+| Key | Action |
+| --- | --- |
+| `j` / `↓`, `k` / `↑` | Next / previous commit |
+| `Enter` | Open the detail |
+| `Esc` | Close the detail or the search |
+| `/` | Search |
+| `n` / `N` | Next / previous result |
+| `w` | Uncommitted changes |
+| `h` | `HEAD` |
+| `c` | Copy the hash |
+| `r` | Reload |
+| `?` | Help with every shortcut |
+
+The keys act only with the graph focused and no modifier held, so they never
+take a terminal's input or the app's shortcuts.
+
 ## Images
 
 On a selected SSH endpoint, drop one PNG, JPEG, GIF, WebP, or BMP image onto a pane

@@ -520,6 +520,7 @@ pub(crate) fn fixture_window(window: &mut Window, cx: &mut Context<HerdrWindow>)
         config_watch: None,
         config_load_revision: 0,
         git: Default::default(),
+        git_graphs: Default::default(),
         deliveries: Default::default(),
         terminal_notes: Default::default(),
         notes_width: crate::panel_resize::NOTES,

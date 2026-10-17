@@ -126,6 +126,8 @@ pub(crate) enum WorkspaceMenuAction {
     Script(crate::worktree_scripts::ScriptKind),
     /// Open the repository's orchestrator tab.
     Orchestrator,
+    /// Open the repository's Git graph tab.
+    GitGraph,
     /// Personal fork: start an installed agent in a new tab of the space.
     StartAgent,
 }
@@ -193,6 +195,7 @@ impl WorkspaceMenuAction {
             Self::Checkpoints => "icons/refresh.svg",
             Self::FanOut => "icons/fan-out.svg",
             Self::Orchestrator => "icons/github.svg",
+            Self::GitGraph => "icons/git-graph.svg",
             Self::Script(crate::worktree_scripts::ScriptKind::Setup) => "icons/refresh.svg",
             Self::Script(_) => "icons/play.svg",
             Self::StartAgent => "icons/play.svg",

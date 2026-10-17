@@ -20,7 +20,7 @@ pub use settings::{
     ThemeCommand, UpdateCommand,
 };
 use std::ffi::OsString;
-pub use tabs::{CodeCommand, FileAt, Items, OrchestratorCommand, TabCommand};
+pub use tabs::{CodeCommand, FileAt, GraphCommand, Items, OrchestratorCommand, TabCommand};
 pub use work::{CheckpointCommand, FanOut, NotesCommand, WaitFor};
 
 /// What to do, and how the answer is printed.
@@ -50,6 +50,8 @@ pub enum ControlCommand {
     Devices,
     Orchestrator(OrchestratorCommand),
     Review,
+    /// Open or close the caller's workspace's Git graph.
+    Graph(GraphCommand),
     Notes(NotesCommand),
     /// Every kind of note the user sent this pane: page, review, terminal.
     Feedback {
@@ -141,6 +143,10 @@ pub const FAMILIES: &[(&str, &str)] = &[
         "A repository's issues, pull requests, and runs",
     ),
     ("review", "Open the review of the uncommitted changes"),
+    (
+        "graph",
+        "Open or close the Git graph of the caller's repository",
+    ),
     ("notes", "Notes kept on worktrees"),
     (
         "feedback",
@@ -283,6 +289,7 @@ fn command(family: &'static str, args: &mut Args) -> Result<ControlCommand, CliE
             tabs::open_only(args)?;
             ControlCommand::Review
         }
+        "graph" => ControlCommand::Graph(tabs::graph(args)?),
         "notes" => ControlCommand::Notes(work::notes(args)?),
         "feedback" => ControlCommand::Feedback {
             wait: wait_option(args, "--wait")?,

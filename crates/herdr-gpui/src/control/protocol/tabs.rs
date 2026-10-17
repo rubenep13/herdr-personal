@@ -65,6 +65,10 @@ pub(crate) enum TabOp {
     },
     /// The review of the caller's workspace's uncommitted changes.
     Review,
+    /// The Git graph of the caller's workspace's repository.
+    Graph,
+    /// Closes the caller's workspace's Git graph, if one is open.
+    GraphClose,
 }
 
 impl TabOp {
@@ -76,7 +80,9 @@ impl TabOp {
             | Self::Edit { .. }
             | Self::Devices
             | Self::Orchestrator { .. }
-            | Self::Review => ARRIVE_WAIT_SECONDS,
+            | Self::Review
+            | Self::Graph
+            | Self::GraphClose => ARRIVE_WAIT_SECONDS,
             Self::List { .. }
             | Self::Focus { .. }
             | Self::Close { .. }
@@ -98,6 +104,7 @@ impl TabKind {
             Self::Review => "review",
             Self::Orchestrator => "orchestrator",
             Self::Devices => "devices",
+            Self::Graph => "graph",
             Self::Editor => "editor",
         }
     }
@@ -119,6 +126,8 @@ pub(crate) enum TabKind {
     Review,
     Orchestrator,
     Devices,
+    /// The repository's Git graph.
+    Graph,
     /// The workspace's VS Code tab.
     Editor,
 }

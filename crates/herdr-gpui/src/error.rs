@@ -289,6 +289,8 @@ pub enum Error {
         details: String,
     },
     #[error(transparent)]
+    GitGraph(#[from] crate::git_graph::Error),
+    #[error(transparent)]
     GitHubAccounts(#[from] GitHubAccountsError),
     #[error(
         "GitHub authentication required. Use menu > GitHub sign-in or set GH_TOKEN / GITHUB_TOKEN."

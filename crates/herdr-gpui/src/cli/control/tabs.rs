@@ -1,4 +1,4 @@
-//! `tab`, `code`, `devices`, `orchestrator`, and `review`.
+//! `tab`, `code`, `devices`, `orchestrator`, `review`, and `graph`.
 use super::{Args, CliError, unknown};
 use std::{ffi::OsString, path::PathBuf};
 
@@ -66,6 +66,13 @@ pub enum OrchestratorCommand {
     },
 }
 
+/// The caller's workspace's Git graph tab.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GraphCommand {
+    Open,
+    Close,
+}
+
 fn id(args: &mut Args) -> Result<u64, CliError> {
     args.required_text("ID")?
         .parse()
@@ -103,6 +110,15 @@ pub(super) fn open_only(args: &mut Args) -> Result<(), CliError> {
         Some(verb) if verb == "open" => Ok(()),
         Some(verb) => Err(unknown(args.name(), verb)),
     }
+}
+
+pub(super) fn graph(args: &mut Args) -> Result<GraphCommand, CliError> {
+    let verb = args.verb();
+    Ok(match verb.as_ref().and_then(|verb| verb.to_str()) {
+        None | Some("open") => GraphCommand::Open,
+        Some("close") => GraphCommand::Close,
+        _ => return Err(unknown("graph", verb.unwrap_or_default())),
+    })
 }
 
 pub(super) fn orchestrator(args: &mut Args) -> Result<OrchestratorCommand, CliError> {

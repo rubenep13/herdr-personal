@@ -344,5 +344,60 @@ pub(super) fn review(
     );
 }
 
+/// The Git graph of the caller's workspace's repository. A workspace has
+/// one graph tab, which a second request brings back as it is.
+pub(super) fn graph(
+    caller: &Caller,
+    incoming: socket::Incoming,
+    watches: &mut Watches,
+    cx: &mut App,
+) {
+    open_there(
+        caller,
+        incoming,
+        watches,
+        cx,
+        |_| true,
+        |view, workspace, window, cx| {
+            view.open_git_graph(window, cx);
+            opened(view, workspace, "the Git graph", cx, |location| {
+                matches!(location, Location::GitGraph { .. })
+            })
+        },
+    );
+}
+
+/// Closes the caller's workspace's Git graph; nothing open is not an error.
+pub(super) fn graph_close(caller: &Caller, cx: &mut App) -> Response {
+    let Destination {
+        handle,
+        endpoint,
+        workspace,
+    } = match destination(caller, cx) {
+        Ok(destination) => destination,
+        Err(response) => return response,
+    };
+    let found = handle.read_with(cx, |view, cx| {
+        let scope = crate::browser::scope(&view.endpoints[endpoint]);
+        cx.try_global::<Store>().and_then(|store| {
+            store
+                .in_workspace(&scope, &workspace)
+                .find(|tab| matches!(tab.location, Some(Location::GitGraph { .. })))
+                .map(|tab| tab.id)
+        })
+    });
+    let Ok(found) = found else {
+        return closed();
+    };
+    let Some(id) = found else {
+        return Response::done(format!("No Git graph is open in workspace {workspace}"));
+    };
+    let _ = handle.update(cx, |view, window, cx| {
+        view.close_browser_tab(id, window, cx)
+    });
+    Store::update(cx, |store| store.close(id));
+    Response::done(format!("Closed the Git graph of workspace {workspace}"))
+}
+
 #[cfg(test)]
 mod tests;

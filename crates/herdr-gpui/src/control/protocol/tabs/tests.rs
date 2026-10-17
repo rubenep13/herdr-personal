@@ -41,9 +41,27 @@ fn tab_operations_round_trip() {
             repo: Some("/src".into()),
         },
         TabOp::Review,
+        TabOp::Graph,
+        TabOp::GraphClose,
     ] {
         round_trip(op);
     }
+}
+
+#[test]
+fn graph_requests_wait_like_the_review() {
+    assert_eq!(TabOp::Graph.wait_seconds(), TabOp::Review.wait_seconds());
+    assert_eq!(
+        TabOp::GraphClose.wait_seconds(),
+        TabOp::Review.wait_seconds()
+    );
+    let request: Request =
+        serde_json::from_str(r#"{"method":"tab","caller":{},"op":{"op":"graph_close"}}"#).unwrap();
+    let Request::Tab(call) = request else {
+        panic!("not a tab request");
+    };
+    assert_eq!(call.op, TabOp::GraphClose);
+    assert_eq!(TabKind::Graph.name(), "graph");
 }
 
 #[test]

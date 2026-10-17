@@ -3,7 +3,7 @@ mod items;
 
 use super::{Context, Output, unexpected};
 use crate::{
-    cli::control::{CodeCommand, FileAt, OrchestratorCommand, TabCommand},
+    cli::control::{CodeCommand, FileAt, GraphCommand, OrchestratorCommand, TabCommand},
     control::{
         ErrorCode,
         protocol::{
@@ -157,6 +157,16 @@ pub(super) fn orchestrator(
             opened("the orchestrator", response)
         }
         OrchestratorCommand::Items { repo, items } => items::list(repo.as_deref(), items),
+    }
+}
+
+pub(super) fn graph(command: GraphCommand, context: &Context) -> crate::Result<Output> {
+    match command {
+        GraphCommand::Open => {
+            let response = context.call(Request::Tab, TabOp::Graph)?;
+            opened("the Git graph", response)
+        }
+        GraphCommand::Close => context.act(Request::Tab, TabOp::GraphClose),
     }
 }
 

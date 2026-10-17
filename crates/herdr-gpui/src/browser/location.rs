@@ -74,6 +74,28 @@ pub(crate) enum Location {
     },
     /// Every device this window connects to, drawn by the app, never a page.
     Devices,
+    /// A repository's history as a graph, drawn by the app, never a page.
+    GitGraph {
+        repo: crate::git_graph::GraphCheckout,
+    },
+}
+
+/// Whether `path` can name a checkout: absolute, bounded, and without
+/// control characters; a remote one is a POSIX path whatever this machine's
+/// own convention.
+pub(crate) fn checkout_path_ok(path: &str) -> bool {
+    !path.is_empty()
+        && path.len() <= 4096
+        && !path.chars().any(char::is_control)
+        && (path.starts_with('/') || Path::new(path).is_absolute())
+}
+
+/// A checkout's folder name, for a tab title.
+pub(crate) fn checkout_name(path: &str) -> &str {
+    path.trim_end_matches(['/', '\\'])
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(path)
 }
 
 /// The checkout an orchestrator tab lists the repository of, on the tab's
@@ -102,11 +124,7 @@ impl OrchestratorRepo {
     /// An absolute, bounded path without control characters; a remote one
     /// is a POSIX path whatever this machine's own convention.
     pub(crate) fn new(checkout: String) -> crate::orchestrator::Result<Self> {
-        let valid = !checkout.is_empty()
-            && checkout.len() <= 4096
-            && !checkout.chars().any(char::is_control)
-            && (checkout.starts_with('/') || Path::new(&checkout).is_absolute());
-        if !valid {
+        if !checkout_path_ok(&checkout) {
             return Err(crate::orchestrator::Error::InvalidCheckout);
         }
         Ok(Self { checkout })
@@ -114,11 +132,7 @@ impl OrchestratorRepo {
 
     /// The checkout's folder name, for the tab title.
     pub(crate) fn name(&self) -> &str {
-        self.checkout
-            .trim_end_matches(['/', '\\'])
-            .rsplit(['/', '\\'])
-            .next()
-            .unwrap_or(&self.checkout)
+        checkout_name(&self.checkout)
     }
 }
 
@@ -196,9 +210,11 @@ impl Location {
             Self::Web { url } => url.as_str().to_owned(),
             Self::Local { file } => file.page_url(),
             // Never loaded: a review is drawn by the app.
-            Self::Review { .. } | Self::Code { .. } | Self::Orchestrator { .. } | Self::Devices => {
-                "about:blank".to_owned()
-            }
+            Self::Review { .. }
+            | Self::Code { .. }
+            | Self::Orchestrator { .. }
+            | Self::Devices
+            | Self::GitGraph { .. } => "about:blank".to_owned(),
         }
     }
 
@@ -206,7 +222,11 @@ impl Location {
     pub(crate) fn is_page(&self) -> bool {
         !matches!(
             self,
-            Self::Review { .. } | Self::Code { .. } | Self::Orchestrator { .. } | Self::Devices
+            Self::Review { .. }
+                | Self::Code { .. }
+                | Self::Orchestrator { .. }
+                | Self::Devices
+                | Self::GitGraph { .. }
         )
     }
 
@@ -219,6 +239,7 @@ impl Location {
             Self::Code { file } => file.path.clone(),
             Self::Orchestrator { repo } => format!("Orchestrator of {}", repo.name()),
             Self::Devices => "Devices overview".to_owned(),
+            Self::GitGraph { repo } => format!("Git graph of {}", repo.name()),
         }
     }
 
@@ -231,6 +252,19 @@ impl Location {
             Self::Code { file } => file.name().to_owned(),
             Self::Orchestrator { repo } => format!("Orchestrator \u{00b7} {}", repo.name()),
             Self::Devices => "Devices".to_owned(),
+            Self::GitGraph { .. } => "Git graph".to_owned(),
+        }
+    }
+
+    /// The icon a tab of the app's own drawing shows; a page shows its own.
+    pub(crate) fn icon(&self) -> Option<&'static str> {
+        match self {
+            Self::Web { .. } | Self::Local { .. } => None,
+            Self::Review { .. } => Some("icons/diff-unified.svg"),
+            Self::Code { .. } => Some("icons/code.svg"),
+            Self::Orchestrator { .. } => Some("icons/pulse.svg"),
+            Self::Devices => Some("icons/devices.svg"),
+            Self::GitGraph { .. } => Some("icons/git-graph.svg"),
         }
     }
 

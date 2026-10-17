@@ -95,6 +95,14 @@ impl Host {
     }
 
     /// Whether `herdr_cli` can reach this host's session; see `development`.
+    /// The SSH target scripts run on, for an SSH host.
+    pub(crate) fn ssh_target(&self) -> Option<&str> {
+        match &self.route {
+            Route::Ssh(target) => Some(target),
+            _ => None,
+        }
+    }
+
     pub(crate) fn scripts_herdr(&self) -> bool {
         !self.development
     }
@@ -230,8 +238,20 @@ export PATH
         limits: ScriptLimits,
         cancelled: &AtomicBool,
     ) -> herdr_client::Result<Vec<u8>> {
+        self.capture_fed(body, &[], limits, cancelled)
+    }
+
+    /// [`Host::capture_limited`] with `input` on the script's stdin, for
+    /// arguments too many for one command line.
+    pub(crate) fn capture_fed(
+        &self,
+        body: &str,
+        input: &[u8],
+        limits: ScriptLimits,
+        cancelled: &AtomicBool,
+    ) -> herdr_client::Result<Vec<u8>> {
         let mut output = Vec::new();
-        self.stream(body, &[][..], &mut output, limits, cancelled)?;
+        self.stream(body, input, &mut output, limits, cancelled)?;
         Ok(output)
     }
 

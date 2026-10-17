@@ -6,5 +6,5 @@ pub(crate) mod highlight;
 mod notes;
 mod view;
 
-pub(crate) use diff::push_clean;
+pub(crate) use diff::{Body, Kind, Lines, literal, parse_files, push_clean};
 pub(crate) use view::{Review, styled_code};

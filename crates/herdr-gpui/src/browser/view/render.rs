@@ -74,13 +74,10 @@ impl HerdrWindow {
                 };
                 // The VS Code tab bears its mark; a review tab shows a diff,
                 // a code tab a file, and the overview devices, not a page.
-                let icon = match tab.location {
+                let icon = match &tab.location {
                     _ if tab.place.is_code() => "icons/vscode.svg",
-                    Some(Location::Review { .. }) => "icons/diff-unified.svg",
-                    Some(Location::Code { .. }) => "icons/code.svg",
-                    Some(Location::Orchestrator { .. }) => "icons/pulse.svg",
-                    Some(Location::Devices) => "icons/devices.svg",
-                    _ => GLOBE,
+                    Some(location) => location.icon().unwrap_or(GLOBE),
+                    None => GLOBE,
                 };
                 let tab = div()
                     .id(SharedString::from(format!("browser-tab-{id}")))

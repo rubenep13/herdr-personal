@@ -19,8 +19,14 @@
 >   options (`[sidebar] hierarchy`, `tree_tabs`, `state_text`,
 >   `agent_details`; `[tabs] content`, `position`) are described in the
 >   [crate README](crates/herdr-gpui/README.md#title-bar).
+> - A Git graph tab shows the workspace's repository as a read-only graph,
+>   locally or on an SSH host, with the look of
+>   [herdr-git-graph](https://github.com/rubenep13/herdr-git-graph): lanes,
+>   labels, commit details and diffs, uncommitted changes, search, and live
+>   refresh. See the [crate README](crates/herdr-gpui/README.md#git-graph).
 > - `scripts/personal-tree-qa.sh /absolute/path/to/herdr` opens it against an
->   isolated daemon with sample agents for manual QA.
+>   isolated daemon with sample agents for manual QA; `--two-hosts` adds a
+>   simulated SSH host, and both hosts' spaces work in seeded Git repositories.
 >
 > The upstream README and attribution are preserved below; its release and
 > install instructions refer to the original project. License and NOTICE are

@@ -8,6 +8,7 @@ use crate::{
 use gpui::{Entity, VisualTestContext};
 use std::{path::Path, sync::Arc};
 
+mod graph;
 mod windows;
 
 fn web(url: &str) -> Location {

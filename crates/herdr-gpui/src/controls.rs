@@ -69,6 +69,8 @@ pub enum Command {
     NewBrowserTab,
     /// The focused workspace's repository's issues, pull requests, and runs.
     OpenOrchestrator,
+    /// The focused workspace's repository's history, drawn as a graph.
+    OpenGitGraph,
     InstallBrowserSkill,
     SplitEditor,
     OpenCode,
@@ -655,6 +657,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         label: "Open Orchestrator",
     },
     CommandInfo {
+        command: Command::OpenGitGraph,
+        name: "git_graph",
+        label: "Open Git Graph",
+    },
+    CommandInfo {
         command: Command::InstallBrowserSkill,
         name: "install_browser_skill",
         label: "Install Browser Skill for Agents",
@@ -855,6 +862,7 @@ pub fn request(command: Command, snapshot: &ClientShellSnapshot) -> Option<(Meth
         | Command::OpenNotificationTarget
         | Command::NewBrowserTab
         | Command::OpenOrchestrator
+        | Command::OpenGitGraph
         | Command::InstallBrowserSkill
         | Command::SplitEditor
         | Command::OpenCode

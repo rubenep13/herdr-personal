@@ -65,6 +65,7 @@ mod find;
 mod font_picker;
 mod fonts;
 mod git;
+mod git_graph;
 mod github;
 mod group_menu;
 mod group_terminals;

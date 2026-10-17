@@ -142,7 +142,7 @@ impl HerdrWindow {
 
     /// A folder of the focused workspace: its focused pane's, else the one
     /// new tabs start in.
-    fn focused_checkout(&self) -> Option<String> {
+    pub(crate) fn focused_checkout(&self) -> Option<String> {
         let snapshot = self.live.snapshot.as_deref()?;
         let workspace = snapshot.focused_workspace_id.as_deref()?;
         let pane = snapshot
