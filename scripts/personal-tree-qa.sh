@@ -17,9 +17,9 @@
 # With --two-hosts, a second daemon appears as the saved SSH host "Build box",
 # reached through a fake `ssh` in the sandbox that never connects anywhere: it
 # runs the remote command on this machine, in the second daemon's own HOME
-# and XDG directories. Local then connects through HERDR_SOCKET_PATH rather
-# than --socket, so views that need a scriptable host (orchestrator, Git
-# graph) open on both hosts.
+# and XDG directories, and appends it to `$sandbox/ssh.log`. Local then
+# connects through HERDR_SOCKET_PATH rather than --socket, so views that
+# need a scriptable host (orchestrator, Git graph) open on both hosts.
 #
 # A newline on stdin quits the app, stops the daemons, and removes the sandbox.
 set -euo pipefail
@@ -154,6 +154,8 @@ if [ \$resolve = 1 ]; then
   exit 0
 fi
 [ "\$target" = buildbox ] || { echo "qa ssh: no such host: \$target" >&2; exit 255; }
+# Every remote command, so a run can show what went over "SSH".
+printf '%s\n' "\$*" >> $sandbox/ssh.log
 exec env -i ${remote_env[*]} /bin/sh -c "\$*"
 EOF
   chmod 700 "$sandbox/bin/ssh"
