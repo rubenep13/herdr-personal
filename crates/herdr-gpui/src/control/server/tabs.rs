@@ -43,6 +43,8 @@ pub(super) fn serve(
         TabOp::Devices => arrive::devices(&caller, incoming, watches, cx),
         TabOp::Orchestrator { repo } => arrive::orchestrator(&caller, repo, incoming, watches, cx),
         TabOp::Review => arrive::review(&caller, incoming, watches, cx),
+        TabOp::Graph => arrive::graph(&caller, incoming, watches, cx),
+        TabOp::GraphClose => incoming.respond(arrive::graph_close(&caller, cx)),
     }
 }
 

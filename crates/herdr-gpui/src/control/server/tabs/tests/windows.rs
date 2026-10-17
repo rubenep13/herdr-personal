@@ -3,7 +3,7 @@ use super::*;
 use crate::control::protocol::Request;
 
 /// A request queued on a private socket, and the caller waiting for it.
-fn queued(
+pub(super) fn queued(
     server: &socket::Server,
     op: TabOp,
     caller: Caller,
@@ -19,7 +19,7 @@ fn queued(
     (call, server.next().unwrap(), waiting)
 }
 
-fn socket_dir() -> tempfile::TempDir {
+pub(super) fn socket_dir() -> tempfile::TempDir {
     tempfile::Builder::new()
         .prefix("hgc")
         .tempdir_in("/tmp")

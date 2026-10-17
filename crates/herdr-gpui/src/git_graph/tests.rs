@@ -18,6 +18,7 @@ mod chips;
 mod detail;
 #[cfg(unix)]
 mod git;
+mod help;
 mod keys;
 mod layout;
 mod live;

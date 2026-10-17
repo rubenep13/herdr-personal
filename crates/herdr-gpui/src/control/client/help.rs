@@ -59,7 +59,7 @@ fn family(name: &str) -> &'static str {
             "herdr-personal-dev ui sidebar [on|off|toggle]\nherdr-personal-dev ui statusbar [on|off|toggle]\nherdr-personal-dev ui font-size +|-|reset|POINTS\n    For this window and session; settings are changed with `config`."
         }
         "tab" => {
-            "herdr-personal-dev tab [list]\n    The app's own tabs: pages, code, reviews, the orchestrator, Devices.\n    Terminal tabs belong to Herdr: use `herdr tab`.\nherdr-personal-dev tab focus|close ID\n    Show a tab, switching to its workspace, or close it."
+            "herdr-personal-dev tab [list]\n    The app's own tabs: pages, code, reviews, the orchestrator, the Git graph,\n    Devices.\n    Terminal tabs belong to Herdr: use `herdr tab`.\nherdr-personal-dev tab focus|close ID\n    Show a tab, switching to its workspace, or close it."
         }
         "code" => {
             "herdr-personal-dev code open FILE[:LINE]\n    Show a local file read-only in a code tab, at LINE.\nherdr-personal-dev code edit FILE[:LINE]\n    Open it in your terminal editor ($VISUAL, $EDITOR) in a new pane."
@@ -72,6 +72,9 @@ fn family(name: &str) -> &'static str {
         }
         "review" => {
             "herdr-personal-dev review [open]\n    Open the review of the caller's workspace's uncommitted changes."
+        }
+        "graph" => {
+            "herdr-personal-dev graph [open]\n    Open the Git graph of the caller's workspace's repository, or bring\n    it back: one tab per workspace, local or on an SSH host. Read-only.\nherdr-personal-dev graph close\n    Close it; nothing open is not an error."
         }
         "notes" => {
             "herdr-personal-dev notes [list]\n    Every worktree note, most recently edited first.\nherdr-personal-dev notes get|clear\nherdr-personal-dev notes set TEXT...\n    The note on the caller's checkout (its repository and branch), or the\n    focused workspace's outside a Herdr pane. Notes are one line of at most\n    500 characters. `list` and `get` exit 4 when there is none."

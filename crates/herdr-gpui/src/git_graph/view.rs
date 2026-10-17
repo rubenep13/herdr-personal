@@ -4,6 +4,7 @@
 mod chips;
 mod detail;
 mod header;
+mod help;
 mod keys;
 mod lanes;
 mod rows;
@@ -15,6 +16,8 @@ pub(crate) use super::live::Liveness;
 pub(crate) use chips::chip_icons;
 #[cfg(test)]
 pub(crate) use detail::diff_tint;
+#[cfg(test)]
+pub(crate) use help::SHORTCUTS;
 
 use super::{
     checkout::GraphCheckout,
@@ -108,6 +111,8 @@ pub(crate) struct GitGraphView {
     probe: Option<u64>,
     /// The last live check failed.
     probe_failed: bool,
+    /// Whether the shortcuts are shown.
+    help: bool,
 }
 
 /// The headline for a failure, on this machine or the SSH host `remote`.
@@ -217,6 +222,7 @@ impl GitGraphView {
             next_probe: None,
             probe: None,
             probe_failed: false,
+            help: false,
         };
         view.send(Request::Load);
         view
@@ -666,6 +672,7 @@ impl Render for GitGraphView {
         let bar = self.render_bar(cx);
         let panel = self.render_panel(cx);
         let results = self.render_results(header::BAR_H, cx);
+        let help = self.render_help(cx);
         let width = self.width.clone();
         let measure = canvas(
             move |bounds, _, _| width.set(f32::from(bounds.size.width)),
@@ -702,6 +709,7 @@ impl Render for GitGraphView {
             .child(measure)
             .child(bar)
             .children(results)
+            .children(help)
             .child(div().flex_1().min_h_0().flex().child(body).children(panel))
     }
 }

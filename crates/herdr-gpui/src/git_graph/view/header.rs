@@ -150,6 +150,23 @@ impl GitGraphView {
                 button("graph-reload", "icons/graph-refresh.svg", true)
                     .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
             )
+            .child(
+                div()
+                    .id("graph-help-button")
+                    .debug_selector(|| "graph-help-button".to_owned())
+                    .flex_none()
+                    .size(px(28.))
+                    .rounded(px(4.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .text_color(rgb(theme.subtext()))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .hover(|style| style.bg(rgb(theme.active)))
+                    .child("?")
+                    .on_click(cx.listener(|this, _, _, cx| this.toggle_help(cx))),
+            )
             .child(match self.render_search_field() {
                 Some(field) => field,
                 None => button("graph-search", "icons/search.svg", true)

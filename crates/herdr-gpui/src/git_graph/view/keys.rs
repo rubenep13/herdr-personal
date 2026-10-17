@@ -46,6 +46,14 @@ impl GitGraphView {
                 self.reload(cx);
                 true
             }
+            ("?", _) => {
+                self.toggle_help(cx);
+                true
+            }
+            ("escape", _) if self.help => {
+                self.toggle_help(cx);
+                true
+            }
             ("/", _) => {
                 self.open_search(window, cx);
                 true
