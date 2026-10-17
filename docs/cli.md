@@ -4,8 +4,8 @@
 `herdr` CLI drives the daemon: workspaces, terminal tabs, panes, agents,
 worktrees, and notifications. `herdr-gpui COMMAND` covers what only this
 client knows or draws: its windows, its own tabs (pages, code, reviews, the
-orchestrator, Devices), worktree notes, checkpoints, forwarded ports, and its
-settings.
+orchestrator, the Git graph, Devices), worktree notes, checkpoints, forwarded
+ports, and its settings.
 
 Commands reach the app over a socket of its own,
 `$XDG_STATE_HOME/herdr/gpui/control.sock` (default `~/.local/state/`), which
@@ -70,7 +70,7 @@ Every command accepts:
 
 | Command | What it does |
 | --- | --- |
-| `tab [list]` | Pages, code, reviews, the orchestrator, and Devices tabs with IDs |
+| `tab [list]` | Pages, code, reviews, the orchestrator, the Git graph, and Devices tabs with IDs |
 | `tab focus\|close ID` | |
 | `browser open\|reload\|feedback` | See [browser tabs](../crates/herdr-gpui/README.md#browser-tabs) |
 | `browser list` | Page tabs only |
@@ -84,6 +84,8 @@ Every command accepts:
 | `orchestrator [--repo PATH]` | The orchestrator of your checkout, or of PATH |
 | `orchestrator items\|issues\|prs` | What it last synced, from its local database (no app needed) |
 | `review` | The review of your workspace's uncommitted changes |
+| `graph [open]` | The [Git graph](../crates/herdr-gpui/README.md#git-graph) of your workspace's repository, local or on its SSH host |
+| `graph close` | Close it; nothing open is not an error |
 
 ### Worktrees and agents
 

@@ -1,6 +1,6 @@
 ---
 name: herdr-gpui-browser
-description: "Open a browser tab in Herdr UI to show the user a web page or an HTML file you wrote, beside the terminal you run in, and get back the notes and picks the user sends. Use whenever the user asks to open, start, or show a browser tab, a page, a preview, or a mockup, or asks you to explain, demo, or visualize how something works, or to mock up UI variants to choose from, while you run inside Herdr (HERDR_ENV=1 is set in your environment); prefer it there over other browser skills, over opening Safari or another system browser, and over long text explanations of a flow. Also use it, inside Herdr, for anything Herdr UI itself shows or keeps rather than the herdr daemon: show a file at a line, open a review of your changes, keep a note on a worktree, take or diff a checkpoint, check your branch's pull request and CI, forward or open a port, list or focus the app's windows and tabs, wait for a tab to close or the user's notes to arrive, change a Herdr UI setting, theme, or font, or keep the machine awake."
+description: "Open a browser tab in Herdr UI to show the user a web page or an HTML file you wrote, beside the terminal you run in, and get back the notes and picks the user sends. Use whenever the user asks to open, start, or show a browser tab, a page, a preview, or a mockup, or asks you to explain, demo, or visualize how something works, or to mock up UI variants to choose from, while you run inside Herdr (HERDR_ENV=1 is set in your environment); prefer it there over other browser skills, over opening Safari or another system browser, and over long text explanations of a flow. Also use it, inside Herdr, for anything Herdr UI itself shows or keeps rather than the herdr daemon: show a file at a line, open a review of your changes, show the repository's branches as a Git graph, keep a note on a worktree, take or diff a checkpoint, check your branch's pull request and CI, forward or open a port, list or focus the app's windows and tabs, wait for a tab to close or the user's notes to arrive, change a Herdr UI setting, theme, or font, or keep the machine awake."
 ---
 <!-- herdr-gpui-managed-skill v1: Herdr UI keeps this file up to date. Edit a copy under another name to keep your changes. -->
 
@@ -207,6 +207,7 @@ for what only Herdr UI shows or keeps.
 | --- | --- |
 | Show a file at a line, read-only | `herdr-gpui code open src/main.rs:42` |
 | Open the review of your uncommitted changes | `herdr-gpui review` |
+| Show the user the repository's branches and history as a graph | `herdr-gpui graph` |
 | Get notes the user sent this pane (pages, reviews, terminals) | `herdr-gpui feedback --wait 600` |
 | Keep a note on this worktree (repository and branch) | `herdr-gpui notes set waiting on CI` |
 | Save the working tree before a risky change, and compare later | `herdr-gpui checkpoint create before refactor`, `herdr-gpui checkpoint diff ID` |
