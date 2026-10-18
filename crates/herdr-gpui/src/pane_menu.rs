@@ -1,5 +1,9 @@
 use crate::{
-    HerdrWindow, close_modal::CloseConfirmation, menu::Page, pane_move::Destination,
+    HerdrWindow,
+    close_modal::CloseConfirmation,
+    design::{ItemState, Leading},
+    menu::Page,
+    pane_move::Destination,
     search_input::SearchInput,
 };
 use gpui::{prelude::*, *};
@@ -148,6 +152,23 @@ impl Action {
             | Self::Processes
             | Self::Close => return None,
         })
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Rename => "icons/pencil.svg",
+            Self::SplitRight => "icons/split.svg",
+            Self::SplitDown => "icons/split-down.svg",
+            Self::Swap => "icons/swap.svg",
+            Self::Zoom => "icons/zoom.svg",
+            Self::MoveToNewTab => "icons/tab.svg",
+            Self::MoveToNewWorkspace => "icons/folder.svg",
+            Self::MoveTo => "icons/arrow-right.svg",
+            Self::EditScrollback => "icons/file.svg",
+            Self::RightClick => "icons/mouse.svg",
+            Self::Processes => "icons/pulse.svg",
+            Self::Close => "icons/x.svg",
+        }
     }
 
     fn label(self, target: &Target) -> &'static str {
@@ -673,38 +694,34 @@ impl HerdrWindow {
         if pane.moving.is_some() {
             body = self.render_pane_move_pending();
         } else if self.menu.page == Some(Page::Pane) {
+            let look = self.menu_look();
             for (index, action) in pane.actions().into_iter().enumerate() {
+                let state = ItemState {
+                    selected: pane.selected == Some(index),
+                    ..ItemState::default()
+                };
                 body = body.child(
-                    div()
-                        .id(("pane-menu-action", index))
-                        .debug_selector(move || format!("pane-menu-{index}"))
-                        .min_h(px(self.config.ui.line_height() + 12.))
-                        .px(px(8.))
-                        .flex()
-                        .items_center()
-                        .cursor_pointer()
-                        .when(pane.selected == Some(index), |row| {
-                            row.bg(rgb(self.theme.active))
-                        })
-                        .hover(|row| row.bg(rgb(self.theme.active)))
-                        .child(
-                            // One line: the panel widens to fit it, and a
-                            // window too narrow for that ends it with "…".
-                            div()
-                                .debug_selector(move || format!("pane-menu-label-{index}"))
-                                .min_w_0()
-                                .truncate()
-                                .child(action.label(&pane.target)),
-                        )
-                        .on_hover(cx.listener(move |this, hovered, _, cx| {
-                            if *hovered && let Some(pane) = &mut this.menu.pane {
-                                pane.selected = Some(index);
-                                cx.notify();
-                            }
-                        }))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.activate_pane_menu(action, window, cx)
-                        })),
+                    look.row(
+                        ("pane-menu-action", index),
+                        format!("pane-menu-{index}"),
+                        Leading::Icon(action.icon(), format!("pane-menu-{index}-icon")),
+                        state,
+                    )
+                    // One line: the panel widens to fit it, and a window
+                    // too narrow for that ends it with "…".
+                    .child(look.label(
+                        format!("pane-menu-label-{index}"),
+                        action.label(&pane.target),
+                    ))
+                    .on_hover(cx.listener(move |this, hovered, _, cx| {
+                        if *hovered && let Some(pane) = &mut this.menu.pane {
+                            pane.selected = Some(index);
+                            cx.notify();
+                        }
+                    }))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.activate_pane_menu(action, window, cx)
+                    })),
                 );
             }
         } else {
