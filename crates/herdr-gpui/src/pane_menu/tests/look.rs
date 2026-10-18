@@ -84,3 +84,23 @@ fn long_pane_labels_stay_whole_beside_their_icon(cx: &mut TestAppContext) {
         "{panel:?}"
     );
 }
+
+#[gpui::test]
+fn leaving_a_row_restores_it(cx: &mut TestAppContext) {
+    let (view, cx) = open(800., cx);
+    let selected = |cx: &mut VisualTestContext| {
+        view.read_with(cx, |v, _| v.menu.pane.as_ref().unwrap().selected)
+    };
+    let row = cx.debug_bounds("pane-menu-2").unwrap();
+    cx.simulate_mouse_move(row.center(), None, Modifiers::default());
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    assert_eq!(selected(cx), Some(2));
+    let panel = cx.debug_bounds("menu-panel").unwrap();
+    cx.simulate_mouse_move(
+        point(panel.right() + px(20.), panel.bottom() + px(20.)),
+        None,
+        Modifiers::default(),
+    );
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    assert_eq!(selected(cx), None);
+}

@@ -1,7 +1,8 @@
 use super::*;
 
-/// Go To's preview sits beside its list when the window has room, Alt-P
-/// hides it, and a narrow window keeps the list alone.
+/// Go To's preview is hidden until Alt-P shows it, so the palette keeps its
+/// width; shown, it sits beside the list when the window has room, Alt-P
+/// hides it again, and a narrow window keeps the list alone.
 #[gpui::test]
 fn go_to_preview_sits_beside_the_list_when_there_is_room(cx: &mut TestAppContext) {
     let (view, cx) = cx.add_window_view(|window, cx| {
@@ -18,6 +19,12 @@ fn go_to_preview_sits_beside_the_list_when_there_is_room(cx: &mut TestAppContext
     };
     cx.simulate_resize(size(px(1400.), px(900.)));
     open(cx, Filter::Navigation);
+    assert!(cx.debug_bounds("palette-preview").is_none());
+    let alone = cx.debug_bounds("menu-panel").unwrap();
+    cx.simulate_keystrokes("alt-p");
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    assert!(cx.debug_bounds("menu-panel").unwrap().size.width > alone.size.width);
     let row = cx.debug_bounds("palette-row-0").unwrap();
     let preview = cx.debug_bounds("palette-preview").unwrap();
     assert!(preview.left() >= row.right());
@@ -101,6 +108,7 @@ fn a_streamed_pane_previews_its_cells(cx: &mut TestAppContext) {
     cx.simulate_resize(size(px(1400.), px(900.)));
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
+            view.menu.palette_preview = true;
             view.open_palette(Filter::Navigation, window, cx);
             let palette = view.menu.palette.as_mut().unwrap();
             palette.selected = palette

@@ -43,3 +43,25 @@ fn session_rows_keep_their_height_and_sit_inside_the_inset(cx: &mut TestAppConte
     let header = bounds(cx, "sessions-local-header");
     assert!(header.size.height < px(line + 13.), "{header:?}");
 }
+
+#[gpui::test]
+fn leaving_a_device_row_restores_it(cx: &mut TestAppContext) {
+    let (view, cx) = cx.add_window_view(fixture_window);
+    cx.simulate_resize(size(px(800.), px(600.)));
+    cx.run_until_parked();
+    draw(cx);
+    click(cx, "device-picker");
+    draw(cx);
+    let row = bounds(cx, "device-row-0");
+    cx.simulate_mouse_move(row.center(), None, Modifiers::default());
+    draw(cx);
+    assert_eq!(view.read_with(cx, |view, _| view.menu.selected), Some(0));
+    let panel = bounds(cx, "menu-panel");
+    cx.simulate_mouse_move(
+        gpui::point(panel.right() + px(20.), panel.top() - px(20.)),
+        None,
+        Modifiers::default(),
+    );
+    draw(cx);
+    assert_eq!(view.read_with(cx, |view, _| view.menu.selected), None);
+}

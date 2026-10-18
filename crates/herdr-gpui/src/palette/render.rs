@@ -14,7 +14,6 @@ const FOOTER_HEIGHT: f32 = 36.;
 const LIST_INSET: f32 = 6.;
 /// How far each level of Go To's nesting steps in.
 const NEST: f32 = 18.;
-const KEYCAP: f32 = 17.;
 const STATUS_DOT: f32 = 7.;
 
 /// How much larger than the interface text the palette's query is drawn.
@@ -195,6 +194,8 @@ impl HerdrWindow {
                 .with_highlights(ranges.iter().map(|range| (range.clone(), matched)))
         };
         let (mark, mark_color) = self.palette_mark(entry);
+        // A GUI action's detail is its shortcut, drawn as keys at the row's end.
+        let shortcut = matches!(entry.action, Action::Native(_)) && !entry.detail.is_empty();
         let row = look
             .list_row(index, format!("palette-row-{index}"), state)
             .flex_1()
@@ -219,14 +220,19 @@ impl HerdrWindow {
                             .font_weight(FontWeight::MEDIUM)
                             .child(styled(&entry.label, &hit.highlights.label)),
                     )
-                    .child(
-                        div()
-                            .truncate()
-                            .text_size(px(scale.detail))
-                            .text_color(look.muted())
-                            .child(styled(&entry.detail, &hit.highlights.detail)),
-                    ),
+                    .when(!shortcut, |lines| {
+                        lines.child(
+                            div()
+                                .truncate()
+                                .text_size(px(scale.detail))
+                                .text_color(look.muted())
+                                .child(styled(&entry.detail, &hit.highlights.detail)),
+                        )
+                    }),
             )
+            .when(shortcut, |row| {
+                row.child(look.keys(&format!("palette-shortcut-{index}"), &entry.detail))
+            })
             .map(|row| match entry.status {
                 // An agent ends as the sidebar's agent row does: its state's
                 // badge, and the state's words in a pill of its colour.
@@ -260,6 +266,17 @@ impl HerdrWindow {
                     )
                 }),
             })
+            // As in the menus, the row under the pointer is the selected one.
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                if *hovered
+                    && let Some(palette) = &mut this.menu.palette
+                    && palette.selected != index
+                {
+                    palette.restore = None;
+                    palette.selected = index;
+                    cx.notify();
+                }
+            }))
             .on_click(cx.listener(move |this, _, window, cx| {
                 this.activate_palette(action.clone(), window, cx)
             }));
@@ -315,23 +332,10 @@ impl HerdrWindow {
         let mut footer = footer;
         let mut first = 0;
         for hint in hints {
-            let keys = hint.keys.iter().enumerate().map(|(offset, key)| {
-                let index = first + offset;
-                div()
-                    .debug_selector(move || format!("palette-key-{index}"))
-                    .flex_none()
-                    .h(look.at(KEYCAP))
-                    .min_w(look.at(KEYCAP))
-                    .px(look.at(4.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .rounded(look.at(4.))
-                    .bg(rgb(theme.active))
-                    .text_color(rgb(theme.subtext()))
-                    .text_size(px(look.scale().detail - 1.))
-                    .child(*key)
-            });
+            let keys =
+                hint.keys.iter().enumerate().map(|(offset, key)| {
+                    look.keycap(format!("palette-key-{}", first + offset), *key)
+                });
             footer = footer.child(
                 div()
                     .flex()

@@ -40,3 +40,38 @@ fn host_menu_heads_with_the_device_and_icons_each_row(cx: &mut TestAppContext) {
         );
     }
 }
+
+#[gpui::test]
+fn leaving_a_row_restores_it(cx: &mut TestAppContext) {
+    if cfg!(windows) {
+        return;
+    }
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = fixture_window(window, cx);
+        add_host(&mut view);
+        view
+    });
+    cx.simulate_resize(size(px(800.), px(600.)));
+    view.update_in(cx, |view, window, cx| {
+        view.open_host_menu(HOST, point(px(20.), px(20.)), window, cx)
+    });
+    let draw = |cx: &mut VisualTestContext| {
+        cx.update(|window, cx| crate::sidebar::layout_tests::full_draw(window, cx).clear(cx))
+    };
+    draw(cx);
+    let selected = |cx: &mut VisualTestContext| {
+        view.read_with(cx, |view, _| view.menu.host.as_ref().unwrap().selected)
+    };
+    let row = cx.debug_bounds("host-menu-0").unwrap();
+    cx.simulate_mouse_move(row.center(), None, Modifiers::default());
+    draw(cx);
+    assert_eq!(selected(cx), Some(0));
+    let panel = cx.debug_bounds("menu-panel").unwrap();
+    cx.simulate_mouse_move(
+        point(panel.right() + px(20.), panel.bottom() + px(20.)),
+        None,
+        Modifiers::default(),
+    );
+    draw(cx);
+    assert_eq!(selected(cx), None);
+}

@@ -338,8 +338,9 @@ impl HerdrWindow {
                     )
                     .child(look.label(format!("tab-menu-label-{index}"), label))
                     .on_hover(cx.listener(move |this, hovered, _, cx| {
-                        if *hovered && let Some(tab) = &mut this.menu.tab {
-                            tab.selected = Some(index);
+                        if let Some(tab) = &mut this.menu.tab
+                            && crate::design::menu_hover(&mut tab.selected, index, *hovered)
+                        {
                             cx.notify();
                         }
                     }))

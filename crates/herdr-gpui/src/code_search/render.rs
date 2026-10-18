@@ -221,6 +221,16 @@ impl HerdrWindow {
                     }),
             )
             .child(badge.flex_none().text_size(px(look.scale().secondary)))
+            // As in the palette, the row under the pointer is the selected one.
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                if *hovered
+                    && let Some(code) = &mut this.menu.code_search
+                    && code.selected != row
+                {
+                    code.selected = row;
+                    cx.notify();
+                }
+            }))
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                 let viewer = event.modifiers().secondary();
                 this.activate_code_search(row, viewer, window, cx);

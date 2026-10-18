@@ -31,6 +31,12 @@ const HEADER_SUB_INSET: f32 = 24.;
 const QUERY_HEIGHT: f32 = 56.;
 const SEARCH_ICON: f32 = 18.;
 const TABS_HEIGHT: f32 = 40.;
+/// How far a separator leans from the hairline toward the quiet text colour.
+const RULE_PERCENT: u32 = 40;
+/// How far a key chip's fill leans from the selection toward the text.
+const KEY_PERCENT: u32 = 12;
+/// A key chip's height and least width.
+const KEYCAP: f32 = 17.;
 /// How much of the danger red fills a selected destructive row.
 const DANGER_WASH: f32 = 0.14;
 /// The panel's shadow: lighter on a light theme, where black reads heavier.
@@ -69,6 +75,12 @@ pub(crate) struct Header<'a> {
 pub(crate) struct MenuLook {
     panel: Rgba,
     line: Rgba,
+    /// A separator between groups of rows: the hairline would vanish on a
+    /// dark theme between rows, so it leans toward the quiet text colour.
+    rule: Rgba,
+    /// A key chip's fill: a step lighter than the selection, so a chip still
+    /// shows on a selected row.
+    key: Rgba,
     selection: Rgba,
     text: Rgba,
     selected_text: Rgba,
@@ -86,6 +98,12 @@ impl MenuLook {
         Self {
             panel: rgb(theme.background),
             line: rgb(theme.active),
+            rule: rgb(crate::config::mix(theme.active, theme.muted, RULE_PERCENT)),
+            key: rgb(crate::config::mix(
+                theme.active,
+                theme.foreground,
+                KEY_PERCENT,
+            )),
             selection: rgb(theme.active),
             text: rgb(theme.subtext()),
             selected_text: rgb(theme.foreground),
@@ -125,6 +143,10 @@ impl MenuLook {
 
     pub(crate) fn line(&self) -> Rgba {
         self.line
+    }
+
+    pub(crate) fn rule(&self) -> Rgba {
+        self.rule
     }
 
     /// A row's fill: none at rest, the selection colour when selected, and a
@@ -179,7 +201,9 @@ impl MenuLook {
     }
 
     /// The frame both kinds of row share: rounded, filled while selected,
-    /// tinted by its state.
+    /// tinted by its state. The pointer selects a row (each menu moves its
+    /// selection on hover), so there is no separate hover style to drift
+    /// from it.
     fn frame(
         &self,
         id: impl Into<ElementId>,
@@ -187,10 +211,6 @@ impl MenuLook {
         height: f32,
         state: ItemState,
     ) -> Stateful<Div> {
-        let hover = self.fill(ItemState {
-            selected: true,
-            ..state
-        });
         div()
             .id(id)
             .debug_selector(move || selector)
@@ -204,10 +224,7 @@ impl MenuLook {
             .text_size(px(self.scale.name))
             .text_color(self.ink(state))
             .when_some(self.fill(state), |row, fill| row.bg(fill))
-            .when(!state.disabled, |row| {
-                row.cursor_pointer()
-                    .when_some(hover, |row, hover| row.hover(move |style| style.bg(hover)))
-            })
+            .when(!state.disabled, |row| row.cursor_pointer())
     }
 
     /// A menu's one-line row, its leading slot filled. The caller adds the
@@ -307,7 +324,42 @@ impl MenuLook {
             .h(px(1.))
             .mx(self.at(SEPARATOR_INSET))
             .my(self.at(SEPARATOR_GAP))
-            .bg(self.line)
+            .bg(self.rule)
+    }
+
+    /// One key of a shortcut, drawn as a key.
+    pub(crate) fn keycap(&self, selector: String, key: impl Into<SharedString>) -> Div {
+        div()
+            .debug_selector(move || selector)
+            .flex_none()
+            .h(self.at(KEYCAP))
+            .min_w(self.at(KEYCAP))
+            .px(self.at(4.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(self.at(4.))
+            .bg(self.key)
+            .text_color(self.text)
+            .text_size(px(self.scale.detail - 1.))
+            .child(key.into())
+    }
+
+    /// A shortcut's keys as chips: the row named `selector`, each key
+    /// `{selector}-key-{n}`.
+    pub(crate) fn keys(&self, selector: &str, shortcut: &str) -> Div {
+        let row = selector.to_owned();
+        div()
+            .debug_selector(move || row)
+            .flex()
+            .flex_none()
+            .items_center()
+            .gap(self.at(3.))
+            .children(
+                keycaps(shortcut)
+                    .enumerate()
+                    .map(|(index, key)| self.keycap(format!("{selector}-key-{index}"), key)),
+            )
     }
 
     /// A small heading over a group of rows.
@@ -471,6 +523,50 @@ impl MenuLook {
                 )
             })
     }
+}
+
+/// Moves a menu's selection with the pointer: onto `index` while it is
+/// hovered, and off it again when the pointer leaves, so the row reads as it
+/// did before. Returns whether the selection changed.
+pub(crate) fn menu_hover(selected: &mut Option<usize>, index: usize, hovered: bool) -> bool {
+    let next = if hovered {
+        Some(index)
+    } else if *selected == Some(index) {
+        None
+    } else {
+        return false;
+    };
+    let changed = *selected != next;
+    *selected = next;
+    changed
+}
+
+/// The keys of a shortcut as its chips name them: `ctrl-shift-t` is Ctrl,
+/// Shift, T, and a chord's keystrokes follow one another.
+pub(crate) fn keycaps(shortcut: &str) -> impl Iterator<Item = String> + '_ {
+    shortcut
+        .split(' ')
+        .flat_map(|keystroke| {
+            let (modifiers, key) = match keystroke.strip_suffix('-') {
+                Some(modifiers) if modifiers.is_empty() || modifiers.ends_with('-') => {
+                    (modifiers, "-")
+                }
+                _ => keystroke.rsplit_once('-').unwrap_or(("", keystroke)),
+            };
+            modifiers
+                .split('-')
+                .filter(|modifier| !modifier.is_empty())
+                .chain(std::iter::once(key))
+        })
+        .map(|key| {
+            let mut chars = key.chars();
+            chars
+                .next()
+                .map(|first| first.to_ascii_uppercase())
+                .into_iter()
+                .chain(chars)
+                .collect()
+        })
 }
 
 #[cfg(test)]

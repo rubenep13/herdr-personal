@@ -1,6 +1,6 @@
 // Not a glob, for the parent's reason: `gpui::*` would shadow `#[test]`.
 use super::{Mode, checkout, window};
-use gpui::{TestAppContext, px, size};
+use gpui::{Modifiers, TestAppContext, px, size};
 
 #[gpui::test]
 fn code_search_rows_are_list_rows_with_a_tile(cx: &mut TestAppContext) {
@@ -41,4 +41,25 @@ fn modes_are_underlined_tabs(cx: &mut TestAppContext) {
     let moved = cx.debug_bounds("code-search-mode-underline").unwrap();
     let files = cx.debug_bounds("code-search-mode-files").unwrap();
     assert!(moved.left() > files.left() && moved.right() < files.right());
+}
+
+/// As in the palette, the row under the pointer is the selected one.
+#[gpui::test]
+fn hovering_a_row_selects_it(cx: &mut TestAppContext) {
+    let dir = checkout();
+    let (view, cx) = window(cx, Some(&dir.path().join("src")));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_code_search(Mode::Symbols, window, cx)
+        })
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| crate::sidebar::layout_tests::full_draw(window, cx).clear(cx));
+    let row = cx.debug_bounds("code-search-row-1").unwrap();
+    cx.simulate_mouse_move(row.center(), None, Modifiers::default());
+    cx.update(|window, cx| crate::sidebar::layout_tests::full_draw(window, cx).clear(cx));
+    let selected = view.read_with(cx, |view, _| {
+        view.menu.code_search.as_ref().unwrap().selected
+    });
+    assert_eq!(selected, 1);
 }

@@ -66,3 +66,57 @@ fn a_submenu_opens_under_a_back_row_and_an_inset_separator(cx: &mut TestAppConte
     assert_eq!(separator.right(), row.right() - px(10.));
     assert_eq!(separator.size.height, px(1.));
 }
+
+#[gpui::test]
+fn shortcuts_are_drawn_as_chips(cx: &mut TestAppContext) {
+    let (view, cx) = window(cx);
+    draw(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_application_menu(Some(1), window, cx)
+        })
+    });
+    draw(cx);
+    let shortcut = view.read_with(cx, |view, _| {
+        view.keymap()
+            .primary(crate::controls::Command::Workspace)
+            .to_owned()
+    });
+    let keys = crate::design::keycaps(&shortcut).count();
+    assert!(keys > 0, "New Workspace has a default shortcut");
+    for index in 0..=keys {
+        let selector = format!("application-item-New Workspace-detail-key-{index}");
+        assert_eq!(cx.debug_bounds(selector.leak()).is_some(), index < keys);
+    }
+}
+
+/// The row under the pointer is selected; once the pointer leaves it, the
+/// row reads as it did before.
+#[gpui::test]
+fn leaving_a_row_restores_it(cx: &mut TestAppContext) {
+    let (view, cx) = window(cx);
+    draw(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_application_menu(Some(1), window, cx)
+        })
+    });
+    draw(cx);
+    let selected = |cx: &mut VisualTestContext| {
+        view.read_with(cx, |view, _| {
+            view.menu.application.as_ref().unwrap().selected
+        })
+    };
+    let row = cx.debug_bounds("application-item-New Tab").unwrap();
+    cx.simulate_mouse_move(row.center(), None, Modifiers::none());
+    draw(cx);
+    assert!(selected(cx).is_some());
+    let panel = cx.debug_bounds("application-menu-panel").unwrap();
+    cx.simulate_mouse_move(
+        point(panel.right() + px(20.), panel.bottom() + px(20.)),
+        None,
+        Modifiers::none(),
+    );
+    draw(cx);
+    assert_eq!(selected(cx), None);
+}

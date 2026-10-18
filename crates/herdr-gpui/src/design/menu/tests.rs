@@ -85,3 +85,25 @@ fn light_themes_get_a_fainter_shadow() {
     let dark = MenuLook::of(&Theme::default(), &font(12.), false);
     assert!(light.shadow_opacity() < dark.shadow_opacity());
 }
+
+/// Separators part groups of rows, so they must show on dark themes too:
+/// they stand further from the panel than its hairline border does.
+#[test]
+fn separators_stand_out_from_the_panel() {
+    let distance = |a: Rgba, b: Rgba| (a.r - b.r).abs() + (a.g - b.g).abs() + (a.b - b.b).abs();
+    for theme in themes() {
+        let look = MenuLook::of(&theme, &font(12.), false);
+        let panel = rgb(theme.background);
+        assert!(distance(look.rule(), panel) > distance(look.line(), panel));
+    }
+}
+
+/// A shortcut splits into one chip per key, chords included.
+#[test]
+fn shortcuts_split_into_keys() {
+    assert_eq!(
+        keycaps("ctrl-shift-t").collect::<Vec<_>>(),
+        ["Ctrl", "Shift", "T"]
+    );
+    assert_eq!(keycaps("ctrl-b n").collect::<Vec<_>>(), ["Ctrl", "B", "N"]);
+}

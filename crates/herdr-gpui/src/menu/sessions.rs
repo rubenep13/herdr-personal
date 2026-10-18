@@ -456,8 +456,7 @@ impl HerdrWindow {
                 ))
             })
             .on_hover(cx.listener(move |this, hovered, _, cx| {
-                if *hovered {
-                    this.menu.selected = Some(row);
+                if crate::design::menu_hover(&mut this.menu.selected, row, *hovered) {
                     cx.notify();
                 }
             }))

@@ -140,3 +140,44 @@ fn the_footer_draws_every_hint_key_as_a_key(cx: &mut TestAppContext) {
         assert_eq!(drawn, expected, "{filter:?}");
     }
 }
+
+/// As in the menus, the row under the pointer is the selected one.
+#[gpui::test]
+fn hovering_a_row_selects_it(cx: &mut TestAppContext) {
+    let (view, cx) = open(Filter::Commands, cx);
+    let row = cx.debug_bounds("palette-row-2").unwrap();
+    cx.simulate_mouse_move(row.center(), None, Modifiers::default());
+    redraw(cx);
+    assert_eq!(
+        view.read_with(cx, |view, _| view.menu.palette.as_ref().unwrap().selected),
+        2
+    );
+}
+
+/// A GUI action's shortcut is drawn as keys at the row's end.
+#[gpui::test]
+fn gui_action_shortcuts_are_chips(cx: &mut TestAppContext) {
+    let (view, cx) = open(Filter::Commands, cx);
+    let shortcut = rows(&view, cx, |entry, _| {
+        matches!(entry.action, Action::Native(_)) && !entry.detail.is_empty()
+    })
+    .into_iter()
+    .find(|index| *index < 8)
+    .unwrap();
+    assert!(bounds(cx, format!("palette-shortcut-{shortcut}-key-0")).is_some());
+}
+
+/// Go To keeps the palette's width until its preview is asked for.
+#[gpui::test]
+fn go_to_keeps_the_palette_width(cx: &mut TestAppContext) {
+    let (_, cx) = open(Filter::Commands, cx);
+    let commands = cx.debug_bounds("menu-panel").unwrap();
+    // Back from Commands to Navigation (Go To).
+    cx.simulate_keystrokes("ctrl-shift-tab");
+    redraw(cx);
+    assert_eq!(
+        cx.debug_bounds("menu-panel").unwrap().size.width,
+        commands.size.width
+    );
+    assert!(cx.debug_bounds("palette-preview").is_none());
+}

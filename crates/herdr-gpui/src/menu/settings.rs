@@ -3,6 +3,7 @@
 //! thread, and a superseded load cannot overwrite a newer one.
 
 use super::{Page, accent};
+use crate::design::keycaps;
 use crate::{HerdrWindow, config::Config, keymap::Reach};
 use gpui::{prelude::*, *};
 use herdr_client::protocol::ClientShellCommand;
@@ -679,32 +680,6 @@ fn reach_note(reach: Reach) -> Option<&'static str> {
         Reach::OverLimit => Some("Beyond the 8-shortcut limit"),
         Reach::Unsupported => Some("Not supported by this client"),
     }
-}
-
-fn keycaps(shortcut: &str) -> impl Iterator<Item = String> + '_ {
-    shortcut
-        .split(' ')
-        .flat_map(|keystroke| {
-            let (modifiers, key) = match keystroke.strip_suffix('-') {
-                Some(modifiers) if modifiers.is_empty() || modifiers.ends_with('-') => {
-                    (modifiers, "-")
-                }
-                _ => keystroke.rsplit_once('-').unwrap_or(("", keystroke)),
-            };
-            modifiers
-                .split('-')
-                .filter(|modifier| !modifier.is_empty())
-                .chain(std::iter::once(key))
-        })
-        .map(|key| {
-            let mut chars = key.chars();
-            chars
-                .next()
-                .map(|first| first.to_ascii_uppercase())
-                .into_iter()
-                .chain(chars)
-                .collect()
-        })
 }
 
 fn shortcut_matches(query: &str, keys: &str, description: &str, section: &str) -> bool {

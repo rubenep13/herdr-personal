@@ -263,8 +263,9 @@ impl HerdrWindow {
             )
             .overflow_hidden()
             .on_hover(cx.listener(move |this, hovered, _, cx| {
-                if *hovered && let Some(pane) = &mut this.menu.pane {
-                    pane.selected = Some(index);
+                if let Some(pane) = &mut this.menu.pane
+                    && crate::design::menu_hover(&mut pane.selected, index, *hovered)
+                {
                     cx.notify();
                 }
             }))

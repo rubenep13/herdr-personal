@@ -200,7 +200,7 @@ impl HerdrWindow {
             };
             let end = match shortcut {
                 Some(shortcut) => look
-                    .detail(format!("{selector}-detail"), shortcut)
+                    .keys(&format!("{selector}-detail"), &shortcut)
                     .into_any_element(),
                 None => look
                     .submenu(format!("application-submenu-{name}"))
@@ -216,11 +216,10 @@ impl HerdrWindow {
                 .child(look.label(format!("{selector}-label"), name))
                 .child(end)
                 .on_hover(cx.listener(move |this, hovered, _, cx| {
-                    if *hovered
-                        && !disabled
+                    if !disabled
                         && let Some(menu) = &mut this.menu.application
+                        && crate::design::menu_hover(&mut menu.selected, index, *hovered)
                     {
-                        menu.selected = Some(index);
                         cx.notify();
                     }
                 }))

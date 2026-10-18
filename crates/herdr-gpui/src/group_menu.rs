@@ -356,15 +356,20 @@ impl HerdrWindow {
                 )
                 .child(look.label(label, action.label()))
                 .when(!detail.is_empty(), |line| {
-                    line.child(
+                    // A port's detail is its process; the others' is a shortcut.
+                    line.child(if capped {
                         look.detail(process, detail)
-                            .when(capped, |detail| detail.max_w(px(PROCESS_WIDTH)).truncate()),
-                    )
+                            .max_w(px(PROCESS_WIDTH))
+                            .truncate()
+                    } else {
+                        look.keys(&process, &detail)
+                    })
                 })
                 .children(close)
                 .on_hover(cx.listener(move |this, hovered, _, cx| {
-                    if *hovered && let Some(menu) = &mut this.menu.group {
-                        menu.selected = Some(index);
+                    if let Some(menu) = &mut this.menu.group
+                        && crate::design::menu_hover(&mut menu.selected, index, *hovered)
+                    {
                         cx.notify();
                     }
                 }))
