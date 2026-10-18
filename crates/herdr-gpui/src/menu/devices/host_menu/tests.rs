@@ -6,6 +6,7 @@ use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px,
 mod cloud;
 mod device_theme;
 mod forwards;
+mod look;
 mod menu_width;
 
 // Endpoint IDs carry the `ssh:` prefix; the profile ID is the rest.

@@ -9,6 +9,7 @@ use crate::{
     HerdrWindow,
     browser::{GroupId, Pick},
     controls::Command,
+    design::{ItemState, Leading},
     listening_ports::Link,
     menu::Page,
 };
@@ -75,7 +76,7 @@ impl Action {
             Self::VsCode => Some("icons/vscode.svg"),
             Self::Port { .. } => Some("icons/arrow-right.svg"),
             Self::Split => Some("icons/split.svg"),
-            Self::Close | Self::CloseOthers | Self::CloseGroup => None,
+            Self::Close | Self::CloseOthers | Self::CloseGroup => Some("icons/close.svg"),
         }
     }
 
@@ -285,6 +286,7 @@ impl HerdrWindow {
             return panel;
         };
         let theme = &self.theme;
+        let look = self.menu_look();
         let mut panel = panel.track_scroll(&menu.scroll).flex().flex_col();
         let mut section = None;
         for (index, action) in self.group_actions(menu.group, cx).into_iter().enumerate() {
@@ -292,21 +294,20 @@ impl HerdrWindow {
             let first_port = matches!(action, Action::Port { .. }) && section != Some(1);
             section = Some(action.section());
             if first_port {
+                // One child, the separator inside it, so the scroll handle's
+                // count of children stays what `child_index` expects.
                 panel = panel.child(
                     div()
                         .flex_none()
+                        .flex()
+                        .flex_col()
                         .when(starts_section, |heading| {
-                            heading
-                                .mt(px(4.))
-                                .border_t_1()
-                                .border_color(rgb(theme.active))
+                            heading.child(
+                                look.separator()
+                                    .debug_selector(|| "group-menu-separator-listening".into()),
+                            )
                         })
-                        .pt(px(6.))
-                        .pb(px(2.))
-                        .px(px(8.))
-                        .text_xs()
-                        .text_color(rgb(theme.muted))
-                        .child("Listening"),
+                        .child(look.section("group-menu-section-listening".into(), "Listening")),
                 );
             }
             let detail: SharedString = match &action {
@@ -338,61 +339,56 @@ impl HerdrWindow {
                 )),
                 _ => None,
             };
+            let state = ItemState {
+                selected: menu.selected == Some(index),
+                ..ItemState::default()
+            };
+            let leading = action.icon().map_or(Leading::Empty, |icon| {
+                Leading::Icon(icon, format!("{selector}-icon"))
+            });
+            let separated = starts_section && !first_port;
+            let row = look
+                .row(
+                    ("group-menu-action", index),
+                    selector.clone(),
+                    leading,
+                    state,
+                )
+                .child(look.label(label, action.label()))
+                .when(!detail.is_empty(), |line| {
+                    // A port's detail is its process; the others' is a shortcut.
+                    line.child(if capped {
+                        look.detail(process, detail)
+                            .max_w(px(PROCESS_WIDTH))
+                            .truncate()
+                    } else {
+                        look.keys(&process, &detail)
+                    })
+                })
+                .children(close)
+                .on_hover(cx.listener(move |this, hovered, _, cx| {
+                    if let Some(menu) = &mut this.menu.group
+                        && crate::design::menu_hover(&mut menu.selected, index, *hovered)
+                    {
+                        cx.notify();
+                    }
+                }))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.activate_group_menu(action.clone(), window, cx)
+                }));
+            // As with the heading, the separator rides inside the row's child.
             panel = panel.child(
                 div()
-                    .id(("group-menu-action", index))
                     .flex_none()
-                    .debug_selector(move || selector.clone())
-                    .when(starts_section && !first_port, |row| {
-                        row.mt(px(4.)).border_t_1().border_color(rgb(theme.active))
-                    })
-                    .min_h(px(self.config.ui.line_height() + 12.))
-                    .px(px(8.))
                     .flex()
-                    .items_center()
-                    .gap(px(8.))
-                    .cursor_pointer()
-                    .when(menu.selected == Some(index), |row| {
-                        row.bg(rgb(theme.active))
-                    })
-                    .hover(|row| row.bg(rgb(theme.active)))
-                    .child(match action.icon() {
-                        Some(icon) => svg()
-                            .path(icon)
-                            .size(px(ICON_SIZE))
-                            .flex_none()
-                            .text_color(rgb(theme.muted))
-                            .into_any_element(),
-                        None => div().size(px(ICON_SIZE)).flex_none().into_any_element(),
-                    })
-                    .child(
-                        div()
-                            .debug_selector(move || label.clone())
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .child(action.label()),
-                    )
-                    .when(!detail.is_empty(), |line| {
-                        line.child(
-                            div()
-                                .debug_selector(move || process.clone())
-                                .flex_none()
-                                .when(capped, |detail| detail.max_w(px(PROCESS_WIDTH)).truncate())
-                                .text_color(rgb(theme.muted))
-                                .child(detail),
+                    .flex_col()
+                    .when(separated, |run| {
+                        run.child(
+                            look.separator()
+                                .debug_selector(move || format!("group-menu-separator-{index}")),
                         )
                     })
-                    .children(close)
-                    .on_hover(cx.listener(move |this, hovered, _, cx| {
-                        if *hovered && let Some(menu) = &mut this.menu.group {
-                            menu.selected = Some(index);
-                            cx.notify();
-                        }
-                    }))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.activate_group_menu(action.clone(), window, cx)
-                    })),
+                    .child(row),
             );
         }
         panel

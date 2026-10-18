@@ -18,6 +18,7 @@ mod agent_filter;
 mod frecency;
 pub(crate) use frecency::{Frecency, now as unix_now};
 mod go_to;
+mod hints;
 #[cfg(test)]
 mod interaction_tests;
 mod keys;
@@ -139,6 +140,8 @@ struct Entry {
     parent: Option<usize>,
     /// The daemon-reported status of a Go To row's agent, if it has one.
     status: Option<herdr_client::protocol::AgentStatus>,
+    /// The mark of a Go To row's agent, drawn on the row's tile.
+    agent: Option<crate::icons::AgentIcon>,
     /// How choosing this row is remembered, for rows ranked by frecency.
     frecency: Option<frecency::Key>,
     /// Ranking points from how often and recently the row was chosen.
@@ -180,6 +183,7 @@ impl Entry {
             action,
             parent,
             status: None,
+            agent: None,
             frecency: None,
             boost: 0,
             fields,

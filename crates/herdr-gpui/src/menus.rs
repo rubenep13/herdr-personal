@@ -1,6 +1,7 @@
 //! Shared definitions for the macOS native and Linux in-window menu bars.
 //! Every item dispatches the same action the palette and the keymap use.
 
+pub(crate) mod icons;
 pub(crate) mod in_window;
 
 use crate::{

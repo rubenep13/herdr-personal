@@ -5,6 +5,9 @@
 
 use crate::config::FontConfig;
 
+mod menu;
+pub(crate) use menu::{Header, ItemState, Leading, MenuLook, keycaps, menu_hover};
+
 /// A host's or space's row.
 pub(crate) const ROW_HEIGHT: f32 = 34.;
 /// An agent's or tab's row: its name over its kind.

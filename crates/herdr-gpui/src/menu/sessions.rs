@@ -4,7 +4,7 @@
 //! Both lists are probes — a session socket outlives its daemon, and a device's
 //! sessions cost an SSH round trip — so this page is the only thing that asks.
 use super::{Page, colors, devices};
-use crate::{HerdrWindow, endpoint::Endpoint, sessions::DeviceScan};
+use crate::{HerdrWindow, design::ItemState, endpoint::Endpoint, sessions::DeviceScan};
 use gpui::{prelude::*, *};
 use herdr_client::{ConnectTarget, LocalSession};
 mod management;
@@ -346,6 +346,7 @@ impl HerdrWindow {
             .filter(|departure| matches_target(&departure.target))
             .map(|departure| departure.remaining(std::time::Instant::now()));
         let height = font.line_height() * 2. + 16.;
+        let look = self.menu_look();
         let removal = choice.clone();
         let removal_target = self.management_target(&choice);
         let removable = !matches!(choice, Row::Add(_));
@@ -359,7 +360,8 @@ impl HerdrWindow {
         let view = div()
             .id(("session-entry", row))
             .debug_selector(move || format!("sessions-row-{row}"))
-            .p(px(8.))
+            .px(look.at(10.))
+            .py(px(8.))
             .h(px(height))
             .line_height(px(font.line_height()))
             .rounded(px(crate::config::corners::CONTROL))
@@ -370,13 +372,14 @@ impl HerdrWindow {
             .when(selected, |s| s.bg(rgb(theme.active)))
             .when(spec.checked, |s| s.bg(rgb(theme.primary_wash())))
             .when(spec.enabled, |s| s.cursor_pointer())
-            .text_color(rgb(if spec.enabled {
-                theme.foreground
-            } else {
-                theme.muted
+            .text_color(look.ink(ItemState {
+                selected,
+                disabled: !spec.enabled,
+                ..ItemState::default()
             }))
             .child(
                 div()
+                    .debug_selector(move || format!("sessions-label-{row}"))
                     .flex_1()
                     .min_w_0()
                     .child(
@@ -453,8 +456,7 @@ impl HerdrWindow {
                 ))
             })
             .on_hover(cx.listener(move |this, hovered, _, cx| {
-                if *hovered {
-                    this.menu.selected = Some(row);
+                if crate::design::menu_hover(&mut this.menu.selected, row, *hovered) {
                     cx.notify();
                 }
             }))
@@ -504,14 +506,7 @@ impl HerdrWindow {
             let ordinal = children.iter().position(|index| *index == child);
             view = match entry {
                 Entry::Header { selector, text } => {
-                    let selector = selector.clone();
-                    view.child(
-                        div()
-                            .debug_selector(move || selector.clone())
-                            .p(px(8.))
-                            .text_color(rgb(theme.muted))
-                            .child(text.clone()),
-                    )
+                    view.child(self.menu_look().section(selector.clone(), text.clone()))
                 }
                 Entry::Muted { selector, text } => {
                     let selector = selector.clone();

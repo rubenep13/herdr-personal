@@ -89,7 +89,8 @@ fn compact_menu_and_long_lists_fit_a_narrow_short_window(cx: &mut TestAppContext
     draw(cx);
     cx.simulate_keystrokes("end");
     draw(cx);
-    let panel = cx.debug_bounds("application-menu-panel").unwrap();
+    // Terminal's entries open in their own panel beside the categories.
+    let panel = cx.debug_bounds("application-menu-panel-1").unwrap();
     let last = cx.debug_bounds("application-item-Reconnect").unwrap();
     assert!(panel.contains(&last.center()));
     assert!(panel.left() >= px(0.) && panel.right() <= px(360.));

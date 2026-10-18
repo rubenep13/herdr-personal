@@ -47,6 +47,8 @@ pub(crate) use {
 };
 
 pub(crate) use layout::SidebarMetrics;
+/// The agent marks the tree draws, shared with the palette's rows.
+pub(crate) use layouts::{badge, badge_color, logo_color, pill, tile};
 pub(crate) use order::step as sidebar_step;
 
 #[cfg(any(test, feature = "integration-test"))]

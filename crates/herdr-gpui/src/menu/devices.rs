@@ -19,7 +19,7 @@ pub(crate) use host_menu::HostMenu;
 pub(super) use wsl::WslSetup;
 
 use super::{Page, colors};
-use crate::{Command, HerdrWindow};
+use crate::{Command, HerdrWindow, design::ItemState};
 use gpui::{prelude::*, *};
 use herdr_client::ConnectTarget;
 use rail::add_device_offer;
@@ -446,6 +446,7 @@ impl HerdrWindow {
             false,
             self.device_setup_unavailable().is_none(),
         ));
+        let look = self.menu_look();
         let mut view = div()
             .id("devices-list")
             .max_h(device_list_height(self.menu.anchor.y))
@@ -454,19 +455,20 @@ impl HerdrWindow {
             .flex()
             .flex_col()
             .gap(px(4.))
-            .child(
-                div()
-                    .p(px(8.))
-                    .text_color(rgb(self.theme.muted))
-                    .child("DEVICES"),
-            );
+            .child(look.section("devices-heading".into(), "DEVICES"));
         for (index, (label, detail, checked, enabled)) in rows.into_iter().enumerate() {
             let endpoint = index.checked_sub(1).and_then(|i| self.endpoints.get(i));
+            let state = ItemState {
+                selected: self.menu.selected == Some(index),
+                disabled: !enabled,
+                ..ItemState::default()
+            };
             view = view.child(
                 div()
                     .id(("device-row", index))
                     .debug_selector(move || format!("device-row-{index}"))
-                    .p(px(8.))
+                    .px(look.at(10.))
+                    .py(px(8.))
                     .rounded(px(crate::config::corners::CONTROL))
                     .flex_none()
                     .flex()
@@ -479,11 +481,7 @@ impl HerdrWindow {
                     // its current session, rather than with a trailing check.
                     .when(checked, |s| s.bg(rgb(self.theme.primary_wash())))
                     .when(enabled, |s| s.cursor_pointer())
-                    .text_color(rgb(if enabled {
-                        self.theme.foreground
-                    } else {
-                        self.theme.muted
-                    }))
+                    .text_color(look.ink(state))
                     .child(
                         div()
                             .flex_1()
@@ -500,7 +498,10 @@ impl HerdrWindow {
                                                 .path("icons/devices.svg")
                                                 .size(px(16.))
                                                 .flex_none()
-                                                .text_color(rgb(self.theme.foreground)),
+                                                .text_color(rgb(self.theme.foreground))
+                                                .debug_selector(move || {
+                                                    format!("device-row-{index}-icon")
+                                                }),
                                         )
                                     })
                                     .when(index > self.endpoints.len(), |row| {
@@ -513,7 +514,10 @@ impl HerdrWindow {
                                                     self.theme.foreground
                                                 } else {
                                                     self.theme.muted
-                                                })),
+                                                }))
+                                                .debug_selector(move || {
+                                                    format!("device-row-{index}-icon")
+                                                }),
                                         )
                                     })
                                     .child(
@@ -553,8 +557,7 @@ impl HerdrWindow {
                         )
                     })
                     .on_hover(cx.listener(move |this, hovered, _, cx| {
-                        if *hovered {
-                            this.menu.selected = Some(index);
+                        if crate::design::menu_hover(&mut this.menu.selected, index, *hovered) {
                             cx.notify();
                         }
                     }))
@@ -583,10 +586,8 @@ impl HerdrWindow {
     fn cloud_job_rows(&self, mut view: Stateful<Div>) -> Stateful<Div> {
         if !self.cloud_jobs.is_empty() {
             view = view.child(
-                div()
-                    .p(px(8.))
-                    .text_color(rgb(self.theme.muted))
-                    .child("ADDING"),
+                self.menu_look()
+                    .section("devices-adding-heading".into(), "ADDING"),
             );
         }
         for (index, provision) in self.cloud_jobs.iter().enumerate() {

@@ -166,6 +166,57 @@ impl HerdrWindow {
         cx.notify();
     }
 
+    /// Opens the submenu at `index` of `level` as the pointer rests on it,
+    /// closing any deeper one.
+    fn application_open(&mut self, level: usize, index: usize, cx: &mut Context<Self>) {
+        let Some(menu) = &mut self.menu.application else {
+            return;
+        };
+        if menu.path.len() == level + 1 && menu.path.get(level) == Some(&index) {
+            return;
+        }
+        menu.path.truncate(level);
+        menu.path.push(index);
+        menu.selected = None;
+        cx.notify();
+    }
+
+    /// The pointer on an entry of `level`: it closes any deeper submenu and
+    /// selects the entry, and leaving it restores the level.
+    fn application_hover(
+        &mut self,
+        level: usize,
+        index: usize,
+        hovered: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(menu) = &mut self.menu.application else {
+            return;
+        };
+        if hovered && menu.path.len() > level {
+            menu.path.truncate(level);
+            menu.selected = None;
+        }
+        if menu.path.len() == level && crate::design::menu_hover(&mut menu.selected, index, hovered)
+        {
+            cx.notify();
+        }
+    }
+
+    /// A click on a row of `level` chooses it there, whatever was open deeper.
+    fn application_click(
+        &mut self,
+        level: usize,
+        index: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(menu) = &mut self.menu.application {
+            menu.path.truncate(level);
+        }
+        self.application_choose(index, window, cx);
+    }
+
     fn application_back(&mut self, cx: &mut Context<Self>) {
         if let Some(menu) = &mut self.menu.application {
             let selected = menu.path.pop();

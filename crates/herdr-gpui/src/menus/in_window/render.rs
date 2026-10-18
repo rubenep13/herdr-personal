@@ -1,8 +1,20 @@
 //! The application menu's button and its bounded, scrollable dropdown.
 
 use super::*;
-use crate::fonts::StyledFont;
+use crate::{
+    design::{ItemState, Leading},
+    fonts::StyledFont,
+    menus::icons::{action_icon, category_icon},
+};
 use gpui::prelude::*;
+
+/// The menu tree's widths at `[ui] size = 12`: the categories, each
+/// submenu, and the gap between a level and the next.
+const CATEGORIES_WIDTH: f32 = 240.;
+const SUBMENU_WIDTH: f32 = 340.;
+const SUBMENU_GAP: f32 = 4.;
+/// Keeps rows' element IDs apart across levels.
+const ITEMS_PER_LEVEL: usize = 1000;
 
 impl HerdrWindow {
     /// The button that opens the application menu where Linux has no global
@@ -87,7 +99,7 @@ impl HerdrWindow {
     }
 
     pub(crate) fn render_application_menu(&self, cx: &mut Context<Self>) -> Stateful<Div> {
-        let overlay = div()
+        let mut overlay = div()
             .id("application-menu-overlay")
             .debug_selector(|| "application-menu-overlay".into())
             .absolute()
@@ -123,41 +135,119 @@ impl HerdrWindow {
             .first()
             .copied()
             .unwrap_or(bar);
-        let font = &self.config.ui;
-        let theme = &self.theme;
-        let width = px(380. * font.size / 12.).min((content.size.width - px(16.)).max(px(0.)));
-        let top = bar.bottom();
-        let current = menu.current();
-        let items = current.map(|menu| menu.items.clone()).unwrap_or_else(|| {
+        let look = self.menu_look();
+        let room = (content.size.width - px(16.)).max(px(0.));
+        // The menus as a tree: the categories, then each submenu the path
+        // opens, beside the row that opened it.
+        let mut levels = vec![
             menu.menus
                 .iter()
                 .cloned()
                 .map(OwnedMenuItem::Submenu)
-                .collect()
-        });
+                .collect::<Vec<_>>(),
+        ];
+        for index in &menu.path {
+            let Some(OwnedMenuItem::Submenu(next)) =
+                levels.last().and_then(|items| items.get(*index))
+            else {
+                break;
+            };
+            levels.push(next.items.clone());
+        }
+        let depth = levels.len() - 1;
+        let mut width = look.at(CATEGORIES_WIDTH).min(room);
+        let mut origin = point(
+            button
+                .left()
+                .min((content.right() - width - px(8.)).max(content.left() + px(8.)))
+                .max(content.left() + px(8.)),
+            bar.bottom(),
+        );
+        for (level, items) in levels.into_iter().enumerate() {
+            let heights: Vec<Pixels> = items
+                .iter()
+                .map(|item| match item {
+                    OwnedMenuItem::Separator => px(look.separator_height()),
+                    _ => px(look.row_height()),
+                })
+                .collect();
+            let max_height = if level == 0 {
+                (content.bottom() - origin.y - px(8.)).max(px(0.))
+            } else {
+                (content.size.height - px(16.)).max(px(0.))
+            };
+            overlay = overlay.child(
+                anchored()
+                    .position(origin)
+                    .snap_to_window_with_margin(Edges::all(px(8.)))
+                    .child(self.application_panel((level, depth), items, (width, max_height), cx)),
+            );
+            // The next level opens beside this one, its first row level with
+            // the row that opened it; without room on the right it opens on
+            // the left, and failing that it overlaps.
+            let Some(&opened) = menu.path.get(level) else {
+                break;
+            };
+            let next_width = look.at(SUBMENU_WIDTH).min(room);
+            let right = origin.x + width + look.at(SUBMENU_GAP);
+            let left = origin.x - next_width - look.at(SUBMENU_GAP);
+            let x = if right + next_width <= content.right() - px(8.) {
+                right
+            } else if left >= content.left() + px(8.) {
+                left
+            } else {
+                (content.right() - next_width - px(8.)).max(content.left() + px(8.))
+            };
+            let above: Pixels = heights.iter().take(opened).copied().sum();
+            origin = point(x, origin.y + above);
+            width = next_width;
+        }
+        overlay
+    }
+
+    /// One level of the menu tree. The row the path continues through stays
+    /// highlighted; on the deepest level, the selection is.
+    fn application_panel(
+        &self,
+        (level, depth): (usize, usize),
+        items: Vec<OwnedMenuItem>,
+        (width, max_height): (Pixels, Pixels),
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let font = &self.config.ui;
+        let look = self.menu_look();
+        let Some(menu) = &self.menu.application else {
+            return div().id(("application-menu-panel", level));
+        };
+        let highlighted = if level < depth {
+            menu.path.get(level).copied()
+        } else {
+            menu.selected
+        };
         let mut rows = div()
-            .id("application-menu-rows")
+            .id(("application-menu-rows", level))
             .flex()
             .flex_col()
             .min_h_0()
             .overflow_y_scroll()
-            .track_scroll(&menu.scroll);
+            .when(level == depth, |rows| rows.track_scroll(&menu.scroll));
         for (index, item) in items.into_iter().enumerate() {
-            let (name, disabled, checked, detail) = match item {
+            // A submenu ends in a chevron; an action, in its shortcut.
+            let (name, disabled, checked, icon, shortcut) = match item {
                 OwnedMenuItem::Separator => {
                     rows = rows.child(
-                        div()
-                            .flex_none()
-                            .h(px(1.))
-                            .my(px(4.))
-                            .mx(px(8.))
-                            .bg(rgb(theme.active)),
+                        look.separator()
+                            .debug_selector(move || format!("application-separator-{index}")),
                     );
                     continue;
                 }
-                OwnedMenuItem::Submenu(menu) => {
-                    (menu.name.to_string(), menu.disabled, false, "›".to_owned())
-                }
+                OwnedMenuItem::Submenu(menu) => (
+                    menu.name.to_string(),
+                    menu.disabled,
+                    false,
+                    category_icon(&menu.name),
+                    None,
+                ),
                 OwnedMenuItem::Action {
                     name,
                     action,
@@ -165,114 +255,113 @@ impl HerdrWindow {
                     checked,
                     ..
                 } => {
-                    let detail = self.application_shortcut(action.as_ref(), cx);
-                    (name, disabled, checked, detail)
-                }
-                OwnedMenuItem::SystemMenu(menu) => {
-                    (menu.name.to_string(), true, false, String::new())
-                }
-            };
-            let selector = format!("application-item-{name}");
-            rows = rows.child(
-                div()
-                    .id(("application-item", index))
-                    .debug_selector(move || selector.clone())
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .gap(px(8.))
-                    .px(px(8.))
-                    .min_h(px(font.line_height() + 10.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .when(menu.selected == Some(index), |row| {
-                        row.bg(rgb(theme.active))
-                    })
-                    .when(disabled, |row| row.text_color(rgb(theme.muted)))
-                    .when(!disabled, |row| row.cursor_pointer())
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(14.))
-                            .child(if checked { "✓" } else { "" }),
+                    let shortcut = self.application_shortcut(action.as_ref(), cx);
+                    (
+                        name,
+                        disabled,
+                        checked,
+                        action_icon(action.as_ref()),
+                        Some(shortcut),
                     )
-                    .child(div().flex_1().min_w_0().overflow_hidden().child(name))
-                    .child(div().flex_none().text_color(rgb(theme.muted)).child(detail))
-                    .on_hover(cx.listener(move |this, hovered, _, cx| {
-                        if *hovered
-                            && !disabled
-                            && let Some(menu) = &mut this.menu.application
-                        {
-                            menu.selected = Some(index);
-                            cx.notify();
+                }
+                OwnedMenuItem::SystemMenu(menu) => (
+                    menu.name.to_string(),
+                    true,
+                    false,
+                    None,
+                    Some(String::new()),
+                ),
+            };
+            let submenu = shortcut.is_none();
+            let selector = format!("application-item-{name}");
+            let leading = match icon {
+                _ if checked => Leading::Check,
+                Some(icon) => Leading::Icon(icon, format!("{selector}-icon")),
+                None => Leading::Empty,
+            };
+            let state = ItemState {
+                selected: highlighted == Some(index),
+                disabled,
+                danger: false,
+            };
+            let end = match shortcut {
+                Some(shortcut) => look
+                    .keys(&format!("{selector}-detail"), &shortcut)
+                    .into_any_element(),
+                None => look
+                    .submenu(format!("application-submenu-{name}"))
+                    .into_any_element(),
+            };
+            rows = rows.child(
+                look.row(
+                    ("application-item", level * ITEMS_PER_LEVEL + index),
+                    selector.clone(),
+                    leading,
+                    state,
+                )
+                .child(look.label(format!("{selector}-label"), name))
+                .child(end)
+                .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                    if disabled {
+                        return;
+                    }
+                    if submenu {
+                        if *hovered {
+                            this.application_open(level, index, cx);
                         }
-                    }))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        cx.stop_propagation();
-                        this.application_choose(index, window, cx);
-                    })),
+                    } else {
+                        this.application_hover(level, index, *hovered, cx);
+                    }
+                }))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.application_click(level, index, window, cx);
+                })),
             );
         }
+        let selector = if level == 0 {
+            "application-menu-panel".to_owned()
+        } else {
+            format!("application-menu-panel-{level}")
+        };
         let cover = self.menu.cover.clone();
-        let panel = div()
-            .id("application-menu-panel")
-            .debug_selector(|| "application-menu-panel".into())
+        div()
+            .id(("application-menu-panel", level))
+            .debug_selector(move || selector)
             .relative()
             .w(width)
-            .max_h((content.bottom() - top - px(8.)).max(px(0.)))
+            .max_h(max_height)
             .flex()
             .flex_col()
             .overflow_hidden()
-            .p(px(5.))
-            .bg(rgb(theme.surface))
-            .text_color(rgb(theme.foreground))
+            .p(px(6.))
+            .map(|panel| look.panel(panel))
+            .text_color(look.ink(ItemState::default()))
             .text_font(font)
             .text_size(px(font.size))
             .line_height(px(font.line_height()))
-            .border_1()
-            .border_color(rgb(theme.active))
-            .rounded(px(crate::config::corners::PANEL))
-            .shadow_lg()
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
-            .when_some(current, |panel, current| {
-                panel.child(
-                    div()
-                        .id("application-menu-back")
-                        .debug_selector(|| "application-menu-back".into())
-                        .flex_none()
-                        .p(px(8.))
-                        .cursor_pointer()
-                        .child(format!("‹  {}", current.name))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.application_back(cx);
-                        })),
-                )
-            })
             .child(rows)
             .child(
                 canvas(
+                    // The categories lay out first each frame and reset what
+                    // the menu covers; each open submenu adds its own panel.
                     move |bounds, _, _| {
-                        cover.set(crate::menu::Cover::Panel(bounds.dilate(px(8.))));
+                        let bounds = bounds.dilate(px(8.));
+                        cover.set(match cover.get() {
+                            crate::menu::Cover::Panel(covered) if level > 0 => {
+                                crate::menu::Cover::Panel(covered.union(&bounds))
+                            }
+                            _ => crate::menu::Cover::Panel(bounds),
+                        });
                     },
                     |_, _, _, _| {},
                 )
                 .absolute()
                 .inset_0(),
-            );
-        overlay.child(
-            anchored()
-                .position(point(
-                    button
-                        .left()
-                        .min((content.right() - width - px(8.)).max(content.left() + px(8.)))
-                        .max(content.left() + px(8.)),
-                    top,
-                ))
-                .snap_to_window_with_margin(Edges::all(px(8.)))
-                .child(panel),
-        )
+            )
     }
 }

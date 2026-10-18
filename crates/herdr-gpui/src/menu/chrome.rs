@@ -2,16 +2,21 @@
 //! the panes beneath, and painting the page the menu is currently on. Geometry
 //! here is the same geometry used for hit testing and IME placement.
 
+pub(super) mod items;
 mod keys;
 
 use super::{MENU_MARGIN, Page, WorkspaceAction, devices::rail};
-use crate::{HerdrWindow, actions, fonts::StyledFont};
+use crate::{HerdrWindow, actions, design::Leading, fonts::StyledFont};
 use gpui::{prelude::*, *};
 use herdr_client::Method;
 
 /// How far past its panel a popover counts as covering, for the native pages
 /// that step aside for it.
 const COVER_MARGIN: f32 = 8.;
+
+/// The footer menu's width at `[ui] size = 12`: its longest label, an icon
+/// and the row's insets.
+const FOOTER_MENU_WIDTH: f32 = 240.;
 
 impl HerdrWindow {
     pub(crate) fn show_install_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -69,6 +74,11 @@ impl HerdrWindow {
         if self.menu.page.is_none() && self.menu.focus.is_focused(window) {
             window.focus(&self.focus, cx);
         }
+    }
+
+    /// The redesigned menus' look, for this window's theme and `[ui]` face.
+    pub(crate) fn menu_look(&self) -> crate::design::MenuLook {
+        crate::design::MenuLook::of(&self.theme, &self.config.ui, self.theme_light)
     }
 
     pub(crate) fn menu_target_current(&self) -> bool {
@@ -230,7 +240,7 @@ impl HerdrWindow {
         let width = if list {
             super::devices::MENU_WIDTH
         } else {
-            180.
+            FOOTER_MENU_WIDTH * self.config.ui.size / 12.
         };
         let left = match page {
             Page::Devices => self.menu.anchor.x,
@@ -533,11 +543,22 @@ impl HerdrWindow {
             .when(page == Page::About, |panel| {
                 panel.w((viewport.width - px(24.)).max(px(0.)).min(px(340.)))
             })
-            .rounded(px(crate::config::corners::PANEL))
-            .border_1()
-            .border_color(rgb(theme.active))
-            .bg(rgb(theme.surface))
-            .text_color(rgb(theme.foreground))
+            .map(|panel| {
+                // Menus and pickers wear the redesigned panel; a session's
+                // create or delete form is a dialog and keeps the old one.
+                if page.redesigned() && !session_modal {
+                    let look = self.menu_look();
+                    look.panel(panel)
+                        .text_color(look.ink(crate::design::ItemState::default()))
+                } else {
+                    panel
+                        .rounded(px(crate::config::corners::PANEL))
+                        .border_1()
+                        .border_color(rgb(theme.active))
+                        .bg(rgb(theme.surface))
+                        .text_color(rgb(theme.foreground))
+                }
+            })
             .text_font(font)
             .text_size(px(font.size))
             .line_height(px(font.line_height()))
@@ -556,19 +577,17 @@ impl HerdrWindow {
                 }))
             });
         if page == Page::Menu {
+            let look = self.menu_look();
             for (index, item) in self.menu_items().into_iter().enumerate() {
+                let state = crate::design::ItemState {
+                    selected: Some(index) == self.menu.selected,
+                    ..Default::default()
+                };
+                let leading = items::icon(item).map_or(Leading::Empty, |icon| {
+                    Leading::Icon(icon, format!("menu-{item}-icon"))
+                });
                 panel = panel.child(
-                    div()
-                        .id(item)
-                        .debug_selector(move || format!("menu-{item}"))
-                        .min_h(px(font.line_height() + 12.))
-                        .px(px(8.))
-                        .flex()
-                        .items_center()
-                        .cursor_pointer()
-                        .when(Some(index) == self.menu.selected, |row| {
-                            row.bg(rgb(theme.active))
-                        })
+                    look.row(item, format!("menu-{item}"), leading, state)
                         .on_hover(cx.listener(move |this, hovered, _, cx| {
                             if *hovered {
                                 this.menu.selected = Some(index);
@@ -577,7 +596,7 @@ impl HerdrWindow {
                             }
                             cx.notify();
                         }))
-                        .child(item)
+                        .child(look.label(format!("menu-{item}-label"), items::label(item)))
                         .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
                             this.activate_menu(item, window, cx);

@@ -1,9 +1,14 @@
 //! The picker paints ranked rows; ranking and input live elsewhere.
 
 use super::{CodeSearch, Mode, Status, rank};
-use crate::{HerdrWindow, code_index::Change, config::Theme};
+use crate::{HerdrWindow, code_index::Change, config::Theme, design::ItemState};
 use gpui::{prelude::*, *};
 use std::time::SystemTime;
+
+/// How far the list's rows keep from the panel's edges, and the footer's
+/// height, at `[ui] size = 12`, as the palette's.
+const LIST_INSET: f32 = 6.;
+const FOOTER_HEIGHT: f32 = 36.;
 
 /// How long ago a change was last written, as `5m` or `3h`.
 fn age(modified: Option<SystemTime>) -> Option<String> {
@@ -74,21 +79,22 @@ impl HerdrWindow {
             .as_ref()
             .map(|index| index.root().display().to_string())
             .unwrap_or_default();
+        let look = self.menu_look();
         div()
             .flex_none()
-            .p(px(16.))
-            .border_b_1()
-            .border_color(rgb(theme.active))
             .child(
                 div()
+                    .px(look.at(18.))
+                    .pt(look.at(14.))
                     .flex()
                     .items_center()
-                    .gap(px(12.))
+                    .gap(look.at(12.))
                     .child(
                         div()
                             .flex_none()
-                            .text_size(px(self.config.ui.size * 1.35))
+                            .text_size(px(look.scale().name))
                             .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(rgb(theme.foreground))
                             .child(match code.mode {
                                 Mode::Symbols => "Go to Symbol",
                                 Mode::Files => "Go to File",
@@ -99,41 +105,39 @@ impl HerdrWindow {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .text_color(rgb(theme.muted))
+                            .text_size(px(look.scale().secondary))
+                            .text_color(look.muted())
                             .child(root),
                     ),
             )
-            .child(div().pt(px(12.)).child(code.search.clone()))
+            .child(look.query("code-search-search-icon", code.search.clone()))
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(6.))
-                    .pt(px(10.))
+                look.tabs("code-search-modes")
                     .children(Mode::ALL.into_iter().map(|mode| {
-                        div()
-                            .id(("code-search-mode", mode as usize))
-                            .debug_selector(move || {
-                                format!("code-search-mode-{}", mode.label().to_lowercase())
-                            })
-                            .px_2()
-                            .py_1()
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .cursor_pointer()
-                            .when(mode == code.mode, |tab| tab.bg(rgb(theme.active)))
-                            .hover(|tab| tab.bg(rgb(theme.active)))
-                            .child(mode.label())
-                            .on_click(cx.listener(move |this, _, window, cx| {
+                        look.tab(
+                            ("code-search-mode", mode as usize),
+                            format!("code-search-mode-{}", mode.label().to_lowercase()),
+                            "code-search-mode-underline",
+                            mode == code.mode,
+                        )
+                        .child(mode.label())
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
                                 this.set_code_search_mode(mode, window, cx);
-                            }))
+                            },
+                        ))
                     }))
                     .child(
                         div()
+                            .ml_auto()
                             .flex_1()
                             .min_w_0()
+                            .self_center()
+                            .pr(look.at(6.))
                             .truncate()
                             .text_right()
-                            .text_color(rgb(theme.muted))
+                            .text_size(px(look.scale().detail))
+                            .text_color(look.muted())
                             .child(summary),
                     ),
             )
@@ -144,7 +148,7 @@ impl HerdrWindow {
         code: &CodeSearch,
         row: usize,
         cx: &mut Context<Self>,
-    ) -> Option<Stateful<Div>> {
+    ) -> Option<Div> {
         let hit = code.hits.get(row)?;
         let index = code.index.as_ref()?;
         let label: SharedString = rank::label(index, code.mode, hit.item).to_owned().into();
@@ -173,40 +177,70 @@ impl HerdrWindow {
         };
         let label = StyledText::new(label)
             .with_highlights(hit.highlights.iter().map(|range| (range.clone(), matched)));
+        let look = self.menu_look();
+        let state = ItemState {
+            selected: row == code.selected,
+            ..ItemState::default()
+        };
+        let mark = match code.mode {
+            Mode::Symbols => "icons/code.svg",
+            Mode::Files => "icons/file.svg",
+        };
+        let row_element = look
+            .list_row(row, format!("code-search-row-{row}"), state)
+            .flex_1()
+            .min_w_0()
+            .child(crate::sidebar::tile(
+                format!("code-search-tile-{row}"),
+                mark,
+                theme.muted,
+                state.selected,
+                theme,
+            ))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(1.))
+                    .child(
+                        div()
+                            .truncate()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(label),
+                    )
+                    .when(!detail.is_empty(), |column| {
+                        column.child(
+                            div()
+                                .truncate()
+                                .text_size(px(look.scale().detail))
+                                .text_color(look.muted())
+                                .child(detail),
+                        )
+                    }),
+            )
+            .child(badge.flex_none().text_size(px(look.scale().secondary)))
+            // As in the palette, the row under the pointer is the selected one.
+            .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                if *hovered
+                    && let Some(code) = &mut this.menu.code_search
+                    && code.selected != row
+                {
+                    code.selected = row;
+                    cx.notify();
+                }
+            }))
+            .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                let viewer = event.modifiers().secondary();
+                this.activate_code_search(row, viewer, window, cx);
+            }));
         Some(
             div()
-                .id(row)
-                .debug_selector(move || format!("code-search-row-{row}"))
                 .w_full()
-                .h(px(self.config.ui.line_height() * 2. + 12.))
-                .px(px(16.))
                 .flex()
-                .items_center()
-                .gap(px(12.))
-                .cursor_pointer()
-                .when(row == code.selected, |div| div.bg(rgb(self.theme.active)))
-                .hover(|s| s.bg(rgb(self.theme.active)))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .flex()
-                        .flex_col()
-                        .child(div().truncate().child(label))
-                        .when(!detail.is_empty(), |column| {
-                            column.child(
-                                div()
-                                    .truncate()
-                                    .text_color(rgb(self.theme.muted))
-                                    .child(detail),
-                            )
-                        }),
-                )
-                .child(badge.flex_none())
-                .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
-                    let viewer = event.modifiers().secondary();
-                    this.activate_code_search(row, viewer, window, cx);
-                })),
+                .px(look.at(LIST_INSET))
+                .child(row_element),
         )
     }
 
@@ -224,6 +258,7 @@ impl HerdrWindow {
             }),
             _ => None,
         };
+        let look = self.menu_look();
         div()
             .flex()
             .flex_col()
@@ -262,11 +297,16 @@ impl HerdrWindow {
             .child(
                 div()
                     .flex_none()
-                    .px(px(16.))
-                    .py(px(10.))
+                    .h(look.at(FOOTER_HEIGHT))
+                    .px(look.at(16.))
+                    .flex()
+                    .items_center()
+                    .overflow_hidden()
                     .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .text_color(rgb(theme.muted))
+                    .border_color(look.line())
+                    .bg(rgb(theme.surface))
+                    .text_size(px(look.scale().detail))
+                    .text_color(look.muted())
                     .child(if cfg!(target_os = "macos") {
                         "↑ / ↓ navigate · Tab symbols/files · Enter editor · ⌘Enter viewer · Esc cancel"
                     } else {

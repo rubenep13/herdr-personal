@@ -435,7 +435,7 @@ impl OrchestratorView {
             ));
         }
         if let Some(error) = &self.snapshot.error {
-            banners.push(banner(look, RED, "icons/x.svg", error.to_string()));
+            banners.push(banner(look, RED, "icons/close.svg", error.to_string()));
         }
         for status in &self.snapshot.sources {
             let text = match &status.state {

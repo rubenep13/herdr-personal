@@ -18,7 +18,11 @@
 >   agent tiles, tab strips under the header, and a quieter status bar. Its
 >   options (`[sidebar] hierarchy`, `tree_tabs`, `state_text`,
 >   `agent_details`; `[tabs] content`, `position`) are described in the
->   [crate README](crates/herdr-gpui/README.md#title-bar).
+>   [crate README](crates/herdr-gpui/README.md#title-bar). The menus (≡, the
+>   space, pane, tab and host menus, the device and session lists, the Git
+>   popup), the command palette and Go to Symbol/File share that look: rows
+>   led by icons, a rounded selection inside the panel, underlined tabs, and
+>   the theme's colours.
 > - A Git graph tab shows the workspace's repository as a read-only graph,
 >   locally or on an SSH host, with the look of
 >   [herdr-git-graph](https://github.com/rubenep13/herdr-git-graph): lanes,

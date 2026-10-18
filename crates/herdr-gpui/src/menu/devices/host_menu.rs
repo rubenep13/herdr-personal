@@ -6,6 +6,7 @@ use super::setup;
 use crate::{
     HerdrWindow,
     config::{Config, KeybindingSource},
+    design::{Header, ItemState, Leading},
     github::Account,
     menu::Page,
     search_input::SearchInput,
@@ -26,6 +27,25 @@ enum Action {
     #[cfg(feature = "cloud")]
     ProviderSettings,
     Remove,
+}
+
+impl Action {
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Rename => "icons/pencil.svg",
+            Self::ServerKeybindings => "icons/keyboard.svg",
+            Self::ForwardPort => "icons/arrow-right.svg",
+            Self::Theme => "icons/theme.svg",
+            #[cfg(feature = "cloud")]
+            Self::ProviderSettings => "icons/settings.svg",
+            Self::Remove => "icons/trash.svg",
+        }
+    }
+
+    /// Removing the device is the menu's one destructive action.
+    fn danger(self) -> bool {
+        self == Self::Remove
+    }
 }
 
 const SSH_ACTIONS: &[(Action, &str)] = &[
@@ -540,95 +560,72 @@ impl HerdrWindow {
             return div();
         };
         let theme = &self.theme;
+        let look = self.menu_look();
         let mut body = div().flex().flex_col();
         if self.menu.page == Some(Page::Host) {
             // Name the device first, so the destructive row below cannot be
             // mistaken for acting on another host.
+            let place = format!("{} · {}", host.target, host.session);
             body = body.child(
                 // No width of its own, so a long name or target ends with
                 // "…" instead of widening the menu past its actions.
-                div()
-                    .debug_selector(|| "host-menu-header".into())
-                    .w_0()
-                    .min_w_full()
-                    .px(px(8.))
-                    .pt(px(4.))
-                    .pb(px(8.))
-                    .mb(px(4.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        div()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .truncate()
-                            .child(host.label.clone()),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(self.config.ui.size * 0.85))
-                            .text_color(rgb(theme.muted))
-                            .truncate()
-                            .child(format!("{} · {}", host.target, host.session)),
-                    ),
+                look.header(Header {
+                    selector: "host-menu-header",
+                    icon: "icons/computer.svg",
+                    title: ("host-menu-name", &host.label),
+                    sub: Some(("icons/sessions.svg", "host-menu-place", &place)),
+                })
+                .w_0()
+                .min_w_full(),
             );
             let server_keys = self.config.keybinding_source(&host.id) == KeybindingSource::Server;
             let device_theme = self.device_theme_value(&host.id).map(str::to_owned);
             for (index, &(action, label)) in host.actions().iter().enumerate() {
                 let toggle = action == Action::ServerKeybindings;
+                let state = ItemState {
+                    selected: host.selected == Some(index),
+                    danger: action.danger(),
+                    ..ItemState::default()
+                };
                 body = body.child(
-                    div()
-                        .id(("host-menu-action", index))
-                        .debug_selector(move || format!("host-menu-{index}"))
-                        .min_h(px(self.config.ui.line_height() + 12.))
-                        .px(px(8.))
-                        .flex()
-                        .items_center()
-                        .gap(px(8.))
-                        .cursor_pointer()
-                        .when(toggle, |row| {
-                            row.child(crate::toggles::checkbox(
-                                theme,
-                                self.config.ui.size + 2.,
-                                server_keys,
-                            ))
-                        })
-                        .when(action == Action::Remove, |row| {
-                            row.text_color(crate::menu::danger(theme))
-                        })
-                        .when(host.selected == Some(index), |row| {
-                            row.bg(rgb(theme.active))
-                        })
-                        .hover(|row| row.bg(rgb(theme.active)))
-                        .child(
-                            div()
-                                .debug_selector(move || format!("host-menu-label-{index}"))
-                                .min_w_0()
-                                .truncate()
-                                .child(label),
-                        )
-                        .when_some(
-                            device_theme.clone().filter(|_| action == Action::Theme),
-                            |row, name| {
-                                row.child(
-                                    div()
-                                        .debug_selector(|| "host-menu-theme".into())
-                                        .ml_auto()
-                                        .min_w_0()
-                                        .truncate()
-                                        .text_color(rgb(theme.muted))
-                                        .child(name),
-                                )
-                            },
-                        )
-                        .on_hover(cx.listener(move |this, hovered, _, cx| {
-                            if *hovered && let Some(host) = &mut this.menu.host {
-                                host.selected = Some(index);
-                                cx.notify();
-                            }
-                        }))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.activate_host_menu(action, window, cx)
-                        })),
+                    look.row(
+                        ("host-menu-action", index),
+                        format!("host-menu-{index}"),
+                        Leading::Icon(action.icon(), format!("host-menu-{index}-icon")),
+                        state,
+                    )
+                    .child(look.label(format!("host-menu-label-{index}"), label))
+                    .when(toggle, |row| {
+                        row.child(crate::toggles::checkbox(
+                            theme,
+                            self.config.ui.size + 2.,
+                            server_keys,
+                        ))
+                    })
+                    .when_some(
+                        device_theme.clone().filter(|_| action == Action::Theme),
+                        |row, name| {
+                            row.child(
+                                div()
+                                    .debug_selector(|| "host-menu-theme".into())
+                                    .ml_auto()
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_color(rgb(theme.muted))
+                                    .child(name),
+                            )
+                        },
+                    )
+                    .on_hover(cx.listener(move |this, hovered, _, cx| {
+                        if let Some(host) = &mut this.menu.host
+                            && crate::design::menu_hover(&mut host.selected, index, *hovered)
+                        {
+                            cx.notify();
+                        }
+                    }))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.activate_host_menu(action, window, cx)
+                    })),
                 );
                 // Opting in never silently changes nothing: say why the
                 // device is still on local keys.

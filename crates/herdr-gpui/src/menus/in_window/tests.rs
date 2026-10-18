@@ -21,6 +21,7 @@ fn draw(cx: &mut VisualTestContext) {
 mod dragging;
 #[cfg(target_os = "linux")]
 mod linux;
+mod look;
 mod navigation;
 #[cfg(target_os = "linux")]
 mod resizing;

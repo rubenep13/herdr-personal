@@ -337,7 +337,7 @@ impl MenuState {
             themes: None,
             palette: None,
             palette_resume: None,
-            palette_preview: true,
+            palette_preview: false,
             code_search: None,
             close: None,
             pr: Default::default(),

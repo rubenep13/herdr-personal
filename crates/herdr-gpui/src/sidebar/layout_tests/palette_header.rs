@@ -18,9 +18,10 @@ fn palette_query_spans_the_top_in_a_larger_font(cx: &mut gpui::TestAppContext) {
     let search = cx.debug_bounds("theme-search").unwrap();
     let status = cx.debug_bounds("palette-status").unwrap();
     let filter = cx.debug_bounds("palette-filter-all").unwrap();
-    assert!(search.size.height >= px(line * 1.5) - px(0.5));
-    // Only the field's own inset separates it from the panel's edges.
-    assert!(status.size.width - search.size.width <= px(40.5));
+    assert!(search.size.height >= px(line * 1.4) - px(0.5));
+    // Only the row's 18 px insets and the search icon (18 px and its 12 px
+    // gap) separate the field from the panel's edges.
+    assert!(status.size.width - search.size.width <= px(66.5));
     assert!(status.size.width > px(480.));
     assert!(filter.top() >= search.bottom());
 }

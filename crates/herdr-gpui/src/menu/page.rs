@@ -133,6 +133,27 @@ pub(crate) enum WorkspaceMenuAction {
 }
 
 impl Page {
+    /// Menus and pickers, drawn in the redesigned menu look. Dialogs, forms
+    /// and Settings' pickers keep their own panel until their phases.
+    pub(crate) fn redesigned(self) -> bool {
+        matches!(
+            self,
+            Self::Application
+                | Self::CodeSearch
+                | Self::Devices
+                | Self::Git
+                | Self::Group
+                | Self::Host
+                | Self::Menu
+                | Self::MovePane
+                | Self::Palette
+                | Self::Pane
+                | Self::Sessions
+                | Self::Tab
+                | Self::Workspace
+        )
+    }
+
     /// Context menus open where the pointer asked for them, rather than
     /// centred over a dimmed window as a dialog is.
     pub(crate) fn pointer_anchored(self) -> bool {
@@ -191,7 +212,7 @@ impl WorkspaceMenuAction {
             Self::Expand => "icons/chevron-down.svg",
             Self::Teleport | Self::GoToTeleported => "icons/teleport.svg",
             Self::TeleportBack => "icons/teleport-back.svg",
-            Self::ClearTeleported => "icons/x.svg",
+            Self::ClearTeleported => "icons/close.svg",
             Self::Checkpoints => "icons/refresh.svg",
             Self::FanOut => "icons/fan-out.svg",
             Self::Orchestrator => "icons/github.svg",

@@ -6,6 +6,7 @@
 use super::{Action, PaneMenu, Target};
 use crate::{
     HerdrWindow,
+    design::{ItemState, Leading},
     menu::Page,
     pane_move::{self, Choice, Destination},
 };
@@ -243,42 +244,43 @@ impl HerdrWindow {
         if pane.moving.is_some() {
             return panel.child(self.render_pane_move_pending());
         }
-        let mut body = panel.track_scroll(&pane.scroll).flex().flex_col().child(
-            div()
-                .flex_none()
-                .px(px(8.))
-                .py(px(4.))
-                .text_color(rgb(self.theme.muted))
-                .child("Move pane to"),
-        );
-        let row = |index: usize| {
-            div()
-                .id(("pane-move-destination", index))
-                .flex_none()
-                .debug_selector(move || format!("pane-move-{index}"))
-                .min_h(px(self.config.ui.line_height() + 12.))
-                .px(px(8.))
-                .flex()
-                .items_center()
-                .overflow_hidden()
-                .cursor_pointer()
-                .when(pane.selected == Some(index), |row| {
-                    row.bg(rgb(self.theme.active))
-                })
-                .hover(|row| row.bg(rgb(self.theme.active)))
-                .on_hover(cx.listener(move |this, hovered, _, cx| {
-                    if *hovered && let Some(pane) = &mut this.menu.pane {
-                        pane.selected = Some(index);
-                        cx.notify();
-                    }
-                }))
+        let look = self.menu_look();
+        let mut body = panel
+            .track_scroll(&pane.scroll)
+            .flex()
+            .flex_col()
+            .child(look.section("pane-move-heading".into(), "Move pane to"));
+        let row = |index: usize, icon: &'static str| {
+            let state = ItemState {
+                selected: pane.selected == Some(index),
+                ..ItemState::default()
+            };
+            look.row(
+                ("pane-move-destination", index),
+                format!("pane-move-{index}"),
+                Leading::Icon(icon, format!("pane-move-{index}-icon")),
+                state,
+            )
+            .overflow_hidden()
+            .on_hover(cx.listener(move |this, hovered, _, cx| {
+                if let Some(pane) = &mut this.menu.pane
+                    && crate::design::menu_hover(&mut pane.selected, index, *hovered)
+                {
+                    cx.notify();
+                }
+            }))
         };
         let here = pane.target.destinations();
         let local = here.len();
         for (index, choice) in here.into_iter().enumerate() {
             let destination = choice.destination;
+            let icon = match destination {
+                Destination::Tab { .. } => "icons/tab.svg",
+                Destination::NewTab { .. } => "icons/plus.svg",
+                Destination::NewWorkspace => "icons/folder.svg",
+            };
             body = body.child(
-                row(index)
+                row(index, icon)
                     .child(destination_label(index, choice.workspace, choice.place))
                     .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                         // The picker replaces the menu under the pointer, and
@@ -302,7 +304,7 @@ impl HerdrWindow {
             let index = local + offset;
             let chosen = device.clone();
             body = body.child(
-                row(index)
+                row(index, "icons/computer.svg")
                     .when(busy, |row| row.text_color(rgb(self.theme.muted)))
                     .child(destination_label(
                         index,

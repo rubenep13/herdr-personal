@@ -39,17 +39,13 @@ const CONTROL: f32 = 20.;
 const LEAD_GAP: f32 = 10.;
 
 /// The colour of `status`'s badge, inked to read on the theme's chrome.
-pub(in crate::sidebar) fn badge_color(
-    status: AgentStatus,
-    indicators: Indicators,
-    theme: &Theme,
-) -> u32 {
+pub(crate) fn badge_color(status: AgentStatus, indicators: Indicators, theme: &Theme) -> u32 {
     theme.ink(indicators.color(status))
 }
 
 /// The colour an agent's mark draws in on its tile: its brand's, else the
 /// theme's text, inked either way so it reads on a light theme too.
-pub(in crate::sidebar) fn logo_color(icon: AgentIcon, theme: &Theme) -> u32 {
+pub(crate) fn logo_color(icon: AgentIcon, theme: &Theme) -> u32 {
     theme.ink(icon.brand().unwrap_or(theme.foreground))
 }
 
@@ -61,6 +57,24 @@ fn badge_path(status: AgentStatus) -> &'static str {
         AgentStatus::Blocked => "icons/status-badge-blocked.svg",
         status => crate::icons::status_icon(StatusIcons::Rail, status),
     }
+}
+
+/// An agent's state badge in `status`'s colour, as the agent row ends with it.
+pub(crate) fn badge(
+    selector: String,
+    status: AgentStatus,
+    indicators: Indicators,
+    theme: &Theme,
+) -> Div {
+    div()
+        .debug_selector(move || selector)
+        .size(px(BADGE))
+        .flex_none()
+        .child(parts::icon(
+            badge_path(status),
+            BADGE,
+            badge_color(status, indicators, theme),
+        ))
 }
 
 /// A row's frame: its height, the content inset by the nesting, and the
@@ -95,7 +109,7 @@ fn text(selector: String, value: &str, size: f32) -> Div {
 }
 
 /// A small label tinted with `color` over a wash of it.
-fn pill(selector: String, value: &str, color: u32, size: f32) -> Div {
+pub(crate) fn pill(selector: String, value: &str, color: u32, size: f32) -> Div {
     div()
         .debug_selector(move || selector)
         .flex_none()
@@ -161,7 +175,13 @@ fn fold_button(fold: Fold, id: &str, shown: bool, theme: &Theme) -> Stateful<Div
 
 /// An agent's or tab's tile: `mark` drawn in `color` on the active colour,
 /// a step lighter on the selected row, whose own fill is that colour.
-fn tile(selector: String, mark: &'static str, color: u32, selected: bool, theme: &Theme) -> Div {
+pub(crate) fn tile(
+    selector: String,
+    mark: &'static str,
+    color: u32,
+    selected: bool,
+    theme: &Theme,
+) -> Div {
     let fill = if selected {
         mix(theme.active, theme.foreground, 10)
     } else {
@@ -426,13 +446,12 @@ impl RowLayout for Tree {
                 second,
                 cx,
             ))
-            .child(
-                div()
-                    .debug_selector(move || format!("agent-badge-{id}"))
-                    .size(px(BADGE))
-                    .flex_none()
-                    .child(parts::icon(badge_path(agent.status), BADGE, color)),
-            )
+            .child(badge(
+                format!("agent-badge-{id}"),
+                agent.status,
+                cx.indicators,
+                theme,
+            ))
     }
 }
 

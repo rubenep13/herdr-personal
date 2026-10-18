@@ -10,6 +10,7 @@ mod dialog_layout;
 mod dispatch;
 mod git_graph;
 mod issues;
+mod look;
 mod merged_removal;
 mod naming;
 mod pull_requests;

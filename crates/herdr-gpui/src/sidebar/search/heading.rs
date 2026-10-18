@@ -140,7 +140,7 @@ impl HerdrWindow {
                         }))
                         .child(
                             svg()
-                                .path("icons/x.svg")
+                                .path("icons/close.svg")
                                 .size(px(12.))
                                 .text_color(rgb(theme.muted)),
                         ),
@@ -228,7 +228,7 @@ impl HerdrWindow {
                             }))
                             .child(
                                 svg()
-                                    .path("icons/x.svg")
+                                    .path("icons/close.svg")
                                     .size(px(12.))
                                     .text_color(rgb(theme.muted)),
                             ),

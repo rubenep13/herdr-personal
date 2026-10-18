@@ -23,7 +23,7 @@ pub(super) fn check_workspace_menu_rows(
     });
     assert!(cx.debug_bounds("workspace-menu-Close group").is_some());
     assert!(cx.debug_bounds("workspace-menu-New worktree").is_some());
-    // Tiles stack a 20px icon over a centred caption.
+    // Tiles stack an 18px icon over a centred caption.
     for (label, tile, icon, text) in [
         (
             "Rename",
@@ -47,7 +47,7 @@ pub(super) fn check_workspace_menu_rows(
         let tile = cx.debug_bounds(tile).unwrap();
         let icon = cx.debug_bounds(icon).unwrap();
         let text = cx.debug_bounds(text).unwrap();
-        assert_eq!(icon.size, size(px(20.), px(20.)), "{label}");
+        assert_eq!(icon.size, size(px(18.), px(18.)), "{label}");
         assert!(
             icon.bottom() <= text.top(),
             "{label}: icon must sit above caption"
@@ -119,7 +119,7 @@ pub(super) fn check_pr_menu(view: &Entity<HerdrWindow>, cx: &mut gpui::VisualTes
             let open_row = cx.debug_bounds("workspace-menu-Open worktree...").unwrap();
             // Preserve the content budget apart from the tile grid, the Open
             // worktree and Run script rows, and the target header.
-            let row_height = cx.update(|_, cx| px(view.read(cx).config.ui.line_height() + 12.));
+            let row_height = cx.update(|_, cx| px(view.read(cx).menu_look().row_height()));
             let header_height = cx
                 .debug_bounds("workspace-menu-header")
                 .unwrap()

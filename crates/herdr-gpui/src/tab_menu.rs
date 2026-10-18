@@ -1,5 +1,10 @@
 use crate::{
-    HerdrWindow, browser::GroupId, controls::Command, menu::Page, search_input::SearchInput,
+    HerdrWindow,
+    browser::GroupId,
+    controls::Command,
+    design::{ItemState, Leading},
+    menu::Page,
+    search_input::SearchInput,
 };
 use gpui::{prelude::*, *};
 use herdr_client::{Method, protocol::ClientShellSnapshot};
@@ -60,6 +65,16 @@ enum Action {
 }
 
 /// Herdr's own tab menu, in its order.
+impl Action {
+    fn icon(self) -> &'static str {
+        match self {
+            Self::NewTab => "icons/plus.svg",
+            Self::Rename => "icons/pencil.svg",
+            Self::Close => "icons/close.svg",
+        }
+    }
+}
+
 const ACTIONS: [(Action, &str); 3] = [
     (Action::NewTab, "New Tab"),
     (Action::Rename, "Rename"),
@@ -308,28 +323,30 @@ impl HerdrWindow {
         let theme = &self.theme;
         let mut body = div().flex().flex_col();
         if self.menu.page == Some(Page::Tab) {
+            let look = self.menu_look();
             for (index, (action, label)) in ACTIONS.into_iter().enumerate() {
+                let state = ItemState {
+                    selected: tab.selected == Some(index),
+                    ..ItemState::default()
+                };
                 body = body.child(
-                    div()
-                        .id(("tab-menu-action", index))
-                        .debug_selector(move || format!("tab-menu-{index}"))
-                        .min_h(px(self.config.ui.line_height() + 12.))
-                        .px(px(8.))
-                        .flex()
-                        .items_center()
-                        .cursor_pointer()
-                        .when(tab.selected == Some(index), |row| row.bg(rgb(theme.active)))
-                        .hover(|row| row.bg(rgb(theme.active)))
-                        .child(div().min_w_0().truncate().child(label))
-                        .on_hover(cx.listener(move |this, hovered, _, cx| {
-                            if *hovered && let Some(tab) = &mut this.menu.tab {
-                                tab.selected = Some(index);
-                                cx.notify();
-                            }
-                        }))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.activate_tab_menu(action, window, cx)
-                        })),
+                    look.row(
+                        ("tab-menu-action", index),
+                        format!("tab-menu-{index}"),
+                        Leading::Icon(action.icon(), format!("tab-menu-{index}-icon")),
+                        state,
+                    )
+                    .child(look.label(format!("tab-menu-label-{index}"), label))
+                    .on_hover(cx.listener(move |this, hovered, _, cx| {
+                        if let Some(tab) = &mut this.menu.tab
+                            && crate::design::menu_hover(&mut tab.selected, index, *hovered)
+                        {
+                            cx.notify();
+                        }
+                    }))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.activate_tab_menu(action, window, cx)
+                    })),
                 );
             }
         } else {
