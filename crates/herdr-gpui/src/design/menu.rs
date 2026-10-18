@@ -150,7 +150,8 @@ impl MenuLook {
         self.line
     }
 
-    pub(crate) fn rule(&self) -> Rgba {
+    #[cfg(test)]
+    pub(super) fn rule(&self) -> Rgba {
         self.rule
     }
 
