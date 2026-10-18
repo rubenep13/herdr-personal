@@ -8,6 +8,7 @@ mod agent_filter;
 mod background_ranking;
 mod frecency_ranking;
 mod go_to_search;
+mod look;
 mod notes;
 mod plugin_selection;
 mod preview_layout;

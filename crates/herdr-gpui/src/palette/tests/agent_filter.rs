@@ -19,7 +19,7 @@ fn go_to_rows(palette: &Palette) -> Vec<String> {
 
 /// w1 holds a blocked agent and a plain terminal, w2 a working agent, and
 /// w3 nothing at all.
-fn status_fixture(window: &mut Window, cx: &mut Context<HerdrWindow>) -> HerdrWindow {
+pub(super) fn status_fixture(window: &mut Window, cx: &mut Context<HerdrWindow>) -> HerdrWindow {
     let mut view = fixture_window(window, cx);
     let snapshot = Arc::make_mut(view.live.snapshot.as_mut().unwrap());
     let mut terminal = snapshot.panes[0].clone();

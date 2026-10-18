@@ -9,8 +9,7 @@ mod parts;
 mod superset;
 mod tree;
 
-#[cfg(test)]
-pub(super) use tree::{badge_color, logo_color};
+pub(crate) use tree::{badge, badge_color, logo_color, pill, tile};
 pub(super) use tree::{control, tab_row};
 pub(super) use {herdr::Herdr, minimal::Minimal, orca::Orca, superset::Superset, tree::Tree};
 

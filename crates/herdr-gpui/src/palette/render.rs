@@ -1,19 +1,27 @@
 //! The palette paints prepared entries; input and daemon operations live elsewhere.
 
-use super::{Action, AgentFilter, Filter, Palette, preview};
-use crate::HerdrWindow;
+use super::{Action, AgentFilter, Filter, Palette, hints, preview};
+use crate::{HerdrWindow, design::ItemState};
 use gpui::{prelude::*, *};
 
 /// The narrowest window, less its margins, that fits Go To's list and
 /// preview side by side; a narrower one shows the list alone.
 const PREVIEW_MIN_WIDTH: f32 = 840.;
 
-const HINTS: &str = "↑↓ / Tab / ⌃N ⌃P move · ⌃Tab filter · ↵ select · Esc close";
-const GO_TO_HINTS: &str =
-    "↑↓ / Tab / ⌃N ⌃P move · ⌃Tab filter · ⌥B/W/I/D/A status · ⌥P preview · ↵ select · Esc close";
+/// The palette's measures at `[ui] size = 12`, in the redesigned look.
+const QUERY_HEIGHT: f32 = 56.;
+const FILTERS_HEIGHT: f32 = 40.;
+const FOOTER_HEIGHT: f32 = 36.;
+const SEARCH_ICON: f32 = 18.;
+/// How far the list's rows keep from the panel's edges.
+const LIST_INSET: f32 = 6.;
+/// How far each level of Go To's nesting steps in.
+const NEST: f32 = 18.;
+const KEYCAP: f32 = 17.;
+const STATUS_DOT: f32 = 7.;
 
 /// How much larger than the interface text the palette's query is drawn.
-const SEARCH_SCALE: f32 = 1.5;
+const SEARCH_SCALE: f32 = 1.4;
 
 /// The interface font, enlarged for the palette's query field.
 pub(super) fn search_font(ui: &crate::config::FontConfig) -> crate::config::FontConfig {
@@ -25,101 +33,153 @@ pub(super) fn search_font(ui: &crate::config::FontConfig) -> crate::config::Font
 
 impl HerdrWindow {
     /// The query is the palette's focus, as in Raycast: a large frameless
-    /// field spans the top, with the filters and count quieter beneath it.
+    /// field behind a search icon spans the top, with the filters, as the
+    /// subheader's underlined tabs, and the count quieter beneath it.
     fn palette_header(&self, palette: &Palette, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
+        let look = self.menu_look();
+        let scale = look.scale();
+        let hover = rgb(theme.subtext());
         div()
             .flex_none()
             .child(
                 div()
-                    .px(px(20.))
-                    .py(px(16.))
+                    .h(look.at(QUERY_HEIGHT))
+                    .px(look.at(18.))
+                    .flex()
+                    .items_center()
+                    .gap(look.at(12.))
                     .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(palette.search.clone()),
+                    .border_color(look.line())
+                    .child(
+                        svg()
+                            .path("icons/search.svg")
+                            .size(look.at(SEARCH_ICON))
+                            .flex_none()
+                            .text_color(look.muted())
+                            .debug_selector(|| "palette-search-icon".into()),
+                    )
+                    .child(div().flex_1().min_w_0().child(palette.search.clone())),
             )
             .child(
                 div()
-                    .px(px(14.))
-                    .pt(px(8.))
-                    .pb(px(6.))
+                    .debug_selector(|| "palette-filters".into())
+                    .h(look.at(FILTERS_HEIGHT))
+                    .px(look.at(10.))
                     .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .text_color(rgb(theme.muted))
+                    .border_b_1()
+                    .border_color(look.line())
+                    .children(Filter::ALL.into_iter().map(|filter| {
+                        let on = filter == palette.filter;
+                        div()
+                            .id(("palette-filter", filter as usize))
+                            .debug_selector(move || {
+                                format!("palette-filter-{}", filter.label().to_lowercase())
+                            })
+                            .relative()
+                            .h_full()
+                            .px(look.at(10.))
+                            .flex()
+                            .items_center()
+                            .cursor_pointer()
+                            .text_size(px(scale.name))
+                            .when(on, |tab| {
+                                tab.text_color(rgb(theme.foreground))
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child(
+                                        div()
+                                            .debug_selector(|| "palette-filter-underline".into())
+                                            .absolute()
+                                            .left(look.at(6.))
+                                            .right(look.at(6.))
+                                            // Over the row's rule, as the subheader's tabs.
+                                            .bottom(px(-1.))
+                                            .h(px(2.))
+                                            .rounded(px(2.))
+                                            .bg(look.accent()),
+                                    )
+                            })
+                            .when(!on, |tab| {
+                                tab.text_color(look.muted())
+                                    .hover(move |tab| tab.text_color(hover))
+                            })
+                            .child(filter.label())
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.set_palette_filter(filter, cx);
+                                if let Some(palette) = &this.menu.palette {
+                                    let focus = palette.search.read(cx).focus.clone();
+                                    window.focus(&focus, cx);
+                                }
+                            }))
+                    }))
                     .child(
                         div()
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_wrap()
-                            .gap(px(4.))
-                            .children(Filter::ALL.into_iter().map(|filter| {
-                                div()
-                                    .id(("palette-filter", filter as usize))
-                                    .debug_selector(move || {
-                                        format!("palette-filter-{}", filter.label().to_lowercase())
-                                    })
-                                    .px_2()
-                                    .py_1()
-                                    .rounded(px(crate::config::corners::CONTROL))
-                                    .cursor_pointer()
-                                    .when(filter == palette.filter, |tab| {
-                                        tab.bg(rgb(theme.active)).text_color(rgb(theme.foreground))
-                                    })
-                                    .hover(|tab| tab.bg(rgb(theme.active)))
-                                    .child(filter.label())
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.set_palette_filter(filter, cx);
-                                        if let Some(palette) = &this.menu.palette {
-                                            let focus = palette.search.read(cx).focus.clone();
-                                            window.focus(&focus, cx);
-                                        }
-                                    }))
-                            })),
-                    )
-                    .child(div().flex_none().child(format!(
-                        "{} of {}",
-                        palette.filtered.len(),
-                        palette.entries.len()
-                    ))),
+                            .ml_auto()
+                            .flex_none()
+                            .self_center()
+                            .pr(look.at(6.))
+                            .text_size(px(scale.detail))
+                            .text_color(look.muted())
+                            .child(format!(
+                                "{} of {}",
+                                palette.filtered.len(),
+                                palette.entries.len()
+                            )),
+                    ),
             )
             .when(palette.filter == Filter::Navigation, |header| {
-                header.child(
-                    div()
-                        .px(px(14.))
-                        .child(self.palette_agent_filters(palette, cx)),
-                )
+                header.child(self.palette_agent_filters(palette, cx))
             })
     }
 
-    /// Go To's status chips; Alt with the chip's navigator letter picks one
-    /// from the keyboard.
+    /// Go To's status chips, each dotted in its status's colour; Alt with the
+    /// chip's navigator letter picks one from the keyboard.
     fn palette_agent_filters(&self, palette: &Palette, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
+        let look = self.menu_look();
+        let indicators = self.palette_indicators();
+        let wash = rgb(crate::config::mix(theme.background, theme.active, 50));
         div()
             .flex()
             .flex_wrap()
-            .gap(px(6.))
-            .pt(px(6.))
-            .text_color(rgb(theme.muted))
+            .gap(look.at(6.))
+            .px(look.at(16.))
+            .pt(look.at(10.))
+            .pb(look.at(4.))
+            .text_size(px(look.scale().secondary))
             .children(AgentFilter::ALL.into_iter().map(|filter| {
+                let on = filter == palette.agent_filter;
+                let name = filter.label().to_lowercase().replace(' ', "-");
+                let dot = format!("palette-agent-filter-dot-{name}");
                 div()
                     .id(("palette-agent-filter", filter as usize))
-                    .debug_selector(move || {
-                        format!(
-                            "palette-agent-filter-{}",
-                            filter.label().to_lowercase().replace(' ', "-")
-                        )
-                    })
-                    .px_2()
-                    .py_1()
-                    .rounded(px(crate::config::corners::CONTROL))
+                    .debug_selector(move || format!("palette-agent-filter-{name}"))
+                    .flex()
+                    .items_center()
+                    .gap(look.at(6.))
+                    .px(look.at(9.))
+                    .py(look.at(3.))
+                    .rounded(look.at(7.))
+                    .border_1()
+                    .border_color(rgb(theme.active))
                     .cursor_pointer()
-                    .when(filter == palette.agent_filter, |chip| {
+                    .when(on, |chip| {
                         chip.bg(rgb(theme.active)).text_color(rgb(theme.foreground))
                     })
-                    .hover(|chip| chip.bg(rgb(theme.active)))
+                    .when(!on, |chip| {
+                        chip.text_color(rgb(theme.subtext()))
+                            .hover(move |chip| chip.bg(wash))
+                    })
+                    .when_some(filter.status(), |chip, status| {
+                        chip.child(
+                            div()
+                                .debug_selector(move || dot)
+                                .size(look.at(STATUS_DOT))
+                                .flex_none()
+                                .rounded_full()
+                                .bg(rgb(crate::sidebar::badge_color(status, indicators, theme))),
+                        )
+                    })
                     .child(filter.label())
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.set_palette_agent_filter(filter, cx);
@@ -131,12 +191,36 @@ impl HerdrWindow {
             }))
     }
 
-    fn palette_row(
-        &self,
-        palette: &Palette,
-        index: usize,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    /// The status colours and marks the sidebar uses, for Go To's agents.
+    fn palette_indicators(&self) -> crate::sidebar::Indicators {
+        crate::sidebar::Indicators::new(
+            self.settings.shared.as_ref(),
+            self.config.status_icons,
+            self.theme_light,
+            &self.theme,
+        )
+    }
+
+    /// The mark on a row's tile and its colour: an agent's own, in its
+    /// brand's colour, else what the row goes to or does.
+    fn palette_mark(&self, entry: &super::Entry) -> (&'static str, u32) {
+        if let Some(icon) = entry.agent {
+            return (icon.path(), crate::sidebar::logo_color(icon, &self.theme));
+        }
+        let mark = match &entry.action {
+            Action::Go { target, .. } => match target {
+                crate::NavigationTarget::Workspace(_) => "icons/folder.svg",
+                crate::NavigationTarget::Tab(_) => "icons/tab.svg",
+                crate::NavigationTarget::Pane(_) => "icons/terminal.svg",
+            },
+            Action::Native(_) | Action::Configured(..) => "icons/command.svg",
+            Action::Project(_) | Action::NewProject(_) => "icons/folder.svg",
+            Action::Note { .. } => "icons/note.svg",
+        };
+        (mark, self.theme.muted)
+    }
+
+    fn palette_row(&self, palette: &Palette, index: usize, cx: &mut Context<Self>) -> Div {
         let hit = &palette.filtered[index];
         let entry = &palette.entries[hit.index];
         // Ranked results need not keep entry order, so only an empty query nests.
@@ -146,9 +230,17 @@ impl HerdrWindow {
             0
         };
         let action = entry.action.clone();
+        let theme = &self.theme;
+        let look = self.menu_look();
+        let scale = look.scale();
+        let indicators = self.palette_indicators();
+        let state = ItemState {
+            selected: index == palette.selected,
+            ..ItemState::default()
+        };
         // Matched characters were found while ranking; painting only styles them.
         let matched = HighlightStyle {
-            color: Some(rgb(self.theme.primary()).into()),
+            color: Some(look.accent().into()),
             font_weight: Some(FontWeight::BOLD),
             ..Default::default()
         };
@@ -156,50 +248,156 @@ impl HerdrWindow {
             StyledText::new(text.clone())
                 .with_highlights(ranges.iter().map(|range| (range.clone(), matched)))
         };
-        div()
-            .id(index)
-            .debug_selector(move || format!("palette-row-{index}"))
-            .w_full()
-            .h(px(self.config.ui.line_height() * 2. + 20.))
-            .px(px(16.))
-            .flex()
-            .items_center()
-            .gap(px(12.))
-            .cursor_pointer()
-            .when(index == palette.selected, |row| {
-                row.bg(rgb(self.theme.active))
-            })
-            .hover(|s| s.bg(rgb(self.theme.active)))
+        let (mark, mark_color) = self.palette_mark(entry);
+        let row = look
+            .list_row(index, format!("palette-row-{index}"), state)
+            .flex_1()
+            .min_w_0()
+            .child(crate::sidebar::tile(
+                format!("palette-tile-{index}"),
+                mark,
+                mark_color,
+                state.selected,
+                theme,
+            ))
             .child(
                 div()
                     .flex_1()
                     .min_w_0()
                     .flex()
                     .flex_col()
-                    .pl(px(16. * depth as f32))
+                    .gap(px(1.))
                     .child(
                         div()
                             .truncate()
+                            .font_weight(FontWeight::MEDIUM)
                             .child(styled(&entry.label, &hit.highlights.label)),
                     )
                     .child(
                         div()
                             .truncate()
-                            .text_color(rgb(self.theme.muted))
+                            .text_size(px(scale.detail))
+                            .text_color(look.muted())
                             .child(styled(&entry.detail, &hit.highlights.detail)),
                     ),
             )
-            .when(!entry.badge.is_empty(), |row| {
-                row.child(
-                    div()
-                        .flex_none()
-                        .text_color(rgb(self.theme.muted))
-                        .child(entry.badge.clone()),
-                )
+            .map(|row| match entry.status {
+                // An agent ends as the sidebar's agent row does: its state's
+                // badge, and the state's words in a pill of its colour.
+                Some(status) => row
+                    .child(crate::sidebar::badge(
+                        format!("palette-state-{index}"),
+                        status,
+                        indicators,
+                        theme,
+                    ))
+                    .when(!entry.badge.is_empty(), |row| {
+                        row.child(crate::sidebar::pill(
+                            format!("palette-pill-{index}"),
+                            &entry.badge,
+                            crate::sidebar::badge_color(status, indicators, theme),
+                            scale.detail - 1.,
+                        ))
+                    }),
+                None => row.when(!entry.badge.is_empty(), |row| {
+                    row.child(
+                        div()
+                            .debug_selector(move || format!("palette-badge-{index}"))
+                            .flex_none()
+                            .px(look.at(7.))
+                            .py(look.at(2.))
+                            .rounded(look.at(5.))
+                            .bg(rgb(theme.surface))
+                            .text_size(px(scale.detail - 0.5))
+                            .text_color(look.muted())
+                            .child(entry.badge.clone()),
+                    )
+                }),
             })
             .on_click(cx.listener(move |this, _, window, cx| {
                 this.activate_palette(action.clone(), window, cx)
-            }))
+            }));
+        // A nested row steps in and hangs on the tree's guide line.
+        div().w_full().flex().px(look.at(LIST_INSET)).child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .relative()
+                .when(depth > 0, |nest| {
+                    nest.ml(look.at(NEST * depth as f32)).child(
+                        div()
+                            .debug_selector(move || format!("palette-guide-{index}"))
+                            .absolute()
+                            .left(-look.at(NEST / 2.))
+                            .top(look.at(4.))
+                            .bottom(look.at(4.))
+                            .w(px(1.))
+                            .bg(look.line()),
+                    )
+                })
+                .child(row),
+        )
+    }
+
+    /// The footer's hints, each key drawn as a key.
+    fn palette_footer(&self, palette: &Palette) -> Div {
+        let theme = &self.theme;
+        let look = self.menu_look();
+        let footer = div()
+            .debug_selector(|| "palette-status".into())
+            .flex_none()
+            .h(look.at(FOOTER_HEIGHT))
+            .px(look.at(16.))
+            .flex()
+            .items_center()
+            .gap(look.at(14.))
+            .overflow_hidden()
+            .border_t_1()
+            .border_color(look.line())
+            .bg(rgb(theme.surface))
+            .text_size(px(look.scale().detail))
+            .text_color(look.muted());
+        if palette.busy() {
+            return footer.child("Opening local project... Esc to dismiss.");
+        }
+        let hints = if palette.filter == Filter::Navigation {
+            hints::GO_TO_HINTS
+        } else {
+            hints::HINTS
+        };
+        let mut footer = footer;
+        let mut first = 0;
+        for hint in hints {
+            let keys = hint.keys.iter().enumerate().map(|(offset, key)| {
+                let index = first + offset;
+                div()
+                    .debug_selector(move || format!("palette-key-{index}"))
+                    .flex_none()
+                    .h(look.at(KEYCAP))
+                    .min_w(look.at(KEYCAP))
+                    .px(look.at(4.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(look.at(4.))
+                    .bg(rgb(theme.active))
+                    .text_color(rgb(theme.subtext()))
+                    .text_size(px(look.scale().detail - 1.))
+                    .child(*key)
+            });
+            footer = footer.child(
+                div()
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .gap(look.at(4.))
+                    .children(keys)
+                    .child(div().pl(look.at(2.)).child(hint.text)),
+            );
+            first += hint.keys.len();
+        }
+        footer
     }
 
     /// Whether Go To shows its preview: it is toggled on, and the window has
@@ -420,22 +618,6 @@ impl HerdrWindow {
                         body.child(self.render_palette_preview(palette))
                     }),
             )
-            .child(
-                div()
-                    .debug_selector(|| "palette-status".into())
-                    .flex_none()
-                    .px(px(16.))
-                    .py(px(10.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .text_color(rgb(theme.muted))
-                    .child(if palette.busy() {
-                        "Opening local project... Esc to dismiss."
-                    } else if palette.filter == Filter::Navigation {
-                        GO_TO_HINTS
-                    } else {
-                        HINTS
-                    }),
-            )
+            .child(self.palette_footer(palette))
     }
 }

@@ -94,7 +94,8 @@ impl MenuLook {
         }
     }
 
-    fn at(&self, measure: f32) -> Pixels {
+    /// `measure`, given at `[ui] size = 12`, at this face's size.
+    pub(crate) fn at(&self, measure: f32) -> Pixels {
         px(measure * self.zoom)
     }
 

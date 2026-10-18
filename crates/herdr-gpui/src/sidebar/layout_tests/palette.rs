@@ -16,11 +16,12 @@ fn palette_rejects_changed_endpoint_epoch_or_generation(cx: &mut gpui::TestAppCo
         cx.simulate_input("toggle sidebar");
         cx.run_until_parked();
         cx.update(|window, cx| full_draw(window, cx).clear(cx));
-        // Selection paints as a row: the fill spans the list, not the label.
+        // Selection paints as a row: the fill spans the list, not the label,
+        // inside the list's 6 px inset, as the redesigned menus' rows do.
         let row = cx.debug_bounds("palette-row-0").unwrap();
         let status = cx.debug_bounds("palette-status").unwrap();
-        assert_eq!(row.size.width, status.size.width);
-        assert_eq!(row.left(), status.left());
+        assert_eq!(row.size.width, status.size.width - px(12.));
+        assert_eq!(row.left(), status.left() + px(6.));
         view.update(cx, |view, _| {
             assert!(view.menu_target_current());
             if reconnect {

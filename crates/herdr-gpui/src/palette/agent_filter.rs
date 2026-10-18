@@ -64,14 +64,18 @@ impl AgentFilter {
     /// Whether a row whose agent reports `status` stays listed; `None` is a
     /// row without an agent.
     pub(super) fn accepts(self, status: Option<AgentStatus>) -> bool {
-        let wanted = match self {
-            Self::All => return true,
+        self.status().is_none_or(|wanted| status == Some(wanted))
+    }
+
+    /// The status this filter keeps; `None` for every agent.
+    pub(super) fn status(self) -> Option<AgentStatus> {
+        Some(match self {
+            Self::All => return None,
             Self::Blocked => AgentStatus::Blocked,
             Self::Working => AgentStatus::Working,
             Self::Idle => AgentStatus::Idle,
             Self::Done => AgentStatus::Done,
-        };
-        status == Some(wanted)
+        })
     }
 
     /// Ranks `candidates` as [`search::rank`] does. While a status is chosen,

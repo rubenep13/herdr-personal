@@ -175,6 +175,8 @@ pub(super) fn go_to_entries(
                     &keywords,
                 );
                 entry.status = agent.map(|agent| agent.agent_status);
+                entry.agent = agent
+                    .map(|agent| crate::icons::AgentIcon::from_identity(agent.agent.as_deref()));
                 entry.frecency = Some(frecency::Key::Pane {
                     endpoint: endpoint.to_owned(),
                     boot: snapshot.boot_id.clone(),
