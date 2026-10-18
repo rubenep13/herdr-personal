@@ -216,13 +216,16 @@ impl HerdrWindow {
                     .gap(px(1.))
                     .child(
                         div()
+                            .debug_selector(move || format!("palette-label-{index}"))
                             .truncate()
                             .font_weight(FontWeight::MEDIUM)
                             .child(styled(&entry.label, &hit.highlights.label)),
                     )
-                    .when(!shortcut, |lines| {
+                    // Nothing under the name leaves it centred in the row.
+                    .when(!shortcut && !entry.detail.is_empty(), |lines| {
                         lines.child(
                             div()
+                                .debug_selector(move || format!("palette-detail-{index}"))
                                 .truncate()
                                 .text_size(px(scale.detail))
                                 .text_color(look.muted())

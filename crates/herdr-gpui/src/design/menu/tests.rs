@@ -107,3 +107,9 @@ fn shortcuts_split_into_keys() {
     );
     assert_eq!(keycaps("ctrl-b n").collect::<Vec<_>>(), ["Ctrl", "B", "N"]);
 }
+
+/// No shortcut, no keys: an unbound entry draws no empty chip.
+#[test]
+fn an_empty_shortcut_has_no_keys() {
+    assert_eq!(keycaps("").count(), 0);
+}

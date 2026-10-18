@@ -181,3 +181,23 @@ fn go_to_keeps_the_palette_width(cx: &mut TestAppContext) {
     );
     assert!(cx.debug_bounds("palette-preview").is_none());
 }
+
+/// A row with nothing under its name centres the name, as a row with a
+/// shortcut does.
+#[gpui::test]
+fn rows_without_a_detail_center_their_name(cx: &mut TestAppContext) {
+    let (view, cx) = open(Filter::Commands, cx);
+    let bare = rows(&view, cx, |entry, _| {
+        matches!(entry.action, Action::Native(_)) && entry.detail.is_empty()
+    })
+    .into_iter()
+    .find(|index| *index < 8)
+    .unwrap();
+    assert!(bounds(cx, format!("palette-detail-{bare}")).is_none());
+    let row = bounds(cx, format!("palette-row-{bare}")).unwrap();
+    let name = bounds(cx, format!("palette-label-{bare}")).unwrap();
+    assert!(
+        (name.center().y - row.center().y).abs() <= px(1.),
+        "{name:?} {row:?}"
+    );
+}

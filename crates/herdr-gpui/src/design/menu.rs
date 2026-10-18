@@ -567,6 +567,7 @@ pub(crate) fn keycaps(shortcut: &str) -> impl Iterator<Item = String> + '_ {
                 .chain(chars)
                 .collect()
         })
+        .filter(|key: &String| !key.is_empty())
 }
 
 #[cfg(test)]
