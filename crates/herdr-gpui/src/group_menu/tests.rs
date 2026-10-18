@@ -261,6 +261,8 @@ fn the_menu_opens_from_the_strip_and_steps_with_the_keyboard(cx: &mut TestAppCon
 mod close_others;
 mod closed_elsewhere;
 mod git_graph;
+#[cfg(unix)]
+mod look;
 mod new_tabs;
 mod orchestrator;
 #[cfg(unix)]

@@ -4,7 +4,7 @@ use herdr_client::ConnectTarget;
 
 /// A remote workspace `w0` listening on loopback alone at 5173 and 5174,
 /// so both open through a tunnel, with the menu of its first group open.
-fn remote_menu(view: &Entity<HerdrWindow>, cx: &mut VisualTestContext) -> GroupId {
+pub(super) fn remote_menu(view: &Entity<HerdrWindow>, cx: &mut VisualTestContext) -> GroupId {
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             let mut remote = crate::endpoint::Endpoint::new(

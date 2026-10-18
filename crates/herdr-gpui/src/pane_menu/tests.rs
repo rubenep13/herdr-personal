@@ -12,6 +12,8 @@ mod menu_width;
 mod carry;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 mod moves;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+mod moves_look;
 
 fn snapshot() -> ClientShellSnapshot {
     let mut snapshot: ClientShellSnapshot = serde_json::from_str(include_str!(
