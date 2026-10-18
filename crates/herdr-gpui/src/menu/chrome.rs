@@ -71,6 +71,11 @@ impl HerdrWindow {
         }
     }
 
+    /// The redesigned menus' look, for this window's theme and `[ui]` face.
+    pub(crate) fn menu_look(&self) -> crate::design::MenuLook {
+        crate::design::MenuLook::of(&self.theme, &self.config.ui, self.theme_light)
+    }
+
     pub(crate) fn menu_target_current(&self) -> bool {
         self.menu.endpoint_target
             == (
@@ -533,11 +538,22 @@ impl HerdrWindow {
             .when(page == Page::About, |panel| {
                 panel.w((viewport.width - px(24.)).max(px(0.)).min(px(340.)))
             })
-            .rounded(px(crate::config::corners::PANEL))
-            .border_1()
-            .border_color(rgb(theme.active))
-            .bg(rgb(theme.surface))
-            .text_color(rgb(theme.foreground))
+            .map(|panel| {
+                // Menus and pickers wear the redesigned panel; a session's
+                // create or delete form is a dialog and keeps the old one.
+                if page.redesigned() && !session_modal {
+                    let look = self.menu_look();
+                    look.panel(panel)
+                        .text_color(look.ink(crate::design::ItemState::default()))
+                } else {
+                    panel
+                        .rounded(px(crate::config::corners::PANEL))
+                        .border_1()
+                        .border_color(rgb(theme.active))
+                        .bg(rgb(theme.surface))
+                        .text_color(rgb(theme.foreground))
+                }
+            })
             .text_font(font)
             .text_size(px(font.size))
             .line_height(px(font.line_height()))

@@ -125,6 +125,7 @@ impl HerdrWindow {
             .unwrap_or(bar);
         let font = &self.config.ui;
         let theme = &self.theme;
+        let look = self.menu_look();
         let width = px(380. * font.size / 12.).min((content.size.width - px(16.)).max(px(0.)));
         let top = bar.bottom();
         let current = menu.current();
@@ -222,16 +223,12 @@ impl HerdrWindow {
             .flex()
             .flex_col()
             .overflow_hidden()
-            .p(px(5.))
-            .bg(rgb(theme.surface))
-            .text_color(rgb(theme.foreground))
+            .p(px(6.))
+            .map(|panel| look.panel(panel))
+            .text_color(look.ink(crate::design::ItemState::default()))
             .text_font(font)
             .text_size(px(font.size))
             .line_height(px(font.line_height()))
-            .border_1()
-            .border_color(rgb(theme.active))
-            .rounded(px(crate::config::corners::PANEL))
-            .shadow_lg()
             .occlude()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
