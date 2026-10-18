@@ -70,6 +70,8 @@ pub(crate) enum Reply {
         /// Each line's syntax colours.
         spans: Arc<Vec<Vec<Span>>>,
         truncated: bool,
+        /// Not text: `lines` is empty.
+        binary: bool,
     },
     Worktree(Arc<WorktreeStatus>),
     WorktreeDiff {
@@ -78,6 +80,7 @@ pub(crate) enum Reply {
         lines: Arc<Lines>,
         spans: Arc<Vec<Vec<Span>>>,
         truncated: bool,
+        binary: bool,
     },
     /// Whether the refs, HEAD or the working tree changed since the history
     /// was last read.
@@ -336,6 +339,7 @@ impl State<'_> {
                     lines: Arc::new(diff.lines),
                     spans: Arc::new(diff.spans),
                     truncated: diff.truncated,
+                    binary: diff.binary,
                 })
             }
             Request::Worktree => {
@@ -359,6 +363,7 @@ impl State<'_> {
                     lines: Arc::new(diff.lines),
                     spans: Arc::new(diff.spans),
                     truncated: diff.truncated,
+                    binary: diff.binary,
                 })
             }
             Request::More if self.loaded.is_some() => self.more(cancelled),

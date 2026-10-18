@@ -371,6 +371,7 @@ impl GitGraphView {
                 lines,
                 spans,
                 truncated,
+                binary,
             } => self.receive_diff(
                 generation,
                 Some((&oid, &path, None)),
@@ -378,6 +379,7 @@ impl GitGraphView {
                     lines,
                     spans,
                     truncated,
+                    binary,
                 }),
             ),
             Reply::Worktree(status) => self.receive_worktree(generation, status),
@@ -394,6 +396,7 @@ impl GitGraphView {
                 lines,
                 spans,
                 truncated,
+                binary,
             } => self.receive_diff(
                 generation,
                 Some((super::model::WORKTREE_OID, &path, Some(section))),
@@ -401,6 +404,7 @@ impl GitGraphView {
                     lines,
                     spans,
                     truncated,
+                    binary,
                 }),
             ),
             // A failure is applied only to the request of its own

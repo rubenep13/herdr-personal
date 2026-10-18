@@ -214,6 +214,7 @@ fn the_truncated_notice_shows(cx: &mut TestAppContext) {
                 lines: Arc::new(lines.finish()),
                 spans: Arc::new(vec![Vec::new(); 2]),
                 truncated: true,
+                binary: false,
             };
             assert!(view.receive(0, reply, cx));
         })

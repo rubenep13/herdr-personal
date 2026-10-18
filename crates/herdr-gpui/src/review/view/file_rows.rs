@@ -5,7 +5,7 @@ use super::{Review, rows::mark_slot};
 use crate::{
     HerdrWindow,
     browser::TabId,
-    review::diff::{Body, FileDiff, RowId, Status},
+    review::diff::{BINARY_NOTE, Body, FileDiff, RowId, Status},
 };
 use gpui::{prelude::*, *};
 
@@ -169,7 +169,7 @@ impl HerdrWindow {
         let (text, action) = match &entry.body {
             _ if reading => ("Reading\u{2026}".to_owned(), None),
             Body::Pending => ("Reading\u{2026}".to_owned(), None),
-            Body::Binary => ("Binary file not shown".to_owned(), None),
+            Body::Binary => (BINARY_NOTE.to_owned(), None),
             Body::Large => (
                 match counts(entry) {
                     Some((added, removed)) => {
