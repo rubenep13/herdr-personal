@@ -51,6 +51,8 @@ pub(crate) struct DiffText {
     pub(crate) spans: Vec<Vec<Span>>,
     /// Lines were left out past `MAX_DIFF_LINES`.
     pub(crate) truncated: bool,
+    /// Not text: there are no lines to show.
+    pub(crate) binary: bool,
 }
 
 /// "old → new" for a renamed file, else its path.
@@ -189,7 +191,12 @@ fn first_lines(lines: &Lines, keep: usize) -> Lines {
 pub(super) fn file_diff(output: &[u8], name: &str) -> DiffText {
     let text = String::from_utf8_lossy(output);
     let read = text.lines().count();
-    let lines = parse_files_first(&text);
+    let Some(lines) = parse_files_first(&text) else {
+        return DiffText {
+            binary: true,
+            ..DiffText::default()
+        };
+    };
     let truncated = read >= DIFF_READ || lines.len() > MAX_DIFF_LINES || lines.truncated;
     let lines = if lines.len() > MAX_DIFF_LINES {
         first_lines(&lines, MAX_DIFF_LINES)
@@ -201,15 +208,19 @@ pub(super) fn file_diff(output: &[u8], name: &str) -> DiffText {
         lines,
         spans,
         truncated,
+        binary: false,
     }
 }
 
 /// A file shown whole, every line added, from at most `MAX_DIFF_LINES + 1`
-/// of its lines; nothing for a binary one. Blocking: it runs on the
+/// of its lines; no lines for a binary one. Blocking: it runs on the
 /// worker.
 pub(super) fn whole_file(output: &[u8], name: &str) -> DiffText {
     if output.contains(&0) {
-        return DiffText::default();
+        return DiffText {
+            binary: true,
+            ..DiffText::default()
+        };
     }
     let text = String::from_utf8_lossy(output);
     // `Lines::added` adds its own hunk header.
@@ -226,17 +237,19 @@ pub(super) fn whole_file(output: &[u8], name: &str) -> DiffText {
         lines,
         spans,
         truncated,
+        binary: false,
     }
 }
 
-/// The first file's lines in a diff; none for a binary file.
-fn parse_files_first(text: &str) -> Lines {
-    crate::review::parse_files(text)
-        .into_iter()
-        .next()
-        .and_then(|parsed| match parsed.body {
-            Body::Loaded(lines) => Some(Lines::clone(&lines)),
-            _ => None,
-        })
-        .unwrap_or_default()
+/// The first file's lines in a diff, empty for no file; `None` for a
+/// binary file.
+fn parse_files_first(text: &str) -> Option<Lines> {
+    let Some(parsed) = crate::review::parse_files(text).into_iter().next() else {
+        return Some(Lines::default());
+    };
+    match parsed.body {
+        Body::Loaded(lines) => Some(Lines::clone(&lines)),
+        Body::Binary => None,
+        Body::Pending | Body::Large | Body::Failed(_) => Some(Lines::default()),
+    }
 }

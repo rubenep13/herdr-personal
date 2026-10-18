@@ -99,7 +99,9 @@ fn subheader_sits_under_the_header(cx: &mut TestAppContext) {
     );
     let header = bounds(cx, "titlebar");
     let strip = bounds(cx, "tab-strip");
-    assert_eq!(strip.top(), header.bottom());
+    // A worktree build's banner hangs between them.
+    let banner = crate::worktree_banner::reserved(env!("HERDR_BUILD_WORKTREE") == "1");
+    assert_eq!(strip.top(), header.bottom() + px(banner));
     assert_eq!(header.size.height, px(crate::design::HEADER_HEIGHT));
     // The header spans the content column, beside the sidebar's own header.
     let sidebar = bounds(cx, "sidebar-titlebar");

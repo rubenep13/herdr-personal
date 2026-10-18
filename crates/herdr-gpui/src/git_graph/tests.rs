@@ -14,6 +14,7 @@ use std::{
     sync::atomic::AtomicBool,
 };
 
+mod binary;
 mod chips;
 mod detail;
 mod failures;

@@ -16,7 +16,7 @@ use crate::{
         worktree::{Section, WorktreeStatus},
     },
     panel_resize::RESIZE_HOVER,
-    review::{Kind, Lines, highlight::Span},
+    review::{BINARY_NOTE, Kind, Lines, highlight::Span},
 };
 use gpui::{prelude::*, *};
 use std::sync::Arc;
@@ -58,6 +58,7 @@ pub(super) struct DiffLines {
     pub(super) lines: Arc<Lines>,
     pub(super) spans: Arc<Vec<Vec<Span>>>,
     pub(super) truncated: bool,
+    pub(super) binary: bool,
 }
 
 /// The chosen file's diff.
@@ -69,6 +70,8 @@ pub(super) struct Diff {
     lines: Option<Arc<Lines>>,
     spans: Arc<Vec<Vec<Span>>>,
     truncated: bool,
+    /// Not text: it has no lines to show.
+    binary: bool,
     error: Option<Arc<Error>>,
 }
 
@@ -182,6 +185,7 @@ impl GitGraphView {
                 lines: None,
                 spans: Arc::default(),
                 truncated: false,
+                binary: false,
                 error: None,
             });
         }
@@ -294,6 +298,7 @@ impl GitGraphView {
                 shown.lines = Some(read.lines);
                 shown.spans = read.spans;
                 shown.truncated = read.truncated;
+                shown.binary = read.binary;
             }
             Err(error) => shown.error = Some(error),
         }
@@ -759,6 +764,10 @@ impl GitGraphView {
             .truncate()
             .child(path);
         let body = match (&diff.lines, &diff.error) {
+            (Some(_), _) if diff.binary => div()
+                .debug_selector(|| "graph-diff-binary".to_owned())
+                .child(self.panel_note(BINARY_NOTE))
+                .into_any_element(),
             (Some(lines), _) if lines.is_empty() => self.panel_note("No text changes."),
             (Some(lines), _) => uniform_list(
                 "graph-diff",

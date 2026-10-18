@@ -1959,9 +1959,10 @@ checkpoint refs.
   choices are shared by every graph tab and kept between runs.
 - Enter, or a click on a row, opens a panel with the commit's message, author,
   date, parents (which jump to their row), labels, and the files it changed
-  against its first parent; choosing one shows its diff, cut at 4000 lines.
-  The WIP row shows the uncommitted changes by section (Conflicts, Staged,
-  Unstaged, Untracked) with the upstream and how far ahead or behind it is.
+  against its first parent; choosing one shows its diff, cut at 4000 lines,
+  or says that it is a binary file. The WIP row shows the uncommitted changes
+  by section (Conflicts, Staged, Unstaged, Untracked) with the upstream and
+  how far ahead or behind it is.
 - `/` searches messages, authors and hashes; n and N walk the results.
 - While the tab is shown, it checks the repository every 2 seconds (5 on an
   SSH host, through one shell kept open) and reloads when the refs, `HEAD` or

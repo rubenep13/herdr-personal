@@ -349,6 +349,10 @@ impl Status {
     }
 }
 
+/// What stands for a binary file's lines, in the review and in the Git
+/// graph's diff.
+pub(crate) const BINARY_NOTE: &str = "Binary file not shown";
+
 /// What is known of a file's lines.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Body {
