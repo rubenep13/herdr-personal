@@ -9,10 +9,7 @@ use gpui::{prelude::*, *};
 const PREVIEW_MIN_WIDTH: f32 = 840.;
 
 /// The palette's measures at `[ui] size = 12`, in the redesigned look.
-const QUERY_HEIGHT: f32 = 56.;
-const FILTERS_HEIGHT: f32 = 40.;
 const FOOTER_HEIGHT: f32 = 36.;
-const SEARCH_ICON: f32 = 18.;
 /// How far the list's rows keep from the panel's edges.
 const LIST_INSET: f32 = 6.;
 /// How far each level of Go To's nesting steps in.
@@ -36,81 +33,30 @@ impl HerdrWindow {
     /// field behind a search icon spans the top, with the filters, as the
     /// subheader's underlined tabs, and the count quieter beneath it.
     fn palette_header(&self, palette: &Palette, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
         let look = self.menu_look();
         let scale = look.scale();
-        let hover = rgb(theme.subtext());
         div()
             .flex_none()
+            .child(look.query("palette-search-icon", palette.search.clone()))
             .child(
-                div()
-                    .h(look.at(QUERY_HEIGHT))
-                    .px(look.at(18.))
-                    .flex()
-                    .items_center()
-                    .gap(look.at(12.))
-                    .border_b_1()
-                    .border_color(look.line())
-                    .child(
-                        svg()
-                            .path("icons/search.svg")
-                            .size(look.at(SEARCH_ICON))
-                            .flex_none()
-                            .text_color(look.muted())
-                            .debug_selector(|| "palette-search-icon".into()),
-                    )
-                    .child(div().flex_1().min_w_0().child(palette.search.clone())),
-            )
-            .child(
-                div()
-                    .debug_selector(|| "palette-filters".into())
-                    .h(look.at(FILTERS_HEIGHT))
-                    .px(look.at(10.))
-                    .flex()
-                    .border_b_1()
-                    .border_color(look.line())
+                look.tabs("palette-filters")
                     .children(Filter::ALL.into_iter().map(|filter| {
-                        let on = filter == palette.filter;
-                        div()
-                            .id(("palette-filter", filter as usize))
-                            .debug_selector(move || {
-                                format!("palette-filter-{}", filter.label().to_lowercase())
-                            })
-                            .relative()
-                            .h_full()
-                            .px(look.at(10.))
-                            .flex()
-                            .items_center()
-                            .cursor_pointer()
-                            .text_size(px(scale.name))
-                            .when(on, |tab| {
-                                tab.text_color(rgb(theme.foreground))
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .child(
-                                        div()
-                                            .debug_selector(|| "palette-filter-underline".into())
-                                            .absolute()
-                                            .left(look.at(6.))
-                                            .right(look.at(6.))
-                                            // Over the row's rule, as the subheader's tabs.
-                                            .bottom(px(-1.))
-                                            .h(px(2.))
-                                            .rounded(px(2.))
-                                            .bg(look.accent()),
-                                    )
-                            })
-                            .when(!on, |tab| {
-                                tab.text_color(look.muted())
-                                    .hover(move |tab| tab.text_color(hover))
-                            })
-                            .child(filter.label())
-                            .on_click(cx.listener(move |this, _, window, cx| {
+                        look.tab(
+                            ("palette-filter", filter as usize),
+                            format!("palette-filter-{}", filter.label().to_lowercase()),
+                            "palette-filter-underline",
+                            filter == palette.filter,
+                        )
+                        .child(filter.label())
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
                                 this.set_palette_filter(filter, cx);
                                 if let Some(palette) = &this.menu.palette {
                                     let focus = palette.search.read(cx).focus.clone();
                                     window.focus(&focus, cx);
                                 }
-                            }))
+                            },
+                        ))
                     }))
                     .child(
                         div()

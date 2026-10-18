@@ -27,6 +27,10 @@ const HEADER_ICON: f32 = 16.;
 const HEADER_SUB_ICON: f32 = 11.;
 /// The header's second line starts under its title, past the icon.
 const HEADER_SUB_INSET: f32 = 24.;
+/// A picker's query row and its search icon, and its row of tabs.
+const QUERY_HEIGHT: f32 = 56.;
+const SEARCH_ICON: f32 = 18.;
+const TABS_HEIGHT: f32 = 40.;
 /// How much of the danger red fills a selected destructive row.
 const DANGER_WASH: f32 = 0.14;
 /// The panel's shadow: lighter on a light theme, where black reads heavier.
@@ -318,6 +322,81 @@ impl MenuLook {
             .font_weight(FontWeight::MEDIUM)
             .text_color(self.muted)
             .child(text.into())
+    }
+
+    /// A picker's query row: a search icon, then the field.
+    pub(crate) fn query(&self, icon_selector: &'static str, field: impl IntoElement) -> Div {
+        div()
+            .flex_none()
+            .h(self.at(QUERY_HEIGHT))
+            .px(self.at(18.))
+            .flex()
+            .items_center()
+            .gap(self.at(12.))
+            .border_b_1()
+            .border_color(self.line)
+            .child(
+                svg()
+                    .path("icons/search.svg")
+                    .size(self.at(SEARCH_ICON))
+                    .flex_none()
+                    .text_color(self.muted)
+                    .debug_selector(move || icon_selector.into()),
+            )
+            .child(div().flex_1().min_w_0().child(field))
+    }
+
+    /// The row a picker's tabs sit in, ruled underneath.
+    pub(crate) fn tabs(&self, selector: &'static str) -> Div {
+        div()
+            .debug_selector(move || selector.into())
+            .flex_none()
+            .h(self.at(TABS_HEIGHT))
+            .px(self.at(10.))
+            .flex()
+            .border_b_1()
+            .border_color(self.line)
+    }
+
+    /// One of a picker's tabs, as the subheader's: the chosen one in the
+    /// text colour over a line of the accent across the row's rule.
+    pub(crate) fn tab(
+        &self,
+        id: impl Into<ElementId>,
+        selector: String,
+        underline: &'static str,
+        on: bool,
+    ) -> Stateful<Div> {
+        let hover = self.text;
+        div()
+            .id(id)
+            .debug_selector(move || selector)
+            .relative()
+            .h_full()
+            .px(self.at(10.))
+            .flex()
+            .items_center()
+            .cursor_pointer()
+            .text_size(px(self.scale.name))
+            .when(on, |tab| {
+                tab.text_color(self.selected_text)
+                    .font_weight(FontWeight::MEDIUM)
+                    .child(
+                        div()
+                            .debug_selector(move || underline.into())
+                            .absolute()
+                            .left(self.at(6.))
+                            .right(self.at(6.))
+                            .bottom(px(-1.))
+                            .h(px(2.))
+                            .rounded(px(2.))
+                            .bg(self.accent),
+                    )
+            })
+            .when(!on, |tab| {
+                tab.text_color(self.muted)
+                    .hover(move |tab| tab.text_color(hover))
+            })
     }
 
     pub(crate) fn header(&self, header: Header<'_>) -> Div {
