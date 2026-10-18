@@ -167,7 +167,7 @@ impl Action {
             Self::EditScrollback => "icons/file.svg",
             Self::RightClick => "icons/mouse.svg",
             Self::Processes => "icons/pulse.svg",
-            Self::Close => "icons/x.svg",
+            Self::Close => "icons/close.svg",
         }
     }
 

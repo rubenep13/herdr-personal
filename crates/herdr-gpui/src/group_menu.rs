@@ -76,7 +76,7 @@ impl Action {
             Self::VsCode => Some("icons/vscode.svg"),
             Self::Port { .. } => Some("icons/arrow-right.svg"),
             Self::Split => Some("icons/split.svg"),
-            Self::Close | Self::CloseOthers | Self::CloseGroup => Some("icons/x.svg"),
+            Self::Close | Self::CloseOthers | Self::CloseGroup => Some("icons/close.svg"),
         }
     }
 

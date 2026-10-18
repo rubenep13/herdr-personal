@@ -14,8 +14,7 @@ pub(crate) fn command_icon(command: Command) -> Option<&'static str> {
         Command::About => "icons/info.svg",
         Command::Back | Command::PreviousTab => "icons/arrow-left.svg",
         Command::ClearPane => "icons/trash.svg",
-        Command::CloseTab | Command::ClosePane => "icons/x.svg",
-        Command::CloseWindow => "icons/close.svg",
+        Command::CloseTab | Command::ClosePane | Command::CloseWindow => "icons/close.svg",
         Command::CopyMode => "icons/copy.svg",
         Command::CycleWindows => "icons/window.svg",
         Command::DecreaseFontSize | Command::IncreaseFontSize | Command::ResetFontSize => {
@@ -68,7 +67,7 @@ pub(crate) fn action_icon(action: &dyn gpui::Action) -> Option<&'static str> {
     } else if action.is::<ShowLogs>() {
         Some("icons/file.svg")
     } else if action.is::<Quit>() {
-        Some("icons/x.svg")
+        Some("icons/close.svg")
     } else {
         None
     }

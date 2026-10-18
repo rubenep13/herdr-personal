@@ -70,7 +70,7 @@ impl Action {
         match self {
             Self::NewTab => "icons/plus.svg",
             Self::Rename => "icons/pencil.svg",
-            Self::Close => "icons/x.svg",
+            Self::Close => "icons/close.svg",
         }
     }
 }

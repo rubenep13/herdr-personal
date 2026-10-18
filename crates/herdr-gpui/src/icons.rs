@@ -302,6 +302,7 @@ embedded_icons! {
     "window-minimize.svg",
     "window-restore.svg",
     "window.svg",
+    // The X (formerly Twitter) mark, for the About box; never a close button.
     "x.svg",
     "zoom.svg",
     // keep-sorted end
