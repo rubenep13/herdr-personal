@@ -1,7 +1,11 @@
 //! The application menu's button and its bounded, scrollable dropdown.
 
 use super::*;
-use crate::fonts::StyledFont;
+use crate::{
+    design::{ItemState, Leading},
+    fonts::StyledFont,
+    menus::icons::{action_icon, category_icon},
+};
 use gpui::prelude::*;
 
 impl HerdrWindow {
@@ -124,7 +128,6 @@ impl HerdrWindow {
             .copied()
             .unwrap_or(bar);
         let font = &self.config.ui;
-        let theme = &self.theme;
         let look = self.menu_look();
         let width = px(380. * font.size / 12.).min((content.size.width - px(16.)).max(px(0.)));
         let top = bar.bottom();
@@ -144,21 +147,22 @@ impl HerdrWindow {
             .overflow_y_scroll()
             .track_scroll(&menu.scroll);
         for (index, item) in items.into_iter().enumerate() {
-            let (name, disabled, checked, detail) = match item {
+            // A submenu ends in a chevron; an action, in its shortcut.
+            let (name, disabled, checked, icon, shortcut) = match item {
                 OwnedMenuItem::Separator => {
                     rows = rows.child(
-                        div()
-                            .flex_none()
-                            .h(px(1.))
-                            .my(px(4.))
-                            .mx(px(8.))
-                            .bg(rgb(theme.active)),
+                        look.separator()
+                            .debug_selector(move || format!("application-separator-{index}")),
                     );
                     continue;
                 }
-                OwnedMenuItem::Submenu(menu) => {
-                    (menu.name.to_string(), menu.disabled, false, "›".to_owned())
-                }
+                OwnedMenuItem::Submenu(menu) => (
+                    menu.name.to_string(),
+                    menu.disabled,
+                    false,
+                    category_icon(&menu.name),
+                    None,
+                ),
                 OwnedMenuItem::Action {
                     name,
                     action,
@@ -166,51 +170,64 @@ impl HerdrWindow {
                     checked,
                     ..
                 } => {
-                    let detail = self.application_shortcut(action.as_ref(), cx);
-                    (name, disabled, checked, detail)
+                    let shortcut = self.application_shortcut(action.as_ref(), cx);
+                    (
+                        name,
+                        disabled,
+                        checked,
+                        action_icon(action.as_ref()),
+                        Some(shortcut),
+                    )
                 }
-                OwnedMenuItem::SystemMenu(menu) => {
-                    (menu.name.to_string(), true, false, String::new())
-                }
+                OwnedMenuItem::SystemMenu(menu) => (
+                    menu.name.to_string(),
+                    true,
+                    false,
+                    None,
+                    Some(String::new()),
+                ),
             };
             let selector = format!("application-item-{name}");
+            let leading = match icon {
+                _ if checked => Leading::Check,
+                Some(icon) => Leading::Icon(icon, format!("{selector}-icon")),
+                None => Leading::Empty,
+            };
+            let state = ItemState {
+                selected: menu.selected == Some(index),
+                disabled,
+                danger: false,
+            };
+            let end = match shortcut {
+                Some(shortcut) => look
+                    .detail(format!("{selector}-detail"), shortcut)
+                    .into_any_element(),
+                None => look
+                    .submenu(format!("application-submenu-{name}"))
+                    .into_any_element(),
+            };
             rows = rows.child(
-                div()
-                    .id(("application-item", index))
-                    .debug_selector(move || selector.clone())
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .gap(px(8.))
-                    .px(px(8.))
-                    .min_h(px(font.line_height() + 10.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .when(menu.selected == Some(index), |row| {
-                        row.bg(rgb(theme.active))
-                    })
-                    .when(disabled, |row| row.text_color(rgb(theme.muted)))
-                    .when(!disabled, |row| row.cursor_pointer())
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(14.))
-                            .child(if checked { "✓" } else { "" }),
-                    )
-                    .child(div().flex_1().min_w_0().overflow_hidden().child(name))
-                    .child(div().flex_none().text_color(rgb(theme.muted)).child(detail))
-                    .on_hover(cx.listener(move |this, hovered, _, cx| {
-                        if *hovered
-                            && !disabled
-                            && let Some(menu) = &mut this.menu.application
-                        {
-                            menu.selected = Some(index);
-                            cx.notify();
-                        }
-                    }))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        cx.stop_propagation();
-                        this.application_choose(index, window, cx);
-                    })),
+                look.row(
+                    ("application-item", index),
+                    selector.clone(),
+                    leading,
+                    state,
+                )
+                .child(look.label(format!("{selector}-label"), name))
+                .child(end)
+                .on_hover(cx.listener(move |this, hovered, _, cx| {
+                    if *hovered
+                        && !disabled
+                        && let Some(menu) = &mut this.menu.application
+                    {
+                        menu.selected = Some(index);
+                        cx.notify();
+                    }
+                }))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.application_choose(index, window, cx);
+                })),
             );
         }
         let cover = self.menu.cover.clone();
@@ -225,7 +242,7 @@ impl HerdrWindow {
             .overflow_hidden()
             .p(px(6.))
             .map(|panel| look.panel(panel))
-            .text_color(look.ink(crate::design::ItemState::default()))
+            .text_color(look.ink(ItemState::default()))
             .text_font(font)
             .text_size(px(font.size))
             .line_height(px(font.line_height()))
@@ -234,19 +251,31 @@ impl HerdrWindow {
             .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
             .when_some(current, |panel, current| {
-                panel.child(
-                    div()
-                        .id("application-menu-back")
-                        .debug_selector(|| "application-menu-back".into())
-                        .flex_none()
-                        .p(px(8.))
-                        .cursor_pointer()
-                        .child(format!("‹  {}", current.name))
+                panel
+                    .child(
+                        look.row(
+                            "application-menu-back",
+                            "application-menu-back".into(),
+                            Leading::Icon(
+                                "icons/chevron-left.svg",
+                                "application-menu-back-icon".into(),
+                            ),
+                            ItemState::default(),
+                        )
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(look.ink(ItemState {
+                            selected: true,
+                            ..ItemState::default()
+                        }))
+                        .child(
+                            look.label("application-menu-back-label".into(), current.name.clone()),
+                        )
                         .on_click(cx.listener(|this, _, _, cx| {
                             cx.stop_propagation();
                             this.application_back(cx);
                         })),
-                )
+                    )
+                    .child(look.separator())
             })
             .child(rows)
             .child(
