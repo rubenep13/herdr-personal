@@ -129,6 +129,11 @@ impl MenuLook {
         LIST_ROW * self.zoom
     }
 
+    /// A separator's height with the space it keeps above and below.
+    pub(crate) fn separator_height(&self) -> f32 {
+        1. + 2. * SEPARATOR_GAP * self.zoom
+    }
+
     pub(crate) fn scale(&self) -> TypeScale {
         self.scale
     }

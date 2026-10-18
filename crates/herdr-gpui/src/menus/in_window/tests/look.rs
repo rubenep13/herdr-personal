@@ -46,9 +46,12 @@ fn categories_show_an_icon_and_a_chevron(cx: &mut TestAppContext) {
     assert!(chevron.left() >= label.right());
 }
 
+/// The categories stay listed and a category's entries open beside it, its
+/// first entry level with the category's row; separators keep their inset.
 #[gpui::test]
-fn a_submenu_opens_under_a_back_row_and_an_inset_separator(cx: &mut TestAppContext) {
+fn a_submenu_opens_beside_its_category(cx: &mut TestAppContext) {
     let (view, cx) = window(cx);
+    cx.simulate_resize(size(px(1200.), px(800.)));
     draw(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -56,15 +59,85 @@ fn a_submenu_opens_under_a_back_row_and_an_inset_separator(cx: &mut TestAppConte
         })
     });
     draw(cx);
-    assert!(cx.debug_bounds("application-menu-back").is_some());
-    assert!(cx.debug_bounds("application-menu-back-icon").is_some());
-    let row = cx.debug_bounds("application-item-New Workspace").unwrap();
-    assert_eq!(row.size.height, px(32.));
+    assert!(cx.debug_bounds("application-menu-back").is_none());
+    let categories = cx.debug_bounds("application-menu-panel").unwrap();
+    let entries = cx.debug_bounds("application-menu-panel-1").unwrap();
+    assert!(
+        entries.left() >= categories.right(),
+        "{entries:?} {categories:?}"
+    );
+    let file = cx.debug_bounds("application-item-File").unwrap();
+    let first = cx.debug_bounds("application-item-New Workspace").unwrap();
+    assert!(
+        (first.top() - file.top()).abs() <= px(1.),
+        "{first:?} {file:?}"
+    );
+    assert_eq!(first.size.height, px(32.));
     // File keeps closing apart from creating and going to.
     let separator = cx.debug_bounds("application-separator-6").unwrap();
-    assert_eq!(separator.left(), row.left() + px(10.));
-    assert_eq!(separator.right(), row.right() - px(10.));
+    assert_eq!(separator.left(), first.left() + px(10.));
+    assert_eq!(separator.right(), first.right() - px(10.));
     assert_eq!(separator.size.height, px(1.));
+}
+
+/// Resting the pointer on a category opens it, without a click, and moving
+/// to another category opens that one instead.
+#[gpui::test]
+fn hovering_a_category_opens_its_submenu(cx: &mut TestAppContext) {
+    let (view, cx) = window(cx);
+    cx.simulate_resize(size(px(1200.), px(800.)));
+    draw(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| view.open_application_menu(None, window, cx))
+    });
+    draw(cx);
+    let path = |cx: &mut VisualTestContext| {
+        view.read_with(cx, |view, _| {
+            view.menu.application.as_ref().unwrap().path.clone()
+        })
+    };
+    let file = cx.debug_bounds("application-item-File").unwrap();
+    cx.simulate_mouse_move(file.center(), None, Modifiers::none());
+    draw(cx);
+    assert_eq!(path(cx), [1]);
+    assert!(cx.debug_bounds("application-item-New Workspace").is_some());
+    let edit = cx.debug_bounds("application-item-Edit").unwrap();
+    cx.simulate_mouse_move(edit.center(), None, Modifiers::none());
+    draw(cx);
+    assert_eq!(path(cx), [2]);
+    assert!(cx.debug_bounds("application-item-New Workspace").is_none());
+    assert!(cx.debug_bounds("application-item-Copy").is_some());
+}
+
+/// Resting on an entry closes a submenu opened deeper than it.
+#[gpui::test]
+fn hovering_an_entry_closes_a_deeper_submenu(cx: &mut TestAppContext) {
+    let (view, cx) = window(cx);
+    cx.simulate_resize(size(px(1200.), px(800.)));
+    draw(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_application_menu(Some(3), window, cx)
+        })
+    });
+    draw(cx);
+    let path = |cx: &mut VisualTestContext| {
+        view.read_with(cx, |view, _| {
+            view.menu.application.as_ref().unwrap().path.clone()
+        })
+    };
+    let layout = cx.debug_bounds("application-item-Layout").unwrap();
+    cx.simulate_mouse_move(layout.center(), None, Modifiers::none());
+    draw(cx);
+    assert_eq!(path(cx).len(), 2);
+    assert!(cx.debug_bounds("application-menu-panel-2").is_some());
+    let bigger = cx
+        .debug_bounds("application-item-Increase Font Size")
+        .unwrap();
+    cx.simulate_mouse_move(bigger.center(), None, Modifiers::none());
+    draw(cx);
+    assert_eq!(path(cx), [3]);
+    assert!(cx.debug_bounds("application-menu-panel-2").is_none());
 }
 
 #[gpui::test]
@@ -111,7 +184,8 @@ fn leaving_a_row_restores_it(cx: &mut TestAppContext) {
     cx.simulate_mouse_move(row.center(), None, Modifiers::none());
     draw(cx);
     assert!(selected(cx).is_some());
-    let panel = cx.debug_bounds("application-menu-panel").unwrap();
+    // Out past the submenu, the last level open.
+    let panel = cx.debug_bounds("application-menu-panel-1").unwrap();
     cx.simulate_mouse_move(
         point(panel.right() + px(20.), panel.bottom() + px(20.)),
         None,
