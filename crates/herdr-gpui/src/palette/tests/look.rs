@@ -2,10 +2,7 @@ use super::*;
 
 /// The status fixture's palette, open on `filter` in a window wide enough
 /// for Go To's preview.
-fn open<'a>(
-    filter: Filter,
-    cx: &'a mut TestAppContext,
-) -> (Entity<HerdrWindow>, &'a mut VisualTestContext) {
+fn open(filter: Filter, cx: &mut TestAppContext) -> (Entity<HerdrWindow>, &mut VisualTestContext) {
     let (view, cx) = cx.add_window_view(|window, cx| {
         crate::bind_keys(cx);
         agent_filter::status_fixture(window, cx)
