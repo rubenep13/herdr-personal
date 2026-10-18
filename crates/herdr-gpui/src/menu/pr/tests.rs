@@ -110,8 +110,10 @@ fn compact_pr_is_the_only_metadata_action(cx: &mut gpui::TestAppContext) {
             cx.notify();
         })
     });
+    // The redesigned menu's 32 px rows and taller header need about 30 px
+    // more than the old menu did to show the card without scrolling.
     for width in [320., 640., 1200.] {
-        cx.simulate_resize(size(px(width), px(400.)));
+        cx.simulate_resize(size(px(width), px(440.)));
         cx.update(|window, cx| {
             window.draw(cx).clear(cx);
         });
@@ -119,11 +121,11 @@ fn compact_pr_is_the_only_metadata_action(cx: &mut gpui::TestAppContext) {
         let title = cx.debug_bounds("workspace-pr-title").unwrap();
         let header = cx.debug_bounds("workspace-menu-header").unwrap();
         assert!(
-            panel.size.height < px(340.) + header.size.height + px(4.),
+            panel.size.height < px(370.) + header.size.height + px(4.),
             "oversized popover: {panel:?}"
         );
         assert!(panel.left() >= px(0.) && panel.right() <= px(width));
-        assert!(panel.bottom() <= px(400.));
+        assert!(panel.bottom() <= px(440.));
         assert!(panel.contains(&title.origin) && title.right() <= panel.right());
         assert!(cx.debug_bounds("workspace-pr-open").is_none());
         assert!(cx.debug_bounds("workspace-pr-refresh").is_none());

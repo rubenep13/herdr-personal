@@ -168,7 +168,10 @@ fn workspace_popover_header_and_right_click_retargeting(cx: &mut gpui::TestAppCo
     });
     let header = cx.debug_bounds("workspace-menu-header").unwrap();
     let name = cx.debug_bounds("workspace-menu-name").unwrap();
-    assert!(header.size.height < name.size.height * 2.);
+    assert!(cx.debug_bounds("workspace-menu-branch").is_none());
+    assert!(cx.debug_bounds("workspace-menu-header-sub-icon").is_none());
+    // The name, the header's 6 and 10 px padding, and its rule: no second line.
+    assert!(header.size.height <= name.size.height + px(17.));
     cx.update(|_, cx| {
         assert!(!cx.global::<TextProbes>().0.contains_key("main"));
         assert_eq!(target_id(view.read(cx)), Some("w0"));

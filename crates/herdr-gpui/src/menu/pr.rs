@@ -7,6 +7,9 @@ use gpui::{prelude::*, *};
 use herdr_client::protocol::*;
 use std::sync::Arc;
 
+/// The pull request card's corners, as the space menu's tiles have.
+const PR_CARD_RADIUS: f32 = 10.;
+
 impl HerdrWindow {
     /// Where the selected device's checkouts live, if pull requests can be
     /// looked up for them: the verified local daemon, or a saved SSH device.
@@ -227,13 +230,8 @@ impl HerdrWindow {
             .flex_none()
             .min_w_0()
             .child(
-                div()
-                    .px(px(8.))
-                    .pt(px(4.))
-                    .pb(px(4.))
-                    .text_size(small)
-                    .text_color(rgb(theme.muted))
-                    .child("Pull request"),
+                self.menu_look()
+                    .section("workspace-menu-section-pr".into(), "Pull request"),
             );
         let card = || {
             div()
@@ -243,7 +241,7 @@ impl HerdrWindow {
                 .min_w_0()
                 .border_1()
                 .border_color(rgb(theme.active))
-                .rounded(px(crate::config::corners::CONTROL))
+                .rounded(px(PR_CARD_RADIUS))
         };
         let pill = |text: SharedString, color: u32| {
             div()
