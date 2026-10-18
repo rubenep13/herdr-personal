@@ -14,6 +14,7 @@ use herdr_client::{ConnectTarget, LocalSession, SessionState};
 // Adding a session needs SSH, which Windows does not offer.
 #[cfg(not(windows))]
 mod form_scroll;
+mod look;
 
 /// A session as discovery reports it. The socket comes from the same path rules
 /// the window resolves, so no test hard-codes a home directory.

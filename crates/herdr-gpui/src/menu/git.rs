@@ -4,6 +4,7 @@
 use super::{Page, accent, danger};
 use crate::{
     HerdrWindow,
+    design::{ItemState, Leading},
     dialog_input::DialogInput,
     git::{Action, Status},
     pull_request::State as PrState,
@@ -357,7 +358,6 @@ impl HerdrWindow {
 
     pub(super) fn render_git_menu(&self, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
-        let font = &self.config.ui;
         let mut panel = div().flex().flex_col();
         if let Some(input) = self.git.tracked() {
             panel = panel.child(
@@ -499,52 +499,36 @@ impl HerdrWindow {
             }
             panel = panel.child(self.render_git_summary());
         }
-        panel = panel.child(
-            div()
-                .mt(px(4.))
-                .mb(px(4.))
-                .border_t_1()
-                .border_color(rgb(theme.active)),
-        );
+        let look = self.menu_look();
+        panel = panel.child(look.separator());
         let running = self.git.running().is_some() || self.pr_actions.running().is_some();
         for (row, label) in self.git_rows() {
             let selected = self.menu.git_selected == Some(row);
+            let state = ItemState {
+                selected: selected && !running,
+                disabled: running,
+                ..ItemState::default()
+            };
             panel = panel.child(
-                div()
-                    .id(SharedString::from(label.clone()))
-                    .debug_selector({
-                        let label = label.clone();
-                        move || format!("git-menu-{label}")
-                    })
-                    .min_h(px(font.line_height() + 12.))
-                    .px(px(8.))
-                    .flex()
-                    .items_center()
-                    .gap(px(8.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .when(!running, |item| item.cursor_pointer())
-                    .when(running, |item| item.text_color(rgb(theme.muted)))
-                    .when(selected && !running, |item| item.bg(rgb(theme.active)))
-                    .on_hover(cx.listener(move |this, hovered, _, cx| {
-                        if *hovered {
-                            this.menu.git_selected = Some(row);
-                        } else if this.menu.git_selected == Some(row) {
-                            this.menu.git_selected = None;
-                        }
-                        cx.notify();
-                    }))
-                    .child(
-                        svg()
-                            .path(row.icon())
-                            .size(px(14.))
-                            .flex_none()
-                            .text_color(rgb(theme.muted)),
-                    )
-                    .child(label)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        cx.stop_propagation();
-                        this.activate_git_row(row, window, cx);
-                    })),
+                look.row(
+                    SharedString::from(label.clone()),
+                    format!("git-menu-{label}"),
+                    Leading::Icon(row.icon(), format!("git-menu-{label}-icon")),
+                    state,
+                )
+                .on_hover(cx.listener(move |this, hovered, _, cx| {
+                    if *hovered {
+                        this.menu.git_selected = Some(row);
+                    } else if this.menu.git_selected == Some(row) {
+                        this.menu.git_selected = None;
+                    }
+                    cx.notify();
+                }))
+                .child(look.label(format!("git-menu-label-{label}"), label))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.activate_git_row(row, window, cx);
+                })),
             );
         }
         if let Some(action) = self.git.running() {
