@@ -237,18 +237,14 @@ impl SettingsLook {
         self.accent
     }
 
-    pub(crate) fn on_accent(&self) -> Rgba {
-        self.on_accent
-    }
-
-    pub(crate) fn shared(&self) -> Rgba {
-        self.accent
-    }
-
+    /// Read by tests: the chip draws from the field.
+    #[cfg(test)]
     pub(crate) fn shared_fill(&self) -> Rgba {
         self.shared_fill
     }
 
+    /// Read by tests: the chip draws from the field.
+    #[cfg(test)]
     pub(crate) fn local_fill(&self) -> Rgba {
         self.local_fill
     }
@@ -258,6 +254,8 @@ impl SettingsLook {
         self.danger
     }
 
+    /// Read by tests: the chip draws from the field.
+    #[cfg(test)]
     pub(crate) fn good(&self) -> Rgba {
         self.good
     }
@@ -304,8 +302,12 @@ impl SettingsLook {
         enabled: bool,
     ) -> Stateful<Div> {
         let (height, padding, text) = match size {
-            ButtonSize::Regular => (CONTROL, BUTTON_PADDING, self.scale.name),
-            ButtonSize::Small => (SMALL_BUTTON, SMALL_BUTTON_PADDING, self.scale.name - 0.5),
+            ButtonSize::Regular => (self.control_height(), BUTTON_PADDING, self.scale.name),
+            ButtonSize::Small => (
+                self.small_button_height(),
+                SMALL_BUTTON_PADDING,
+                self.scale.name - 0.5,
+            ),
         };
         let (fill, hover, ink) = match kind {
             ButtonKind::Normal => (self.line, self.button_hover, self.title),
@@ -315,7 +317,7 @@ impl SettingsLook {
             .id(id)
             .debug_selector(move || selector)
             .flex_none()
-            .h(self.at(height))
+            .h(px(height))
             .px(self.at(padding))
             .flex()
             .items_center()

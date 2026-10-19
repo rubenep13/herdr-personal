@@ -16,6 +16,7 @@ pub(in crate::settings_window) use swatches::{HostColorChange, parse_hex_input, 
 
 /// A setting's row at its least, at the default `[ui]` size; rows grow with
 /// the face ([`SettingsLook::row_min_height`]).
+#[cfg(any(test, all(feature = "integration-test", target_os = "macos")))]
 pub(in crate::settings_window) const ROW_HEIGHT: f32 = 48.;
 /// How far a dependent row steps in, and where its mark sits.
 const SUB_INDENT: f32 = 34.;
