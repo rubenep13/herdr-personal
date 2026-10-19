@@ -680,7 +680,7 @@ impl Render for SettingsWindow {
             Some(_) => self.render_search_results(cx),
             None => match self.section {
                 Section::Theme => self.render_theme(window, cx),
-                Section::Integrations => self.render_integration_controls(cx),
+                Section::Integrations => self.render_integration_controls(window, cx),
                 Section::Plugins => self.render_plugin_controls(cx),
                 Section::Code => self.render_code_controls(window, cx),
                 #[cfg(feature = "cloud")]

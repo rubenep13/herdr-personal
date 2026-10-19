@@ -71,6 +71,8 @@ fn input(
     input.update(cx, |input, cx| {
         input.set_appearance(config.ui.clone(), theme.clone(), cx);
         input.set_placeholder(placeholder, cx);
+        // The card draws the field's frame.
+        input.set_frameless(cx);
         if !text.is_empty() {
             input.set_text_selected(text, cx);
         }
@@ -228,13 +230,17 @@ impl SettingsWindow {
 
     /// A label over its input; the input draws its own field.
     fn cloud_field(&self, label: &'static str, input: AnyView) -> Div {
+        let look = self.look();
         div()
             .flex()
             .flex_col()
-            .gap(px(6.))
+            .gap(look.at(6.))
             .min_w_0()
-            .child(div().text_color(rgb(self.theme.muted)).child(label))
-            .child(input)
+            .child(div().text_color(look.muted()).child(label))
+            .child(
+                look.field(format!("cloud-field-{}", label.to_lowercase()), false)
+                    .child(div().flex_1().min_w_0().child(input)),
+            )
     }
 
     /// A saved device with its Remove button; removal leaves the machine

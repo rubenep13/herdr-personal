@@ -64,11 +64,20 @@ impl SettingsWindow {
 
     pub(in crate::settings_window) fn render_integration_controls(
         &self,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> Div {
-        let query = self.controls.integration_search.read(cx).text().to_owned();
-        div().debug_selector(|| "integrations-search".into()).flex().flex_col().gap(px(16.))
-            .child(self.controls.integration_search.clone())
+        let look = self.look();
+        let search = self.controls.integration_search.read(cx);
+        let query = search.text().to_owned();
+        let focused = search.focus.is_focused(window);
+        div().debug_selector(|| "integrations-search".into()).flex().flex_col()
+            .child(
+                look.field("integrations-search-field".into(), focused)
+                    .mt(look.at(18.))
+                    .child(svg().path("icons/search.svg").size(look.at(15.)).flex_none().text_color(look.muted()))
+                    .child(div().flex_1().min_w_0().child(self.controls.integration_search.clone())),
+            )
             .child(self.source.update(cx, |source, cx| source.render_filtered_integrations(&query, cx))
                 .unwrap_or_else(|_| div().child("Open a session window to manage agent integrations. Local preferences remain available.")))
     }

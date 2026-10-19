@@ -106,6 +106,8 @@ impl SettingsWindow {
             input.set_text_selected(&saved, cx);
             input.set_placeholder("http://127.0.0.1:8000/?tkn=\u{2026}", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            // The card draws the field's frame.
+            input.set_frameless(cx);
         });
         let focus = input.read(cx).focus.clone();
         let blur = cx.on_blur(&focus, window, |this, _, cx| {
@@ -337,7 +339,7 @@ impl SettingsWindow {
 
     pub(in crate::settings_window) fn render_code_controls(
         &self,
-        _window: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Div {
         let mode = self.code_mode(cx);
@@ -348,22 +350,28 @@ impl SettingsWindow {
             .child(self.render_code_mode(mode, cx))
             .map(|page| match mode {
                 Some(CodeMode::Start) => page.child(self.render_code_start(cx)),
-                Some(CodeMode::Address) => page.child(self.render_code_address(cx)),
+                Some(CodeMode::Address) => page.child(self.render_code_address(window, cx)),
                 None => page,
             })
     }
 
     /// The address of the user's own server, and its check.
-    fn render_code_address(&self, cx: &mut Context<Self>) -> crate::settings_window::ui::FormCard {
+    fn render_code_address(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> crate::settings_window::ui::FormCard {
+        let look = self.look();
         let field = match &self.code.field {
-            Some(field) => div()
-                .debug_selector(|| "settings-code-url".into())
-                .min_w_0()
-                .on_key_down(cx.listener(Self::code_url_key))
-                .when(field.invalid, |row| {
-                    row.border_b_1().border_color(rgb(self.theme.primary()))
-                })
-                .child(field.input.clone()),
+            Some(field) => {
+                let focused = field.input.read(cx).focus.is_focused(window);
+                // An address that does not parse rings the field in red.
+                look.field("settings-code-url".into(), focused)
+                    .min_w_0()
+                    .on_key_down(cx.listener(Self::code_url_key))
+                    .when(field.invalid, |row| row.border_color(look.danger()))
+                    .child(div().flex_1().min_w_0().child(field.input.clone()))
+            }
             None => div(),
         };
         let invalid = self.code.field.as_ref().is_some_and(|field| field.invalid);
