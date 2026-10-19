@@ -137,6 +137,30 @@ pub(super) const CATALOG: &[Entry] = &[
     ),
     entry(
         Section::Sidebar,
+        "sidebar-hierarchy",
+        "Hierarchy",
+        "How spaces and agents show they belong to their host.",
+    ),
+    entry(
+        Section::Sidebar,
+        "sidebar-tree-tabs",
+        "Tabs",
+        "Every tab of a space, or only the tabs an agent runs in.",
+    ),
+    entry(
+        Section::Sidebar,
+        "sidebar-agent-details",
+        "Agent details",
+        "The extra rows Herdr's sidebar config defines, such as the model and summary.",
+    ),
+    entry(
+        Section::Sidebar,
+        "sidebar-state-text",
+        "State as text",
+        "Name each agent's state beside its badge.",
+    ),
+    entry(
+        Section::Sidebar,
         "sidebar-show-agents",
         "Show agents",
         "List running agents under their workspace.",

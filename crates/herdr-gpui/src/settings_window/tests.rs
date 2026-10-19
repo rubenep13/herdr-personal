@@ -29,6 +29,7 @@ mod theme_mode;
 #[cfg(unix)]
 mod theme_recovery;
 mod theme_sources;
+mod tree_options;
 mod window_commands;
 mod window_lifecycle;
 

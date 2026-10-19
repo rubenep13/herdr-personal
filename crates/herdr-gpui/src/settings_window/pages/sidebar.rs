@@ -3,8 +3,10 @@
 use super::{SettingsWindow, on_value, ui};
 use crate::{
     config::{
-        Config, DeviceFooter, LayoutMode, SelectMode, SidebarOverrides, preferences::Preference,
+        AgentDetails, Config, DeviceFooter, LayoutMode, SelectMode, SidebarOverrides,
+        TreeHierarchy, TreeTabs, preferences::Preference,
     },
+    design::SettingsLook,
     settings_window::{
         inputs::{DropdownField, NumberField},
         sidebar::SidebarIntent,
@@ -197,6 +199,7 @@ impl SettingsWindow {
                         }),
                     )),)
             )
+            .child(self.tree_group(look, ready, cx))
             .child(
                 ui::group(look, "show", "Show", None)
                     .row(ui::row(look, "sidebar-show-agents", "Show agents")
@@ -299,6 +302,95 @@ impl SettingsWindow {
             super::super::native::SIDEBAR_PAGE,
         ));
         page
+    }
+
+    /// The tree layout's own options. Another layout leaves them in place,
+    /// disabled, so search still finds them.
+    fn tree_group(&self, look: &SettingsLook, ready: bool, cx: &mut Context<Self>) -> ui::Group {
+        const ONLY_TREE: &str = "Only the tree layout uses this.";
+        let tree = self.config.layout.mode == LayoutMode::Tree;
+        let enabled = ready && tree;
+        let style = &self.config.sidebar_style;
+        let gate = |row: ui::Row| if tree { row } else { row.disabled(ONLY_TREE) };
+        let state_text = style.state_text;
+        ui::group(look, "tree", "Tree", None)
+            .row(
+                gate(ui::row(look, "sidebar-hierarchy", "Hierarchy"))
+                    .description("How spaces and agents show they belong to their host.")
+                    .control(ui::segmented(
+                        look,
+                        "sidebar-hierarchy-control",
+                        &[
+                            (TreeHierarchy::Guide, "Guide"),
+                            (TreeHierarchy::Indent, "Indent"),
+                            (TreeHierarchy::Block, "Block"),
+                        ],
+                        Some(style.hierarchy),
+                        enabled,
+                        on_value(cx, |this, hierarchy, _, cx| {
+                            let mut intent = SidebarIntent::of(&this.config);
+                            intent.style.hierarchy = hierarchy;
+                            this.preview_sidebar(intent, cx);
+                        }),
+                    )),
+            )
+            .row(
+                gate(ui::row(look, "sidebar-tree-tabs", "Tabs"))
+                    .description("Every tab of a space, or only the tabs an agent runs in.")
+                    .control(ui::segmented(
+                        look,
+                        "sidebar-tree-tabs-control",
+                        &[
+                            (TreeTabs::All, "All tabs"),
+                            (TreeTabs::Agents, "Agents only"),
+                        ],
+                        Some(style.tree_tabs),
+                        enabled,
+                        on_value(cx, |this, tabs, _, cx| {
+                            let mut intent = SidebarIntent::of(&this.config);
+                            intent.style.tree_tabs = tabs;
+                            this.preview_sidebar(intent, cx);
+                        }),
+                    )),
+            )
+            .row(
+                gate(ui::row(look, "sidebar-agent-details", "Agent details"))
+                    .description(
+                        "The extra rows Herdr's sidebar config defines, such as the model and \
+                         summary.",
+                    )
+                    .control(ui::segmented(
+                        look,
+                        "sidebar-agent-details-control",
+                        &[
+                            (AgentDetails::Herdr, "From Herdr"),
+                            (AgentDetails::Off, "Off"),
+                        ],
+                        Some(style.agent_details),
+                        enabled,
+                        on_value(cx, |this, details, _, cx| {
+                            let mut intent = SidebarIntent::of(&this.config);
+                            intent.style.agent_details = details;
+                            this.preview_sidebar(intent, cx);
+                        }),
+                    )),
+            )
+            .row(
+                gate(ui::row(look, "sidebar-state-text", "State as text"))
+                    .description("Name each agent's state beside its badge.")
+                    .control(
+                        ui::toggle(look, "sidebar-state-text-toggle", state_text, enabled).when(
+                            enabled,
+                            |toggle| {
+                                toggle.on_click(cx.listener(move |this, _, _, cx| {
+                                    let mut intent = SidebarIntent::of(&this.config);
+                                    intent.style.state_text = !state_text;
+                                    this.preview_sidebar(intent, cx);
+                                }))
+                            },
+                        ),
+                    ),
+            )
     }
 
     fn layout_dropdown(&self, ready: bool, cx: &mut Context<Self>) -> Stateful<Div> {

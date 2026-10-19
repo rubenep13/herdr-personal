@@ -320,16 +320,19 @@ size = 12
 # line runs down from the host's icon beside its spaces and agents), "indent"
 # (each level steps further in), or "block" (each host and its rows sit in one
 # rounded block). Default "guide". Only the tree layout reads this key.
+# Also under Settings > Sidebar > Tree.
 # hierarchy = "guide"
 # Which tabs the tree layout lists under each space: "all" (its agents, then
 # the tabs no agent runs in) or "agents" (only the agents). Default "all".
+# Also under Settings > Sidebar > Tree.
 # tree_tabs = "all"
 # Name an agent's state in words beside its badge in the tree layout. The
-# badge already shows it, so the default is false.
+# badge already shows it, so the default is false. Also under Settings >
+# Sidebar > Tree.
 # state_text = false
 # What the tree layout shows under an agent's tab name and kind: "herdr" (the
 # extra agent rows Herdr's sidebar config defines, such as the model and the
-# summary) or "off". Default "herdr".
+# summary) or "off". Default "herdr". Also under Settings > Sidebar > Tree.
 # agent_details = "herdr"
 
 # A colour per host, keyed by the host's name in the sidebar, as #rgb or
