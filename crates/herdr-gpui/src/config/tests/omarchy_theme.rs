@@ -1,5 +1,5 @@
 use super::*;
-use crate::config::omarchy::{NAME, files, installed, load};
+use crate::config::omarchy::{NAME, desktop_home, files, installed, load};
 use theme::theme_files_in;
 use watch::fingerprint_all;
 
@@ -121,4 +121,12 @@ fn omarchy_is_never_looked_up_as_a_theme_file() -> anyhow::Result<()> {
     assert!(theme_files_in(NAME, directories).is_empty());
     assert!(theme_files_in(&ThemeName::system("Nord", NAME), directories).is_empty());
     Ok(())
+}
+
+#[test]
+fn unit_tests_never_see_the_machines_desktop_theme() {
+    // The machine running the tests may have an Omarchy theme applied; the
+    // fixtures loaded above must not pick it up. The tests above pass their
+    // own home instead.
+    assert_eq!(desktop_home(), None);
 }

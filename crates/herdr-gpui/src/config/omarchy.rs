@@ -26,6 +26,13 @@ fn directory(home: &Path) -> Option<PathBuf> {
         .find(|directory| directory.join("ghostty.conf").is_file())
 }
 
+/// The home whose desktop theme the app follows. Unit tests load fixtures
+/// on whatever machine runs them, which may have an Omarchy theme applied, so
+/// they see none; the tests that cover Omarchy pass a home of their own.
+pub(super) fn desktop_home() -> Option<PathBuf> {
+    if cfg!(test) { None } else { super::home().ok() }
+}
+
 pub(super) fn installed(home: &Path) -> bool {
     directory(home).is_some()
 }

@@ -743,7 +743,7 @@ impl Config {
     /// Without a home directory there is no desktop theme to find, and the
     /// managed default stays.
     fn with_desktop_theme(mut self, overrides: &str) -> Self {
-        if let Ok(home) = home() {
+        if let Some(home) = omarchy::desktop_home() {
             self.follow_omarchy(overrides, &home);
         }
         self

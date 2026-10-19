@@ -107,7 +107,7 @@ impl Config {
     /// `Theme::BUILTIN_NAMES`, which remain loadable without any directories.
     pub fn available_themes(&self) -> Result<Vec<String>> {
         let mut names = self.available_themes_in(&theme_directories()?)?;
-        if home().is_ok_and(|home| omarchy::installed(&home)) {
+        if omarchy::desktop_home().is_some_and(|home| omarchy::installed(&home)) {
             names.push(omarchy::NAME.into());
             names.sort_by_cached_key(|name| (name.to_lowercase(), name.clone()));
             names.dedup();
@@ -216,7 +216,7 @@ impl Config {
         let mut files = theme_files_in(theme, theme_directories);
         let follows_omarchy = ThemeName::parse(theme)
             .is_ok_and(|name| [name.get(true), name.get(false)].contains(&omarchy::NAME));
-        if follows_omarchy && let Ok(home) = home() {
+        if follows_omarchy && let Some(home) = omarchy::desktop_home() {
             files.extend(omarchy::files(&home));
         }
         files
