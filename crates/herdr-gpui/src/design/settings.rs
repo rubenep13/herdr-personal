@@ -21,6 +21,8 @@ const SEGMENT: f32 = 26.;
 /// A setting's row at its least.
 const ROW_MIN: f32 = 48.;
 const SMALL_BUTTON: f32 = 26.;
+/// The switch's track, as the app draws it elsewhere.
+const SWITCH: f32 = 20.;
 const CONTROL_RADIUS: f32 = 8.;
 const CARD_RADIUS: f32 = 10.;
 /// How far the rule between a card's rows keeps from its sides.
@@ -88,10 +90,14 @@ pub(crate) struct SettingsLook {
     on_accent: Rgba,
     shared_fill: Rgba,
     local_fill: Rgba,
+    danger: Rgba,
     good: Rgba,
     good_fill: Rgba,
     warn: Rgba,
     warn_fill: Rgba,
+    /// The switch's colours off and on, as [`crate::toggles::colors`] gives
+    /// them for the theme.
+    switch: [(u32, u32); 2],
     scale: TypeScale,
     /// How far the face is from the size the measures are given at.
     zoom: f32,
@@ -126,10 +132,15 @@ impl SettingsLook {
             on_accent: rgb(theme.background),
             shared_fill: rgb(mix(theme.background, theme.primary(), SHARED_PERCENT)),
             local_fill: rgb(mix(theme.background, theme.active, LOCAL_PERCENT)),
+            danger: crate::menu::danger(theme),
             good: rgb(good),
             good_fill: rgb(mix(theme.background, good, TONE_PERCENT)),
             warn: rgb(warn),
             warn_fill: rgb(mix(theme.background, warn, TONE_PERCENT)),
+            switch: [
+                crate::toggles::colors(theme, false),
+                crate::toggles::colors(theme, true),
+            ],
             scale: TypeScale::of(font),
             zoom: font.size / BASE_SIZE,
         }
@@ -190,6 +201,12 @@ impl SettingsLook {
         self.line
     }
 
+    /// A step past the hairline toward the text: a hovered button's fill, a
+    /// hovered control's ring.
+    pub(crate) fn raised(&self) -> Rgba {
+        self.button_hover
+    }
+
     /// A selected row's fill.
     pub(crate) fn selection(&self) -> Rgba {
         self.line
@@ -227,12 +244,22 @@ impl SettingsLook {
         self.local_fill
     }
 
+    /// A field whose text does not parse.
+    pub(crate) fn danger(&self) -> Rgba {
+        self.danger
+    }
+
     pub(crate) fn good(&self) -> Rgba {
         self.good
     }
 
     pub(crate) fn warn(&self) -> Rgba {
         self.warn
+    }
+
+    /// A switch, the app's shared one at this face's size.
+    pub(crate) fn switch(&self, on: bool) -> Div {
+        crate::toggles::switch_in(self.switch[usize::from(on)], SWITCH * self.zoom, on)
     }
 
     /// A section's card: its rows go in a column, split by [`Self::rule`].

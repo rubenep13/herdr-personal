@@ -71,7 +71,7 @@ impl SettingsWindow {
         let view = cx.entity().downgrade();
         let (opener, picker, dismisser) = (view.clone(), view.clone(), view);
         ui::dropdown(
-            &self.theme,
+            &self.look(),
             field.selector(),
             label,
             true,

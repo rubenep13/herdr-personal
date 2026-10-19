@@ -12,7 +12,7 @@ impl SettingsWindow {
             .flex_col()
             .gap(px(10.))
             .min_w_0()
-            .child(ui::section(&self.theme, title, None))
+            .child(ui::section(&self.look(), title, None))
     }
 
     /// A clickable row with `label` and a switch; the caller adds `.on_click`
@@ -46,6 +46,6 @@ impl SettingsWindow {
                     .font_weight(FontWeight::MEDIUM)
                     .child(label.into()),
             )
-            .child(ui::toggle(&self.theme, toggle, checked, true))
+            .child(ui::toggle(&self.look(), toggle, checked, true))
     }
 }

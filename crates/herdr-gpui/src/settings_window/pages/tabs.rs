@@ -9,7 +9,7 @@ use gpui::{prelude::*, *};
 
 impl SettingsWindow {
     pub(in crate::settings_window) fn render_tabs(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         let ready = self.controls_shared_ready();
         let shared = self.shared.as_ref();
         let position = shared.map(|shared| shared.tab_bar_position);
@@ -18,11 +18,11 @@ impl SettingsWindow {
         let mut page = div()
             .flex()
             .flex_col()
-            .child(ui::section(theme, "Tab bar", Some(ui::Source::Shared)))
+            .child(ui::section(look, "Tab bar", Some(ui::Source::Shared)))
             .child(
-                self.gate_shared(ui::row(theme, "tabs-position", "Position"))
+                self.gate_shared(ui::row(look, "tabs-position", "Position"))
                     .control(ui::segmented(
-                        theme,
+                        look,
                         "tabs-position-control",
                         &[
                             (TabBarPosition::Top, "Top"),
@@ -36,9 +36,9 @@ impl SettingsWindow {
                     )),
             )
             .child(
-                self.gate_shared(ui::row(theme, "tabs-hide-single", "Hide with a single tab"))
+                self.gate_shared(ui::row(look, "tabs-hide-single", "Hide with a single tab"))
                     .control(
-                        ui::toggle(theme, "tabs-hide-single-toggle", hide, ready).when(
+                        ui::toggle(look, "tabs-hide-single-toggle", hide, ready).when(
                             ready,
                             |toggle| {
                                 toggle.on_click(cx.listener(move |this, _, _, cx| {
@@ -48,9 +48,9 @@ impl SettingsWindow {
                         ),
                     ),
             )
-            .child(ui::section(theme, "Closing", None))
+            .child(ui::section(look, "Closing", None))
             .child(
-                ui::row(theme, "tabs-confirm-tab", "Confirm before closing a tab").control(
+                ui::row(look, "tabs-confirm-tab", "Confirm before closing a tab").control(
                     self.preference_toggle(
                         "tabs-confirm-tab-toggle",
                         self.config.confirm_close_tab,
@@ -60,7 +60,7 @@ impl SettingsWindow {
                 ),
             )
             .child(
-                ui::row(theme, "tabs-confirm-pane", "Confirm before closing a pane").control(
+                ui::row(look, "tabs-confirm-pane", "Confirm before closing a pane").control(
                     self.preference_toggle(
                         "tabs-confirm-pane-toggle",
                         self.config.confirm_close_pane,
@@ -71,7 +71,7 @@ impl SettingsWindow {
             )
             .child(
                 ui::row(
-                    theme,
+                    look,
                     "tabs-confirm-workspace",
                     "Confirm before closing a workspace",
                 )
@@ -82,9 +82,9 @@ impl SettingsWindow {
                     cx,
                 )),
             )
-            .child(ui::section(theme, "Panes", None))
+            .child(ui::section(look, "Panes", None))
             .child(
-                ui::row(theme, "tabs-focus-follows-mouse", "Focus follows mouse")
+                ui::row(look, "tabs-focus-follows-mouse", "Focus follows mouse")
                     .description("The pointer chooses the active pane within a split terminal tab.")
                     .control(self.preference_toggle(
                         "tabs-focus-follows-mouse-toggle",
@@ -93,11 +93,11 @@ impl SettingsWindow {
                         cx,
                     )),
             )
-            .child(ui::section(theme, "Session restore", None))
+            .child(ui::section(look, "Session restore", None))
             .child(
                 self.gate_shared(
                     ui::row(
-                        theme,
+                        look,
                         "tabs-pane-history",
                         "Restore scrollback after Herdr restarts",
                     )
@@ -108,7 +108,7 @@ impl SettingsWindow {
                     ),
                 )
                 .control(
-                    ui::toggle(theme, "tabs-pane-history-toggle", history, ready).when(
+                    ui::toggle(look, "tabs-pane-history-toggle", history, ready).when(
                         ready,
                         |toggle| {
                             toggle.on_click(cx.listener(move |this, _, _, cx| {
@@ -137,10 +137,10 @@ impl SettingsWindow {
             };
             let id = format!("tabs-pane-history-host-{index}");
             page = page.child(
-                ui::row(theme, id.clone(), host.label.clone())
+                ui::row(look, id.clone(), host.label.clone())
                     .description(note)
                     .control(
-                        ui::toggle(theme, format!("{id}-toggle"), checked, enabled).when(
+                        ui::toggle(look, format!("{id}-toggle"), checked, enabled).when(
                             enabled,
                             |toggle| {
                                 toggle.on_click(cx.listener(move |this, _, _, cx| {

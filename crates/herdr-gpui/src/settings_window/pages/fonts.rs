@@ -33,17 +33,17 @@ impl SettingsWindow {
     pub(in crate::settings_window) fn render_fonts(&self, cx: &mut Context<Self>) -> Div {
         #[cfg(all(feature = "integration-test", target_os = "macos"))]
         self.reset_native_font_bounds(cx);
-        let theme = &self.theme;
+        let look = &self.look();
         let mut page = div()
             .flex()
             .flex_col()
             .min_w_0()
-            .child(ui::section(theme, "Faces", None));
+            .child(ui::section(look, "Faces", None));
         for (face, label) in FACES {
             page = page.child(self.face_row(face, label, cx));
         }
         page.child(
-            ui::row(theme, "fonts-all-row", "All faces").control(
+            ui::row(look, "fonts-all-row", "All faces").control(
                 self.all_families_button()
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_control_font_picker(FontTarget::All, window, cx)
@@ -51,7 +51,7 @@ impl SettingsWindow {
             ),
         )
         .child(ui::section(
-            theme,
+            look,
             specimen_title(self.active_font_face()),
             None,
         ))
@@ -71,16 +71,16 @@ impl SettingsWindow {
         label: &'static str,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let theme = &self.theme;
+        let look = &self.look();
         let field = NumberField::FontSize(face);
         let id = field.selector();
         let size = self.control_face_size(face);
         let view = cx.entity().downgrade();
-        let row = ui::row(theme, format!("fonts-{}", face.name()), label)
+        let row = ui::row(look, format!("fonts-{}", face.name()), label)
             .control(self.family_button(face, cx))
             .control(
                 ui::number(
-                    theme,
+                    look,
                     ui::Number {
                         id,
                         value: size,

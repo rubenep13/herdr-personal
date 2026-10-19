@@ -30,17 +30,17 @@ pub(in crate::settings_window) fn padding_ids(
 
 impl SettingsWindow {
     pub(in crate::settings_window) fn render_window_rows(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         div()
             .flex()
             .flex_col()
             .child(
-                ui::section(theme, "Window", Some(ui::Source::Local))
+                ui::section(look, "Window", Some(ui::Source::Local))
                     .debug_selector(|| "settings-window-section".into()),
             )
             .child(self.render_backdrop_controls(cx))
             .child(
-                ui::section(theme, "Terminal padding", Some(ui::Source::Local))
+                ui::section(look, "Terminal padding", Some(ui::Source::Local))
                     .debug_selector(|| "settings-terminal-padding".into()),
             )
             .children(PADDING_SIDES.map(|(axis, side)| self.padding_row(axis, side, cx)))
@@ -51,14 +51,14 @@ impl SettingsWindow {
         let (row, _, title) = padding_ids(axis, side);
         let value = self.number_value(field, self.config.terminal_padding.axis(axis).side(side));
         let view = cx.entity().downgrade();
-        ui::row(&self.theme, row, title)
+        ui::row(&self.look(), row, title)
             .when(axis == Axis::X && side == Side::Start, |row| {
                 row.description(
                     "Beside the sidebar. A deprecated sidebar_gap stands in while unset.",
                 )
             })
             .control(ui::number(
-                &self.theme,
+                &self.look(),
                 ui::Number {
                     id: field.selector(),
                     value,

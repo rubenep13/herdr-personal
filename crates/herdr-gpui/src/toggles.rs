@@ -71,7 +71,12 @@ pub(crate) fn radio(theme: &Theme, size: f32, selected: bool) -> Div {
 /// A pill track with a round thumb that sits right when on. `height` sets the
 /// scale; the track is about 1.6 times as wide.
 pub(crate) fn switch(theme: &Theme, height: f32, on: bool) -> Div {
-    let (track, thumb) = colors(theme, on);
+    switch_in(colors(theme, on), height, on)
+}
+
+/// [`switch`] with its [`colors`] already worked out, for a caller that keeps
+/// them rather than the theme.
+pub(crate) fn switch_in((track, thumb): (u32, u32), height: f32, on: bool) -> Div {
     let inset = (height / 8.).round();
     div()
         .w(px((height * 1.64).round()))

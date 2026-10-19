@@ -34,9 +34,10 @@ impl SettingsWindow {
         }
         let browser = &self.themes;
         let theme = &self.theme;
+        let look = &self.look();
         let count = usize::from(browser.ghostty_enabled) * browser.names.len()
             + usize::from(browser.herdr_enabled) * herdr_settings::THEME_NAMES.len();
-        let button = |id: &'static str, label: String| ui::button(theme, id, label, true);
+        let button = |id: &'static str, label: String| ui::button(look, id, label, true);
         div()
             .flex()
             .flex_col()

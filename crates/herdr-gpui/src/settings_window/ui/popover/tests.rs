@@ -21,7 +21,7 @@ fn options() -> Vec<SharedString> {
 
 impl Render for Harness {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = Theme::default();
+        let look = SettingsLook::of(&Theme::default(), &crate::config::Config::default().ui);
         let picked = self.picked.clone();
         let opens = self.opens.clone();
         let keys = self.keys.clone();
@@ -43,7 +43,7 @@ impl Render for Harness {
                 });
             })
             .child(dropdown(
-                &theme,
+                &look,
                 "notif-position-control",
                 "Top right",
                 false,

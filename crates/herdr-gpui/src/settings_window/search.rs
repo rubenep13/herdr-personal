@@ -133,6 +133,7 @@ impl SettingsWindow {
     /// The body while a query is typed: one row per match, in catalog order.
     pub(super) fn render_search_results(&self, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
+        let look = &self.look();
         let results = self.visible_results();
         if results.is_empty() {
             return div()
@@ -149,7 +150,7 @@ impl SettingsWindow {
                 .map(|(n, (index, entry))| {
                     let id = format!("settings-search-result-{n}");
                     let mut row = ui::row(
-                        theme,
+                        look,
                         id.clone(),
                         format!("{} \u{203a} {}", entry.section.label(), entry.title),
                     );

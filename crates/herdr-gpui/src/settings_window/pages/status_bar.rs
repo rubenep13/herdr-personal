@@ -24,7 +24,7 @@ struct ButtonRow {
 
 impl SettingsWindow {
     pub(in crate::settings_window) fn render_status_bar(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         let items = self.config.status_bar;
         let usage = self.config.usage.show;
         let system_load = self.config.show_system_load;
@@ -59,9 +59,9 @@ impl SettingsWindow {
         div()
             .flex()
             .flex_col()
-            .child(ui::section(theme, "Items", Some(ui::Source::Local)))
+            .child(ui::section(look, "Items", Some(ui::Source::Local)))
             .child(
-                ui::row(theme, "status-usage", "Usage")
+                ui::row(look, "status-usage", "Usage")
                     .description(
                         "Plan usage for signed-in AI services. Compact shows each service's \
                          tightest limit as one share; Detailed adds a meter and its two \
@@ -75,15 +75,15 @@ impl SettingsWindow {
                         cx,
                     ))
                     .control(
-                        ui::toggle(theme, "status-usage-toggle", usage, true).on_click(
-                            cx.listener(move |this, _, _, cx| {
+                        ui::toggle(look, "status-usage-toggle", usage, true).on_click(cx.listener(
+                            move |this, _, _, cx| {
                                 this.save_native(move || Config::save_usage_visibility(!usage), cx);
-                            }),
-                        ),
+                            },
+                        )),
                     ),
             )
             .child(
-                ui::row(theme, "status-system-load", "CPU and memory")
+                ui::row(look, "status-system-load", "CPU and memory")
                     .description("Hiding CPU and memory also removes them from sidebar host rows.")
                     .control(self.detail_control(
                         "status-system-load-detail",
@@ -100,7 +100,7 @@ impl SettingsWindow {
                     )),
             )
             .child(
-                ui::row(theme, "status-network-quality", "Network latency and loss")
+                ui::row(look, "status-network-quality", "Network latency and loss")
                     .description(
                         "Times one TCP connect to 1.1.1.1:443 every 15 seconds from this \
                          machine, about a megabyte a day.",
@@ -113,7 +113,7 @@ impl SettingsWindow {
                     )),
             )
             .child(
-                ui::row(theme, "status-keep-awake", "Keep display awake").control(
+                ui::row(look, "status-keep-awake", "Keep display awake").control(
                     self.preference_toggle(
                         "status-keep-awake-toggle",
                         keep_awake,
@@ -143,7 +143,7 @@ impl SettingsWindow {
         cx: &mut Context<Self>,
     ) -> Div {
         ui::segmented(
-            &self.theme,
+            &self.look(),
             id,
             &DETAILS,
             shown.then_some(current),
@@ -170,9 +170,9 @@ impl SettingsWindow {
         } else {
             Button::default()
         };
-        ui::row(&self.theme, id, title)
+        ui::row(&self.look(), id, title)
             .control(ui::segmented(
-                &self.theme,
+                &self.look(),
                 style,
                 &STYLES,
                 shown.then_some(current),

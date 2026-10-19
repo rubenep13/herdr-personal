@@ -37,12 +37,12 @@ pub(in crate::settings_window) fn open_path(reveal: bool, path: PathBuf, cx: &mu
 
 impl SettingsWindow {
     pub(in crate::settings_window) fn render_configuration(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         let shared_path = self.shared.as_ref().map(|shared| shared.path.clone());
         div()
             .flex()
             .flex_col()
-            .child(ui::section(theme, "Files", None))
+            .child(ui::section(look, "Files", None))
             .child(self.file_row(
                 "config-local",
                 "GUI overrides",
@@ -61,10 +61,10 @@ impl SettingsWindow {
                 shared_path.clone(),
             )))
             .child(
-                ui::row(theme, "config-reload", "Reload configuration")
+                ui::row(look, "config-reload", "Reload configuration")
                     .description("Re-reads both files. Does not restart the daemon.")
                     .control(
-                        ui::button(theme, "config-reload-button", "Reload", true)
+                        ui::button(look, "config-reload-button", "Reload", true)
                             .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
                     ),
             )
@@ -77,7 +77,7 @@ impl SettingsWindow {
         source: ui::Source,
         path: String,
     ) -> ui::Row {
-        ui::row(&self.theme, id, title)
+        ui::row(&self.look(), id, title)
             .tag(source)
             .description(path)
     }
@@ -107,7 +107,7 @@ impl SettingsWindow {
             let enabled = file.is_some();
             let file = file.clone();
             row = row.control(
-                ui::button(&self.theme, format!("{id}-{suffix}"), label, enabled).when(
+                ui::button(&self.look(), format!("{id}-{suffix}"), label, enabled).when(
                     enabled,
                     |button| {
                         button.on_click(move |_, _, cx| {

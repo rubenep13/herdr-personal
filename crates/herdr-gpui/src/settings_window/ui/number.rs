@@ -1,8 +1,12 @@
 //! A number with -/+ steppers, typed entry, and an optional drag slider.
-use crate::config::{Theme, corners};
+use crate::design::SettingsLook;
 use crate::search_input::SearchInput;
 use gpui::{prelude::*, *};
-use std::{cell::Cell, ops::RangeInclusive, rc::Rc};
+use std::{cell::Cell, ops::RangeInclusive, rc::Rc, sync::Arc};
+
+/// The value's cell and each stepper's width, at the default `[ui]` size.
+const VALUE_WIDTH: f32 = 46.;
+const STEPPER_WIDTH: f32 = 28.;
 
 thread_local! {
     /// The last previewed value of the slider being dragged. Every Preview
@@ -87,7 +91,7 @@ fn stepped_value(value: f32, delta: f32, range: &RangeInclusive<f32>) -> Option<
 struct SliderDrag(&'static str);
 
 pub(in crate::settings_window) fn number(
-    theme: &Theme,
+    look: &SettingsLook,
     spec: Number,
     editing: Option<&NumberEdit>,
     on_change: impl Fn(NumberChange, &mut Window, &mut App) + 'static,
@@ -101,7 +105,7 @@ pub(in crate::settings_window) fn number(
         .debug_selector(move || id.into())
         .flex()
         .items_center()
-        .gap(px(10.))
+        .gap(look.at(10.))
         .flex_none()
         .when(!enabled, |root| root.opacity(0.5));
     if spec.slider {
@@ -123,8 +127,8 @@ pub(in crate::settings_window) fn number(
         let track = div()
             .id((ElementId::from(id), "slider"))
             .debug_selector(move || format!("{id}-slider"))
-            .w(px(150.))
-            .h(px(16.))
+            .w(look.at(150.))
+            .h(look.at(16.))
             .flex()
             .items_center()
             .child(
@@ -132,13 +136,13 @@ pub(in crate::settings_window) fn number(
                     .w_full()
                     .h(px(3.))
                     .rounded_full()
-                    .bg(rgb(theme.active))
+                    .bg(look.line())
                     .child(
                         div()
                             .h_full()
                             .w(relative(fraction))
                             .rounded_full()
-                            .bg(rgb(theme.primary())),
+                            .bg(look.accent()),
                     ),
             );
         root = root.child(if enabled {
@@ -167,21 +171,29 @@ pub(in crate::settings_window) fn number(
     }
     let value_text = format!("{}", spec.value as i32);
     let border = match editing {
-        Some(edit) if edit.invalid => theme.ink(0xd45b5b),
-        _ => theme.active,
+        Some(edit) if edit.invalid => look.danger(),
+        _ => look.line(),
     };
+    let value_width = look.at(VALUE_WIDTH);
     let shown = match editing {
         Some(edit) => div()
-            .w(px(44.))
+            .w(value_width)
             .child(edit.input.clone())
             .into_any_element(),
         None => div()
             .id((ElementId::from(id), "value"))
-            .w(px(44.))
-            .px(px(6.))
-            .text_right()
+            .min_w(value_width)
+            .h_full()
+            .px(look.at(4.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .gap(look.at(3.))
+            .font_features(FontFeatures(Arc::new(vec![("tnum".into(), 1)])))
+            .text_color(look.title())
             .when(enabled, |value| value.cursor_text())
             .child(value_text)
+            .child(div().text_color(look.muted()).child(spec.unit))
             .when(enabled, |value| {
                 value.on_click(move |_, window, cx| on_edit(window, cx))
             })
@@ -191,30 +203,25 @@ pub(in crate::settings_window) fn number(
         let on_change = on_change.clone();
         let range = range.clone();
         let value = spec.value;
-        stepper(theme, id, which, glyph, enabled, move |window, cx| {
+        stepper(look, id, which, glyph, enabled, move |window, cx| {
             if let Some(next) = stepped_value(value, delta, &range) {
                 on_change(NumberChange::Commit(next), window, cx)
             }
         })
     };
+    // The value sits between its steppers, as the mockup draws it.
     let field = div()
         .debug_selector(move || format!("{id}-field"))
+        .h(px(look.control_height()))
         .flex()
         .items_center()
-        .rounded(px(corners::CONTROL))
+        .rounded(look.at(8.))
         .border_1()
-        .border_color(rgb(border))
-        .bg(rgb(theme.surface))
-        .child(shown)
-        .child(
-            div()
-                .pr(px(6.))
-                .text_color(rgb(theme.muted))
-                .child(spec.unit),
-        )
+        .border_color(border)
+        .bg(look.well())
         .child(stepper_for("minus", "\u{2212}", -1.))
+        .child(shown)
         .child(stepper_for("plus", "+", 1.));
-    // The native desktop checks click the field by its painted bounds.
     #[cfg(all(feature = "integration-test", target_os = "macos"))]
     let field = field
         .relative()
@@ -223,8 +230,8 @@ pub(in crate::settings_window) fn number(
         )));
     root.child(field).child(
         div()
-            .text_size(px(10.))
-            .text_color(rgb(theme.muted))
+            .text_size(px(look.scale().detail))
+            .text_color(look.muted())
             .child(format!(
                 "{} to {}",
                 *range.start() as i32,
@@ -234,26 +241,29 @@ pub(in crate::settings_window) fn number(
 }
 
 fn stepper(
-    theme: &Theme,
+    look: &SettingsLook,
     id: &'static str,
     which: &'static str,
     glyph: &'static str,
     enabled: bool,
     on_click: impl Fn(&mut Window, &mut App) + 'static,
 ) -> Stateful<Div> {
+    let (fill, ink) = (look.selection(), look.title());
     div()
         .id((ElementId::from(id), which))
         .debug_selector(move || format!("{id}-{which}"))
-        .w(px(20.))
-        .py(px(3.))
-        .text_center()
-        .border_l_1()
-        .border_color(rgb(theme.active))
-        .text_color(rgb(theme.subtext()))
+        .w(look.at(STEPPER_WIDTH))
+        .h_full()
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .rounded(look.at(8.))
+        .text_color(look.muted())
         .when(enabled, |stepper| {
             stepper
                 .cursor_pointer()
-                .hover(|s| s.bg(rgb(theme.active)))
+                .hover(move |s| s.bg(fill).text_color(ink))
                 .on_click(move |_, window, cx| on_click(window, cx))
         })
         .child(glyph)

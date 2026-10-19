@@ -160,7 +160,7 @@ impl SettingsWindow {
             .debug_selector(|| "settings-backdrop".into())
             .flex()
             .flex_col()
-            .child(ui::row(&self.theme, "theme-backdrop", "Backdrop").description(description))
+            .child(ui::row(&self.look(), "theme-backdrop", "Backdrop").description(description))
             .child(tiles.py(px(10.)))
             .child(details)
     }

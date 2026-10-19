@@ -70,7 +70,7 @@ impl Harness {
 
 impl Render for Harness {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let theme = Theme::default();
+        let look = SettingsLook::of(&Theme::default(), &crate::config::Config::default().ui);
         let (seen, other, edits) = (self.seen.clone(), self.other.clone(), self.edits.clone());
         let spec = |id, slider, enabled| Number {
             id,
@@ -87,14 +87,14 @@ impl Render for Harness {
             .flex_col()
             .gap(px(20.))
             .child(number(
-                &theme,
+                &look,
                 spec("n", self.slider, self.enabled),
                 None,
                 move |change, _, _| seen.borrow_mut().push(change),
                 move |_, _| edits.set(edits.get() + 1),
             ))
             .child(number(
-                &theme,
+                &look,
                 spec("m", true, true),
                 None,
                 move |change, _, _| other.borrow_mut().push(change),
@@ -233,11 +233,9 @@ fn clicking_the_value_asks_to_edit(cx: &mut TestAppContext) {
     let (harness, seen, _, edits) = Harness::new();
     let (_, cx) = cx.add_window_view(|_, _| harness);
     draw(cx);
+    // The value sits between the steppers, in the middle of the field.
     let field = cx.debug_bounds("n-field").unwrap();
-    cx.simulate_click(
-        point(field.left() + px(10.), field.center().y),
-        Default::default(),
-    );
+    cx.simulate_click(field.center(), Default::default());
     cx.run_until_parked();
     assert_eq!(edits.get(), 1);
     assert!(seen.borrow().is_empty());

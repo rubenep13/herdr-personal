@@ -493,6 +493,12 @@ impl SettingsWindow {
         }
     }
 
+    /// The look every page draws with: the theme's colours at the `[ui]`
+    /// face's size.
+    pub(super) fn look(&self) -> crate::design::SettingsLook {
+        crate::design::SettingsLook::of(&self.theme, &self.config.ui)
+    }
+
     pub(super) fn busy(&self) -> bool {
         self.loading || self.saving || self.quitting
     }

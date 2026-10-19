@@ -146,23 +146,24 @@ impl SettingsWindow {
 
     pub(in crate::settings_window) fn render_sidebar(&self, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
+        let look = &self.look();
         let ready = !self.quitting && self.closing.is_none();
         let mut page = div()
             .relative()
             .flex()
             .flex_col()
-            .child(ui::section(theme, "Layout", None))
+            .child(ui::section(look, "Layout", None))
             .child(
-                ui::row(theme, "sidebar-layout", "Layout preset")
+                ui::row(look, "sidebar-layout", "Layout preset")
                     .tag(ui::Source::Local)
                     .description("Row shape and density; spacing below starts from the preset.")
                     .control(self.layout_dropdown(ready, cx)),
             )
             .child(
-                ui::row(theme, "sidebar-select", "Selection marks")
+                ui::row(look, "sidebar-select", "Selection marks")
                     .description("What selecting a workspace highlights beyond its own row.")
                     .control(ui::segmented(
-                        theme,
+                        look,
                         "sidebar-select-control",
                         &[
                             (SelectMode::Row, "Row"),
@@ -179,13 +180,13 @@ impl SettingsWindow {
                     )),
             )
             .child(
-                ui::row(theme, "sidebar-device-footer", "Device footer")
+                ui::row(look, "sidebar-device-footer", "Device footer")
                     .description(
                         "The device picker and its buttons. Auto shows it with two or more \
                          devices.",
                     )
                     .control(ui::segmented(
-                        theme,
+                        look,
                         "sidebar-device-footer-control",
                         &[
                             (DeviceFooter::Always, "Always"),
@@ -202,11 +203,11 @@ impl SettingsWindow {
                     )),
             )
             .child(
-                ui::row(theme, "sidebar-show-agents", "Show agents")
+                ui::row(look, "sidebar-show-agents", "Show agents")
                     .description("List running agents under their workspace.")
                     .control(
                         ui::toggle(
-                            theme,
+                            look,
                             "sidebar-show-agents-toggle",
                             self.config.show_agents,
                             true,
@@ -218,7 +219,7 @@ impl SettingsWindow {
                     ),
             )
             .child(
-                ui::row(theme, "sidebar-show-search", "Show search")
+                ui::row(look, "sidebar-show-search", "Show search")
                     .description("The search field above the workspaces.")
                     .control(self.preference_toggle(
                         "sidebar-show-search-toggle",
@@ -228,7 +229,7 @@ impl SettingsWindow {
                     )),
             )
             .child(
-                ui::row(theme, "sidebar-repository-icons", "Show repository icons")
+                ui::row(look, "sidebar-repository-icons", "Show repository icons")
                     .description(
                         "The repository owner's avatar at the start of each workspace row.",
                     )
@@ -240,7 +241,7 @@ impl SettingsWindow {
                     )),
             )
             .child(
-                ui::row(theme, "sidebar-device-icons", "Show device icons")
+                ui::row(look, "sidebar-device-icons", "Show device icons")
                     .description(
                         "A mark before each device's name: this machine, a cloud provider or SSH.",
                     )
@@ -251,12 +252,12 @@ impl SettingsWindow {
                         cx,
                     )),
             )
-            .child(ui::section(theme, "Spacing", None));
+            .child(ui::section(look, "Spacing", None));
         for spacing in Spacing::ALL {
             page = page.child(self.spacing_row(spacing, ready, cx));
         }
         page = page.child(
-            ui::section(theme, "Host colours", None)
+            ui::section(look, "Host colours", None)
                 .relative()
                 .debug_selector(|| "sidebar-host-colours".into())
                 .child(super::super::search::track_bounds(
@@ -289,7 +290,7 @@ impl SettingsWindow {
                 .map(|edit| (edit.input.clone(), edit.invalid));
             let (changed, editing) = (host.clone(), host.clone());
             page = page.child(ui::swatch_row(
-                theme,
+                look,
                 &host,
                 index,
                 color,
@@ -333,7 +334,7 @@ impl SettingsWindow {
         let view = cx.entity().downgrade();
         let (opener, picker, dismisser) = (view.clone(), view.clone(), view);
         ui::dropdown(
-            &self.theme,
+            &self.look(),
             FIELD.selector(),
             mode.label(),
             false,
@@ -361,10 +362,10 @@ impl SettingsWindow {
         let field = NumberField::Spacing(spacing);
         let value = spacing.value(&self.config);
         let view = cx.entity().downgrade();
-        ui::row(&self.theme, spacing.row(), spacing.title())
+        ui::row(&self.look(), spacing.row(), spacing.title())
             .description(spacing.description())
             .control(ui::number(
-                &self.theme,
+                &self.look(),
                 ui::Number {
                     id: field.selector(),
                     value,

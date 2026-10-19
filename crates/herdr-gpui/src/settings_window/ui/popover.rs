@@ -1,10 +1,7 @@
 //! Dropdown: a button that opens a floating option list beneath itself. The
 //! list renders inside the button's subtree via `deferred(anchored(..))`, so
 //! no bounds are passed around and it paints above the page.
-use crate::{
-    config::{Theme, corners},
-    settings_window::inputs::DropdownField,
-};
+use crate::{design::SettingsLook, settings_window::inputs::DropdownField};
 use gpui::{prelude::*, *};
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
@@ -62,7 +59,7 @@ impl Dropdown {
 /// The button, plus its list when `open` is this dropdown.
 #[allow(clippy::too_many_arguments)]
 pub(in crate::settings_window) fn dropdown(
-    theme: &Theme,
+    look: &SettingsLook,
     id: &'static str,
     label: impl Into<SharedString>,
     shared_prefix: bool,
@@ -82,10 +79,11 @@ pub(in crate::settings_window) fn dropdown(
     let label_el = match label.strip_prefix(prefix).filter(|_| shared_prefix) {
         Some(rest) => div()
             .flex()
-            .child(div().text_color(rgb(theme.muted)).child(prefix))
+            .child(div().text_color(look.muted()).child(prefix))
             .child(rest.to_string()),
         None => div().child(label.clone()),
     };
+    let ring = look.raised();
     div()
         .id(id)
         .debug_selector(move || id.to_string())
@@ -93,20 +91,24 @@ pub(in crate::settings_window) fn dropdown(
         .flex()
         .items_center()
         .justify_between()
-        .gap(px(8.))
+        .gap(look.at(8.))
         .flex_none()
-        .min_w(px(150.))
-        .px(px(10.))
-        .py(px(4.))
-        .rounded(px(corners::CONTROL))
+        .h(px(look.control_height()))
+        .min_w(look.at(170.))
+        .pl(look.at(12.))
+        .pr(look.at(8.))
+        .rounded(look.at(8.))
         .border_1()
-        .border_color(rgb(theme.active))
-        .bg(rgb(theme.surface))
-        .text_color(rgb(theme.foreground))
+        .border_color(look.line())
+        .bg(look.well())
+        .text_size(px(look.scale().name))
+        .text_color(look.title())
+        .whitespace_nowrap()
         .when(!enabled, |button| button.opacity(0.5))
         .when(enabled, |button| {
             button
                 .cursor_pointer()
+                .hover(move |button| button.border_color(ring))
                 .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                     if was_open {
                         CLOSING.with(|closing| closing.borrow_mut().insert(id));
@@ -123,12 +125,18 @@ pub(in crate::settings_window) fn dropdown(
                 })
         })
         .child(label_el)
-        .child(div().text_color(rgb(theme.subtext())).child("⌄"))
+        .child(
+            svg()
+                .path("icons/chevron-down.svg")
+                .size(look.at(14.))
+                .flex_none()
+                .text_color(look.muted()),
+        )
         .children(open.map(|open| {
             deferred(
                 anchored()
                     .snap_to_window_with_margin(px(8.))
-                    .child(popover_list(theme, open, on_pick, move |window, cx| {
+                    .child(popover_list(look, open, on_pick, move |window, cx| {
                         dismiss_list(window, cx)
                     })),
             )
@@ -138,7 +146,7 @@ pub(in crate::settings_window) fn dropdown(
 
 /// The floating list; also usable on its own where the view wants it elsewhere.
 pub(in crate::settings_window) fn popover_list(
-    theme: &Theme,
+    look: &SettingsLook,
     open: &Dropdown,
     on_pick: impl Fn(usize, &mut Window, &mut App) + 'static,
     on_dismiss: impl Fn(&mut Window, &mut App) + 'static,
@@ -156,10 +164,10 @@ pub(in crate::settings_window) fn popover_list(
         .max_h(px(260.))
         .overflow_y_scroll()
         .p(px(4.))
-        .rounded(px(corners::CONTROL))
+        .rounded(look.at(8.))
         .border_1()
-        .border_color(rgb(theme.active))
-        .bg(rgb(theme.surface))
+        .border_color(look.line())
+        .bg(look.well())
         .shadow_md()
         .occlude()
         .track_focus(&open.focus)
@@ -173,11 +181,11 @@ pub(in crate::settings_window) fn popover_list(
                 .debug_selector(move || format!("{id}-option-{index}"))
                 .px(px(8.))
                 .py(px(4.))
-                .rounded(px(corners::SMALL))
+                .rounded(look.at(6.))
                 .whitespace_nowrap()
                 .cursor_pointer()
-                .text_color(rgb(theme.foreground))
-                .when(index == open.selected, |item| item.bg(rgb(theme.active)))
+                .text_color(look.title())
+                .when(index == open.selected, |item| item.bg(look.selection()))
                 .on_click(move |_, window, cx| on_pick(index, window, cx))
                 .child(option.clone())
         }))

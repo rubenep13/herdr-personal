@@ -1,7 +1,8 @@
 //! Host colour row: a curated swatch strip, a "none" swatch, a hex field and
 //! a reset glyph. Pure rendering; the page owns the colour and the saves.
 use crate::{
-    config::{FontConfig, Theme, corners, parse_hex},
+    config::{FontConfig, parse_hex},
+    design::SettingsLook,
     fonts::StyledFont,
     search_input::SearchInput,
 };
@@ -15,6 +16,10 @@ pub(in crate::settings_window) const SWATCHES: [u32; 11] = [
 ];
 
 const SWATCH_SIZE: f32 = 18.;
+const SWATCH_RADIUS: f32 = 5.;
+/// The chosen swatch's accent ring, and the gap it keeps from the swatch.
+const RING: f32 = 2.;
+const RING_GAP: f32 = 2.;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::settings_window) enum HostColorChange {
@@ -34,7 +39,7 @@ pub(in crate::settings_window) fn parse_hex_input(text: &str) -> Option<u32> {
 
 #[allow(clippy::too_many_arguments)]
 pub(in crate::settings_window) fn swatch_row(
-    theme: &Theme,
+    look: &SettingsLook,
     host: &str,
     index: usize,
     current: Option<u32>,
@@ -45,42 +50,54 @@ pub(in crate::settings_window) fn swatch_row(
     on_edit_hex: impl Fn(&mut Window, &mut App) + 'static,
 ) -> Div {
     let on_change = Rc::new(on_change);
+    // Every swatch sits in a slot as wide as the chosen one's ring, so
+    // choosing one moves nothing.
+    let slot = |selected: bool, swatch: Stateful<Div>| {
+        div()
+            .flex_none()
+            .p(look.at(RING_GAP))
+            .rounded(look.at(SWATCH_RADIUS + RING + RING_GAP))
+            .border(look.at(RING))
+            .border_color(if selected {
+                look.accent()
+            } else {
+                transparent_black().into()
+            })
+            .child(swatch)
+    };
     let none = {
         let on_change = on_change.clone();
-        div()
-            .id(SharedString::from(format!("host-colour-{index}-none")))
-            .debug_selector(move || format!("host-colour-{index}-none"))
-            .size(px(SWATCH_SIZE))
-            .rounded(px(corners::SMALL))
-            .border_1()
-            .border_dashed()
-            .border_color(rgb(if current.is_none() {
-                theme.foreground
-            } else {
-                theme.muted
-            }))
-            .cursor_pointer()
-            .on_click(move |_, window, cx| on_change(HostColorChange::Clear, window, cx))
+        slot(
+            current.is_none(),
+            div()
+                .id(SharedString::from(format!("host-colour-{index}-none")))
+                .debug_selector(move || format!("host-colour-{index}-none"))
+                .size(look.at(SWATCH_SIZE))
+                .rounded(look.at(SWATCH_RADIUS))
+                .border_1()
+                .border_dashed()
+                .border_color(look.muted())
+                .cursor_pointer()
+                .on_click(move |_, window, cx| on_change(HostColorChange::Clear, window, cx)),
+        )
     };
     let swatches = SWATCHES.iter().enumerate().map(|(k, &color)| {
         let on_change = on_change.clone();
-        let selected = current == Some(color);
-        div()
-            .id(SharedString::from(format!(
-                "host-colour-{index}-swatch-{k}"
-            )))
-            .debug_selector(move || format!("host-colour-{index}-swatch-{k}"))
-            .size(px(SWATCH_SIZE))
-            .rounded(px(corners::SMALL))
-            .bg(rgb(color))
-            .border_2()
-            .border_color(if selected {
-                rgb(theme.foreground).into()
-            } else {
-                transparent_black()
-            })
-            .cursor_pointer()
-            .on_click(move |_, window, cx| on_change(HostColorChange::Set(color), window, cx))
+        slot(
+            current == Some(color),
+            div()
+                .id(SharedString::from(format!(
+                    "host-colour-{index}-swatch-{k}"
+                )))
+                .debug_selector(move || format!("host-colour-{index}-swatch-{k}"))
+                .size(look.at(SWATCH_SIZE))
+                .rounded(look.at(SWATCH_RADIUS))
+                .bg(rgb(color))
+                .border_1()
+                .border_color(look.line())
+                .cursor_pointer()
+                .on_click(move |_, window, cx| on_change(HostColorChange::Set(color), window, cx)),
+        )
     });
     let dot = div()
         .size(px(10.))
@@ -88,41 +105,34 @@ pub(in crate::settings_window) fn swatch_row(
         .rounded_full()
         .map(|dot| match current {
             Some(color) => dot.bg(rgb(color)),
-            None => dot
-                .border_1()
-                .border_dashed()
-                .border_color(rgb(theme.muted)),
+            None => dot.border_1().border_dashed().border_color(look.muted()),
         });
     let hex = div()
         .id(SharedString::from(format!("host-colour-{index}-hex")))
         .debug_selector(move || format!("host-colour-{index}-hex"))
-        .w(px(92.))
+        .w(look.at(92.))
         .flex_none()
-        .text_size(px(12.))
+        .text_size(px(look.scale().secondary))
         .map(|hex| match hex_input {
             // A typed colour that does not parse keeps the field, outlined.
             Some((input, invalid)) => hex
-                .rounded(px(corners::SMALL))
+                .rounded(look.at(6.))
                 .border_1()
-                .border_color(rgb(if invalid {
-                    theme.ink(0xd45b5b)
-                } else {
-                    theme.active
-                }))
+                .border_color(if invalid { look.danger() } else { look.line() })
                 .child(input),
             None => {
                 let (label, color) = match current {
-                    Some(color) => (format!("#{color:06x}"), theme.foreground),
-                    None => ("none".to_owned(), theme.muted),
+                    Some(color) => (format!("#{color:06x}"), look.title()),
+                    None => ("none".to_owned(), look.muted()),
                 };
                 hex.text_font(mono)
-                    .text_color(rgb(color))
+                    .text_color(color)
                     .cursor_pointer()
                     .on_click(move |_, window, cx| on_edit_hex(window, cx))
                     .child(label)
             }
         });
-    let reset = div().w(px(20.)).flex_none().map(|slot| {
+    let reset = div().w(look.at(20.)).flex_none().map(|slot| {
         if current.is_none() {
             return slot;
         }
@@ -131,7 +141,7 @@ pub(in crate::settings_window) fn swatch_row(
             div()
                 .id(SharedString::from(format!("host-colour-{index}-reset")))
                 .debug_selector(move || format!("host-colour-{index}-reset"))
-                .text_color(rgb(theme.muted))
+                .text_color(look.muted())
                 .cursor_pointer()
                 .on_click(move |_, window, cx| on_change(HostColorChange::Clear, window, cx))
                 .child("⟲"),
@@ -141,18 +151,18 @@ pub(in crate::settings_window) fn swatch_row(
         .debug_selector(move || format!("host-colour-{index}"))
         .flex()
         .items_center()
-        .gap(px(10.))
-        .py(px(6.))
-        .text_size(px(13.))
-        .text_color(rgb(theme.foreground))
+        .gap(look.at(10.))
+        .py(look.at(6.))
+        .text_size(px(look.scale().name))
+        .text_color(look.title())
         .child(
             div()
                 .debug_selector(move || format!("host-colour-{index}-label"))
-                .w(px(120.))
+                .w(look.at(120.))
                 .flex_none()
                 .flex()
                 .items_center()
-                .gap(px(8.))
+                .gap(look.at(8.))
                 .child(dot)
                 .child(div().min_w_0().truncate().child(host.to_owned())),
         )
@@ -162,21 +172,21 @@ pub(in crate::settings_window) fn swatch_row(
                 .min_w_0()
                 .flex()
                 .flex_col()
-                .gap(px(4.))
+                .gap(look.at(4.))
                 .child(
                     div()
                         .flex()
                         .flex_wrap()
                         .items_center()
-                        .gap(px(5.))
+                        .gap(look.at(2.))
                         .child(none)
                         .children(swatches),
                 )
                 .when(!hint.is_empty(), |col| {
                     col.child(
                         div()
-                            .text_size(px(11.))
-                            .text_color(rgb(theme.muted))
+                            .text_size(px(look.scale().detail))
+                            .text_color(look.muted())
                             .child(hint),
                     )
                 }),

@@ -82,7 +82,7 @@ impl SettingsWindow {
         edit: Preference,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        super::super::ui::toggle(&self.theme, id, checked, true)
+        super::super::ui::toggle(&self.look(), id, checked, true)
             .on_click(cx.listener(move |this, _, _, cx| this.save_preference(edit.clone(), cx)))
     }
 }

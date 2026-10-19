@@ -21,7 +21,7 @@ pub(in crate::settings_window) fn indicator_style_live(
 
 impl SettingsWindow {
     pub(in crate::settings_window) fn render_notifications(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         let ready = self.controls_shared_ready();
         let shared = self.shared.as_ref();
         let overrides = self.config.notification_overrides;
@@ -65,16 +65,16 @@ impl SettingsWindow {
         div()
             .flex()
             .flex_col()
-            .child(ui::section(theme, "Delivery", Some(ui::Source::Shared)))
+            .child(ui::section(look, "Delivery", Some(ui::Source::Shared)))
             .child(
                 self.gate_shared(
-                    ui::row(theme, "notif-delivery", "Deliver agent notifications").description(
+                    ui::row(look, "notif-delivery", "Deliver agent notifications").description(
                         "Herdr shows them in-app. System uses OS notifications; clicking one \
                          opens its pane. Terminal is for other clients only.",
                     ),
                 )
                 .control(ui::segmented(
-                    theme,
+                    look,
                     "notif-delivery-control",
                     &[
                         (ToastDelivery::Off, "Off"),
@@ -90,7 +90,7 @@ impl SettingsWindow {
                 )),
             )
             .child(
-                ui::row(theme, "notif-finished", "Finished notifications")
+                ui::row(look, "notif-finished", "Finished notifications")
                     .tag(ui::Source::Local)
                     .description(
                         "Off drops the notice at the end of each agent turn, in-app and from \
@@ -103,9 +103,9 @@ impl SettingsWindow {
                         cx,
                     )),
             )
-            .child(ui::section(theme, "In-app toasts", Some(ui::Source::Local)))
+            .child(ui::section(look, "In-app toasts", Some(ui::Source::Local)))
             .child(
-                ui::row(theme, "notif-show", "Show toasts").control(self.override_dropdown(
+                ui::row(look, "notif-show", "Show toasts").control(self.override_dropdown(
                     DropdownField::ToastEnabled,
                     on_off(shared_enabled),
                     &["On", "Off"],
@@ -115,7 +115,7 @@ impl SettingsWindow {
             )
             .child(self.delay_row(cx))
             .child(
-                ui::row(theme, "notif-position", "Position")
+                ui::row(look, "notif-position", "Position")
                     .description(
                         "Controls show effective values; a managed-file override still \
                          takes precedence.",
@@ -128,10 +128,10 @@ impl SettingsWindow {
                         cx,
                     )),
             )
-            .child(ui::section(theme, "Sound", None))
+            .child(ui::section(look, "Sound", None))
             .child(
                 self.gate_shared(
-                    ui::row(theme, "notif-sound", "Play agent sounds")
+                    ui::row(look, "notif-sound", "Play agent sounds")
                         .tag(ui::Source::Shared)
                         .description(if source_alive {
                             "Uses shared sound paths and per-agent overrides. Missing custom \
@@ -143,7 +143,7 @@ impl SettingsWindow {
                         }),
                 )
                 .control(
-                    ui::button(theme, "notif-sound-test", "Test", source_alive).when(
+                    ui::button(look, "notif-sound-test", "Test", source_alive).when(
                         source_alive,
                         |button| {
                             button.on_click(cx.listener(|this, _, _, cx| {
@@ -155,7 +155,7 @@ impl SettingsWindow {
                     ),
                 )
                 .control(
-                    ui::toggle(theme, "notif-sound-toggle", sound, ready).when(ready, |toggle| {
+                    ui::toggle(look, "notif-sound-toggle", sound, ready).when(ready, |toggle| {
                         toggle.on_click(cx.listener(move |this, _, _, cx| {
                             this.save_shared(Edit::Sound(!sound), cx)
                         }))
@@ -163,15 +163,15 @@ impl SettingsWindow {
                 ),
             )
             .child(self.volume_row(cx))
-            .child(ui::section(theme, "Status indicators", None))
+            .child(ui::section(look, "Status indicators", None))
             .child(
                 self.gate_shared(
-                    ui::row(theme, "notif-indicators", "Style")
+                    ui::row(look, "notif-indicators", "Style")
                         .tag(ui::Source::Shared)
                         .description("How agent status shows in the sidebar."),
                 )
                 .control(ui::segmented_elements(
-                    theme,
+                    look,
                     "notif-indicators-control",
                     styles.into(),
                     // Herdr's style shows only while no icon set replaces it.
@@ -191,14 +191,14 @@ impl SettingsWindow {
                 )),
             )
             .child(
-                ui::row(theme, "notif-icons", "Icons")
+                ui::row(look, "notif-icons", "Icons")
                     .tag(ui::Source::Local)
                     .description(
                         "Solid, Tiles and Edge rail are drawn by Herdr UI only; Herdr's \
                          terminal client keeps its dots or symbols.",
                     )
                     .control(ui::segmented(
-                        theme,
+                        look,
                         "notif-icons-control",
                         &icon_choices,
                         Some(icons),
@@ -217,13 +217,13 @@ impl SettingsWindow {
         });
         let value = self.config.notifications.delay_seconds as f32;
         let view = cx.entity().downgrade();
-        ui::row(&self.theme, "notif-delay", "Delay")
+        ui::row(&self.look(), "notif-delay", "Delay")
             .description(
                 "Wait before a toast appears, so quick turns stay quiet. Controls show \
                  effective values; a managed-file override still takes precedence.",
             )
             .control(ui::number(
-                &self.theme,
+                &self.look(),
                 ui::Number {
                     id: NumberField::ToastDelay.selector(),
                     value,
@@ -242,7 +242,7 @@ impl SettingsWindow {
             ))
             .when(overridden, |row| {
                 row.control(
-                    ui::button(&self.theme, "notif-delay-reset", "Reset", true).on_click(
+                    ui::button(&self.look(), "notif-delay-reset", "Reset", true).on_click(
                         cx.listener(|this, _, _, cx| {
                             this.save_preference(Preference::NotificationDelay(None), cx)
                         }),
@@ -263,11 +263,11 @@ impl SettingsWindow {
             f32::from(self.config.sound.volume),
         );
         let view = cx.entity().downgrade();
-        ui::row(&self.theme, "notif-volume", "Volume")
+        ui::row(&self.look(), "notif-volume", "Volume")
             .tag(ui::Source::Local)
             .description("Sounds and Test play at this level, even when sounds are off.")
             .control(ui::number(
-                &self.theme,
+                &self.look(),
                 ui::Number {
                     id: NumberField::SoundVolume.selector(),
                     value,
