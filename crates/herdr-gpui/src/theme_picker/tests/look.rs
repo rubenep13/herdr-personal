@@ -41,7 +41,11 @@ fn theme_rows_keep_their_width_before_the_palette_loads(cx: &mut TestAppContext)
     let (view, cx) = open(cx);
     let before = cx.debug_bounds("theme-name-Default").unwrap();
     view.read_with(cx, |view, _| {
-        assert_eq!(view.menu.theme_swatches.get("Default"), None, "nothing loaded yet");
+        assert_eq!(
+            view.menu.theme_swatches.get("Default"),
+            None,
+            "nothing loaded yet"
+        );
     });
     // The rows on screen asked for their strips; let the load finish.
     cx.run_until_parked();
