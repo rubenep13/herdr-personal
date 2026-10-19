@@ -45,7 +45,7 @@ impl SettingsWindow {
         let follow_row = self.theme_follow_row(cx);
         let contrast_row = self.theme_contrast_row(cx);
         let source_row = self.theme_source_row(cx);
-        let search = self.render_theme_search(cx);
+        let search = self.render_theme_search(window, cx);
         let open_file = self.theme_open_file(cx);
         let results = self.render_theme_results(window, cx);
         let window_rows = self.render_window_rows(cx);

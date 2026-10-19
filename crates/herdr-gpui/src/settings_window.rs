@@ -36,7 +36,7 @@ pub(crate) use themes::{
 
 use crate::{
     HerdrWindow,
-    config::{Config, Theme, corners, mix},
+    config::{Config, Theme},
     fonts::StyledFont,
     herdr_settings,
 };

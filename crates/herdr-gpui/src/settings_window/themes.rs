@@ -12,7 +12,14 @@ mod grid;
 mod system;
 
 pub(super) const FOLLOW: &str = "Follow Herdr";
-const ROW_HEIGHT: f32 = 80.;
+/// A theme card's height, and the gap under each row of cards.
+const CARD_HEIGHT: f32 = 96.;
+const CARD_GAP: f32 = 10.;
+
+/// One row of the theme grid: a card and the gap under it.
+fn row_height(look: &crate::design::SettingsLook) -> f32 {
+    f32::from(look.at(CARD_HEIGHT) + look.at(CARD_GAP))
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum Scope {
@@ -147,6 +154,8 @@ pub(super) struct ThemeBrowser {
 impl ThemeBrowser {
     pub(super) fn new(cx: &mut Context<SettingsWindow>) -> Self {
         let search = cx.new(SearchInput::new);
+        // The page draws the field around it, with the count.
+        search.update(cx, |search, cx| search.set_frameless(cx));
         let subscription = cx.subscribe(&search, |this, search, _: &Changed, cx| {
             let query = search.read(cx).text().to_owned();
             if query == this.themes.query {

@@ -1,52 +1,58 @@
 //! The theme search box, result count and card grid on the Theme page.
-use super::{ROW_HEIGHT, Scope, SettingsWindow, grid};
+use super::{Choice, Scope, SettingsWindow, grid, row_height};
 use crate::{
-    config::{Theme, ThemeName, corners},
+    config::{OMARCHY_THEME, Theme, ThemeName},
     herdr_settings,
     settings_window::ui,
 };
-use gpui::{Context, Div, ScrollStrategy, Window, div, prelude::*, px, rgb, uniform_list};
+use gpui::{
+    Context, Div, FontFeatures, FontWeight, ScrollStrategy, Window, div, prelude::*, px, svg,
+    uniform_list,
+};
+
+/// Where a card's theme comes from, as its second line names it.
+pub(super) fn source_label(choice: &Choice) -> &'static str {
+    let name = choice.name.as_str();
+    match choice.scope {
+        Scope::Herdr => "Herdr",
+        Scope::App if Theme::BUILTIN_NAMES.contains(&name) => "Built-in",
+        Scope::App if name == OMARCHY_THEME => "Omarchy",
+        Scope::App if std::path::Path::new(name).is_absolute() || name.starts_with("~/") => "File",
+        Scope::App => "Ghostty",
+    }
+}
 
 impl SettingsWindow {
-    pub(in crate::settings_window) fn render_theme_search(&self, cx: &mut Context<Self>) -> Div {
-        div()
-            .debug_selector(|| "settings-theme-search".into())
-            .h(px(32.))
-            .flex_none()
-            .on_key_down(cx.listener(Self::theme_browser_key))
-            .child(self.themes.search.clone())
-    }
-
-    pub(in crate::settings_window) fn render_theme_results(
-        &mut self,
+    /// The search field over the grid, with how many themes it shows.
+    pub(in crate::settings_window) fn render_theme_search(
+        &self,
         window: &Window,
         cx: &mut Context<Self>,
     ) -> Div {
-        #[cfg(all(feature = "integration-test", target_os = "macos"))]
-        grid::clear_native_bounds(cx);
-        let columns = grid::columns(f32::from(window.viewport_size().width) - 240.);
-        if self.themes.grid.columns != columns {
-            self.themes.grid.columns = columns;
-            self.themes.scroll.scroll_to_item(
-                self.themes.selected.unwrap_or(0) / columns,
-                ScrollStrategy::Center,
-            );
-        }
+        let look = self.look();
         let browser = &self.themes;
-        let theme = &self.theme;
-        let look = &self.look();
         let count = usize::from(browser.ghostty_enabled) * browser.names.len()
             + usize::from(browser.herdr_enabled) * herdr_settings::THEME_NAMES.len();
-        let button = |id: &'static str, label: String| ui::button(look, id, label, true);
-        div()
-            .flex()
-            .flex_col()
-            .gap(px(6.))
+        let focused = browser.search.read(cx).focus.is_focused(window);
+        look.field("settings-theme-search".into(), focused)
+            .mt(look.at(2.))
+            .on_key_down(cx.listener(Self::theme_browser_key))
+            .child(
+                svg()
+                    .path("icons/search.svg")
+                    .size(look.at(15.))
+                    .flex_none()
+                    .text_color(look.muted()),
+            )
+            .child(div().flex_1().min_w_0().child(browser.search.clone()))
             .child(
                 div()
                     .debug_selector(|| "settings-theme-count".into())
-                    .text_size(px(11.))
-                    .text_color(rgb(theme.subtext()))
+                    .flex_none()
+                    .whitespace_nowrap()
+                    .text_size(px(look.scale().detail))
+                    .text_color(look.muted())
+                    .font_features(FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)])))
                     .child(format!(
                         "{} of {} themes{}",
                         browser.filtered.len(),
@@ -58,6 +64,36 @@ impl SettingsWindow {
                         }
                     )),
             )
+    }
+
+    pub(in crate::settings_window) fn render_theme_results(
+        &mut self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        #[cfg(all(feature = "integration-test", target_os = "macos"))]
+        grid::clear_native_bounds(cx);
+        // The grid fills the page's column: the window past the section list
+        // and the body's margins, at most the column's width.
+        let look = &self.look();
+        let width = (f32::from(window.viewport_size().width)
+            - self.navigation_width.width(self.viewport_width)
+            - 2. * f32::from(look.at(36.)))
+        .min(f32::from(look.at(700.)));
+        let columns = grid::columns(width);
+        if self.themes.grid.columns != columns {
+            self.themes.grid.columns = columns;
+            self.themes.scroll.scroll_to_item(
+                self.themes.selected.unwrap_or(0) / columns,
+                ScrollStrategy::Center,
+            );
+        }
+        let browser = &self.themes;
+        let button = |id: &'static str, label: String| ui::button(look, id, label, true);
+        div()
+            .flex()
+            .flex_col()
+            .gap(look.at(6.))
             .child(
                 div()
                     .id("settings-theme-list")
@@ -73,14 +109,12 @@ impl SettingsWindow {
                         }
                     }))
                     .overflow_hidden()
-                    .border_1()
-                    .border_color(rgb(theme.active))
-                    .rounded(px(corners::CONTROL))
                     .when(browser.filtered.is_empty(), |el| {
                         el.child(
                             div()
                                 .debug_selector(|| "settings-theme-empty".into())
-                                .p(px(12.))
+                                .py(look.at(12.))
+                                .text_color(look.muted())
                                 .child("No matching themes. Try a shorter search."),
                         )
                     })
@@ -91,8 +125,9 @@ impl SettingsWindow {
                                 browser.filtered.len().div_ceil(columns),
                                 cx.processor(|this, range: std::ops::Range<usize>, _, cx| {
                                     this.schedule_grid_palettes(range.clone(), cx);
+                                    let look = this.look();
                                     range
-                                        .map(|row| div().h(px(ROW_HEIGHT)).w_full().flex().gap(px(6.)).children((0..this.themes.grid.columns).map(|column| {
+                                        .map(|row| div().h(px(row_height(&look))).w_full().flex().gap(look.at(10.)).children((0..this.themes.grid.columns).map(|column| {
                                             let index = row * this.themes.grid.columns + column;
                                             if index >= this.themes.filtered.len() {
                                                 return div().flex_1().min_w_0().into_any_element();
@@ -117,23 +152,12 @@ impl SettingsWindow {
                                                     })
                                                 }
                                             };
-                                             let source = match choice.scope {
-                                                Scope::Herdr => "Herdr",
-                                                Scope::App
-                                                    if Theme::BUILTIN_NAMES
-                                                        .contains(&name.as_str()) =>
-                                                {
-                                                    "Built-in"
-                                                }
-                                                Scope::App
-                                                     if std::path::Path::new(name)
-                                                        .is_absolute()
-                                                        || name.starts_with("~/") =>
-                                                {
-                                                    "File"
-                                                }
-                                                Scope::App => "Ghostty",
-                                            };
+                                            let source = source_label(&choice);
+                                            let chosen = this.themes.selected == Some(index);
+                                            // The chosen card's 2 px ring takes a pixel of its
+                                            // padding, so neither it nor its swatch moves.
+                                            let ring = if chosen { 2. } else { 1. };
+                                            let hover = look.hover();
                                             div()
                                                 .id(index)
                                                 .relative()
@@ -145,19 +169,21 @@ impl SettingsWindow {
                                                 .debug_selector(move || {
                                                     format!("settings-theme-row-{index}")
                                                 })
-                                                .h(px(76.))
+                                                .h(look.at(96.))
                                                 .flex_1()
                                                 .min_w_0()
                                                 .overflow_hidden()
-                                                .px(px(7.))
-                                                .py(px(4.))
+                                                .pt(look.at(6.) - px(ring))
+                                                .px(look.at(6.) - px(ring))
+                                                .pb(look.at(8.) - px(ring))
                                                 .flex()
                                                 .flex_col()
-                                                .rounded(px(corners::CONTROL))
-                                                .border_2()
-                                                .border_color(rgb(if this.themes.selected == Some(index) { this.theme.primary() } else { this.theme.active }))
-                                                 .when(choice.scope.editable(), |el| el.cursor_pointer())
-                                                .hover(|el| el.bg(rgb(this.theme.active)))
+                                                .rounded(look.at(10.))
+                                                .bg(look.card_fill())
+                                                .border(px(ring))
+                                                .border_color(if chosen { look.accent() } else { look.line() })
+                                                .when(choice.scope.editable(), |el| el.cursor_pointer())
+                                                .hover(move |el| el.bg(hover))
                                                 .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
                                                     // Leaving is handled by the grid, so moving between
                                                     // cards never flashes the saved theme.
@@ -171,17 +197,21 @@ impl SettingsWindow {
                                                         .debug_selector(move || {
                                                             format!("settings-theme-name-{index}")
                                                         })
+                                                        .mt(look.at(5.))
                                                         .min_w_0()
                                                         .truncate()
-                                                         .child(name.clone()),
+                                                        .text_size(px(look.scale().name))
+                                                        .font_weight(FontWeight::MEDIUM)
+                                                        .text_color(look.title())
+                                                        .child(name.clone()),
                                                 )
                                                 .child(
                                                     div()
                                                         .debug_selector(move || {
                                                             format!("settings-theme-source-{index}")
                                                         })
-                                                        .text_size(px(10.))
-                                                        .text_color(rgb(this.theme.subtext()))
+                                                        .text_size(px(look.scale().detail))
+                                                        .text_color(look.muted())
                                                         .truncate()
                                                         .child(format!("{source}{}", if draft { " / Draft" } else if saved { " / Saved" } else { "" })),
                                                 )
