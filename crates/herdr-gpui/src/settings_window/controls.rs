@@ -228,9 +228,12 @@ impl SettingsWindow {
     }
 
     pub(in crate::settings_window) fn control_note(&self, text: impl Into<SharedString>) -> Div {
+        let look = self.look();
         div()
             .min_w_0()
-            .text_color(rgb(self.theme.muted))
+            .text_size(px(look.scale().secondary))
+            .line_height(relative(1.5))
+            .text_color(look.muted())
             .child(text.into())
     }
 

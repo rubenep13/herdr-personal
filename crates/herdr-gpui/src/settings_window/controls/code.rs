@@ -354,7 +354,7 @@ impl SettingsWindow {
     }
 
     /// The address of the user's own server, and its check.
-    fn render_code_address(&self, cx: &mut Context<Self>) -> Div {
+    fn render_code_address(&self, cx: &mut Context<Self>) -> crate::settings_window::ui::FormCard {
         let field = match &self.code.field {
             Some(field) => div()
                 .debug_selector(|| "settings-code-url".into())

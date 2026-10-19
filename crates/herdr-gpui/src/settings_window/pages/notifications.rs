@@ -65,9 +65,9 @@ impl SettingsWindow {
         div()
             .flex()
             .flex_col()
-            .child(ui::section(look, "Delivery", Some(ui::Source::Shared)))
             .child(
-                self.gate_shared(
+                ui::group(look, "delivery", "Delivery", Some(ui::Source::Shared))
+                    .row(self.gate_shared(
                     ui::row(look, "notif-delivery", "Deliver agent notifications").description(
                         "Herdr shows them in-app. System uses OS notifications; clicking one \
                          opens its pane. Terminal is for other clients only.",
@@ -87,10 +87,8 @@ impl SettingsWindow {
                     on_value(cx, |this, mode, _, cx| {
                         this.save_shared(Edit::Toasts(mode), cx)
                     }),
-                )),
-            )
-            .child(
-                ui::row(look, "notif-finished", "Finished notifications")
+                )),)
+                    .row(ui::row(look, "notif-finished", "Finished notifications")
                     .tag(ui::Source::Local)
                     .description(
                         "Off drops the notice at the end of each agent turn, in-app and from \
@@ -101,21 +99,19 @@ impl SettingsWindow {
                         finished,
                         Preference::NotificationFinished(!finished),
                         cx,
-                    )),
+                    )),),
             )
-            .child(ui::section(look, "In-app toasts", Some(ui::Source::Local)))
             .child(
-                ui::row(look, "notif-show", "Show toasts").control(self.override_dropdown(
+                ui::group(look, "in-app-toasts", "In-app toasts", Some(ui::Source::Local))
+                    .row(ui::row(look, "notif-show", "Show toasts").control(self.override_dropdown(
                     DropdownField::ToastEnabled,
                     on_off(shared_enabled),
                     &["On", "Off"],
                     overrides.enabled().map(|on| usize::from(!on)),
                     cx,
-                )),
-            )
-            .child(self.delay_row(cx))
-            .child(
-                ui::row(look, "notif-position", "Position")
+                )),)
+                    .row(self.delay_row(cx))
+                    .row(ui::row(look, "notif-position", "Position")
                     .description(
                         "Controls show effective values; a managed-file override still \
                          takes precedence.",
@@ -126,11 +122,11 @@ impl SettingsWindow {
                         &position_names,
                         position,
                         cx,
-                    )),
+                    )),),
             )
-            .child(ui::section(look, "Sound", None))
             .child(
-                self.gate_shared(
+                ui::group(look, "sound", "Sound", None)
+                    .row(self.gate_shared(
                     ui::row(look, "notif-sound", "Play agent sounds")
                         .tag(ui::Source::Shared)
                         .description(if source_alive {
@@ -160,12 +156,12 @@ impl SettingsWindow {
                             this.save_shared(Edit::Sound(!sound), cx)
                         }))
                     }),
-                ),
+                ),)
+                    .row(self.volume_row(cx)),
             )
-            .child(self.volume_row(cx))
-            .child(ui::section(look, "Status indicators", None))
             .child(
-                self.gate_shared(
+                ui::group(look, "status-indicators", "Status indicators", None)
+                    .row(self.gate_shared(
                     ui::row(look, "notif-indicators", "Style")
                         .tag(ui::Source::Shared)
                         .description("How agent status shows in the sidebar."),
@@ -188,10 +184,8 @@ impl SettingsWindow {
                             this.choose_herdr_indicators(style, cx)
                         }
                     }),
-                )),
-            )
-            .child(
-                ui::row(look, "notif-icons", "Icons")
+                )),)
+                    .row(ui::row(look, "notif-icons", "Icons")
                     .tag(ui::Source::Local)
                     .description(
                         "Solid, Tiles and Edge rail are drawn by Herdr UI only; Herdr's \
@@ -204,7 +198,7 @@ impl SettingsWindow {
                         Some(icons),
                         true,
                         on_value(cx, |this, icons, _, cx| this.choose_status_icons(icons, cx)),
-                    )),
+                    )),),
             )
     }
 

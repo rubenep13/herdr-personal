@@ -34,28 +34,27 @@ impl SettingsWindow {
         #[cfg(all(feature = "integration-test", target_os = "macos"))]
         self.reset_native_font_bounds(cx);
         let look = &self.look();
-        let mut page = div()
-            .flex()
-            .flex_col()
-            .min_w_0()
-            .child(ui::section(look, "Faces", None));
+        let mut faces = ui::group(look, "faces", "Faces", None);
         for (face, label) in FACES {
-            page = page.child(self.face_row(face, label, cx));
+            faces = faces.row(self.face_row(face, label, cx));
         }
-        page.child(
+        let faces = faces.row(
             ui::row(look, "fonts-all-row", "All faces").control(
                 self.all_families_button()
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_control_font_picker(FontTarget::All, window, cx)
                     })),
             ),
+        );
+        div().flex().flex_col().min_w_0().child(faces).child(
+            ui::group(
+                look,
+                "specimen",
+                specimen_title(self.active_font_face()),
+                None,
+            )
+            .body(self.render_font_specimen()),
         )
-        .child(ui::section(
-            look,
-            specimen_title(self.active_font_face()),
-            None,
-        ))
-        .child(self.render_font_specimen())
     }
 
     fn all_families_button(&self) -> Stateful<Div> {

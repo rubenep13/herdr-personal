@@ -152,7 +152,9 @@ pub(in crate::settings_window) fn swatch_row(
         .flex()
         .items_center()
         .gap(look.at(10.))
-        .py(look.at(6.))
+        .min_h(px(look.row_min_height()))
+        .px(look.at(14.))
+        .py(look.at(9.))
         .text_size(px(look.scale().name))
         .text_color(look.title())
         .child(

@@ -56,81 +56,85 @@ impl SettingsWindow {
                 edit: Edit::ReportIssue,
             },
         ];
-        div()
-            .flex()
-            .flex_col()
-            .child(ui::section(look, "Items", Some(ui::Source::Local)))
-            .child(
-                ui::row(look, "status-usage", "Usage")
-                    .description(
-                        "Plan usage for signed-in AI services. Compact shows each service's \
+        div().flex().flex_col().child(
+            ui::group(look, "items", "Items", Some(ui::Source::Local))
+                .row(
+                    ui::row(look, "status-usage", "Usage")
+                        .description(
+                            "Plan usage for signed-in AI services. Compact shows each service's \
                          tightest limit as one share; Detailed adds a meter and its two \
                          tightest windows.",
-                    )
-                    .control(self.detail_control(
-                        "status-usage-detail",
-                        items.usage,
-                        usage,
-                        Edit::Usage,
-                        cx,
-                    ))
-                    .control(
-                        ui::toggle(look, "status-usage-toggle", usage, true).on_click(cx.listener(
-                            move |this, _, _, cx| {
-                                this.save_native(move || Config::save_usage_visibility(!usage), cx);
-                            },
-                        )),
-                    ),
-            )
-            .child(
-                ui::row(look, "status-system-load", "CPU and memory")
-                    .description("Hiding CPU and memory also removes them from sidebar host rows.")
-                    .control(self.detail_control(
-                        "status-system-load-detail",
-                        items.system_load,
-                        system_load,
-                        Edit::SystemLoad,
-                        cx,
-                    ))
-                    .control(self.preference_toggle(
-                        "status-system-load-toggle",
-                        system_load,
-                        Preference::ShowSystemLoad(!system_load),
-                        cx,
-                    )),
-            )
-            .child(
-                ui::row(look, "status-network-quality", "Network latency and loss")
-                    .description(
-                        "Times one TCP connect to 1.1.1.1:443 every 15 seconds from this \
-                         machine, about a megabyte a day.",
-                    )
-                    .control(self.preference_toggle(
-                        "status-network-quality-toggle",
-                        network_quality,
-                        Preference::ShowNetworkQuality(!network_quality),
-                        cx,
-                    )),
-            )
-            .child(
-                ui::row(look, "status-keep-awake", "Keep display awake").control(
-                    self.preference_toggle(
-                        "status-keep-awake-toggle",
-                        keep_awake,
-                        Preference::StatusBar(Edit::KeepAwake(!keep_awake)),
-                        cx,
-                    ),
-                ),
-            )
-            .children(buttons.map(|button| self.button_row(button, cx)))
-            .child(
-                self.control_note(
-                    "Listening ports are under General. The version stays, since it says when \
-                     an update is ready.",
+                        )
+                        .control(self.detail_control(
+                            "status-usage-detail",
+                            items.usage,
+                            usage,
+                            Edit::Usage,
+                            cx,
+                        ))
+                        .control(
+                            ui::toggle(look, "status-usage-toggle", usage, true).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.save_native(
+                                        move || Config::save_usage_visibility(!usage),
+                                        cx,
+                                    );
+                                }),
+                            ),
+                        ),
                 )
-                .mt(px(10.))
-                .text_size(px(11.)),
+                .row(
+                    ui::row(look, "status-system-load", "CPU and memory")
+                        .description(
+                            "Hiding CPU and memory also removes them from sidebar host rows.",
+                        )
+                        .control(self.detail_control(
+                            "status-system-load-detail",
+                            items.system_load,
+                            system_load,
+                            Edit::SystemLoad,
+                            cx,
+                        ))
+                        .control(self.preference_toggle(
+                            "status-system-load-toggle",
+                            system_load,
+                            Preference::ShowSystemLoad(!system_load),
+                            cx,
+                        )),
+                )
+                .row(
+                    ui::row(look, "status-network-quality", "Network latency and loss")
+                        .description(
+                            "Times one TCP connect to 1.1.1.1:443 every 15 seconds from this \
+                         machine, about a megabyte a day.",
+                        )
+                        .control(self.preference_toggle(
+                            "status-network-quality-toggle",
+                            network_quality,
+                            Preference::ShowNetworkQuality(!network_quality),
+                            cx,
+                        )),
+                )
+                .row(
+                    ui::row(look, "status-keep-awake", "Keep display awake").control(
+                        self.preference_toggle(
+                            "status-keep-awake-toggle",
+                            keep_awake,
+                            Preference::StatusBar(Edit::KeepAwake(!keep_awake)),
+                            cx,
+                        ),
+                    ),
+                )
+                .rows(buttons.map(|button| self.button_row(button, cx))),
+        )
+        .child(
+            self.control_note(
+                "Listening ports are under General. The version stays, since it says when an \
+                 update is ready.",
             )
+            .mt(look.at(8.))
+            .mx(look.at(2.)),
+        )
     }
 
     /// Detailed or Compact for an item; inert while the item is hidden.

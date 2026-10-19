@@ -35,15 +35,20 @@ impl SettingsWindow {
             .flex()
             .flex_col()
             .child(
-                ui::section(look, "Window", Some(ui::Source::Local))
-                    .debug_selector(|| "settings-window-section".into()),
+                ui::group(look, "window", "Window", Some(ui::Source::Local))
+                    .title_selector("settings-window-section")
+                    .row(self.render_backdrop_controls(cx)),
             )
-            .child(self.render_backdrop_controls(cx))
             .child(
-                ui::section(look, "Terminal padding", Some(ui::Source::Local))
-                    .debug_selector(|| "settings-terminal-padding".into()),
+                ui::group(
+                    look,
+                    "terminal-padding",
+                    "Terminal padding",
+                    Some(ui::Source::Local),
+                )
+                .title_selector("settings-terminal-padding")
+                .rows(PADDING_SIDES.map(|(axis, side)| self.padding_row(axis, side, cx))),
             )
-            .children(PADDING_SIDES.map(|(axis, side)| self.padding_row(axis, side, cx)))
     }
 
     fn padding_row(&self, axis: Axis, side: Side, cx: &mut Context<Self>) -> ui::Row {

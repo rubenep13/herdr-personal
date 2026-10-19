@@ -64,6 +64,10 @@ pub(in crate::settings_window) fn section(
 pub(in crate::settings_window) struct Group {
     look: SettingsLook,
     selector: &'static str,
+    /// The title's selector when a page already named it otherwise.
+    title_selector: Option<&'static str>,
+    /// The search row the title stands for, if any.
+    tracked: Option<SharedString>,
     title: &'static str,
     tag: Option<Source>,
     lead: Option<SharedString>,
@@ -79,6 +83,8 @@ pub(in crate::settings_window) fn group(
     Group {
         look: *look,
         selector,
+        title_selector: None,
+        tracked: None,
         title,
         tag,
         lead: None,
@@ -87,6 +93,19 @@ pub(in crate::settings_window) fn group(
 }
 
 impl Group {
+    /// Keeps the selector a page gave its section title before it had a
+    /// card, in place of `settings-group-{selector}`.
+    pub(in crate::settings_window) fn title_selector(mut self, selector: &'static str) -> Self {
+        self.title_selector = Some(selector);
+        self
+    }
+
+    /// Makes the title the place search scrolls to for the row `id`.
+    pub(in crate::settings_window) fn track(mut self, id: &'static str) -> Self {
+        self.tracked = Some(id.into());
+        self
+    }
+
     /// Text under the title, outside the card, that explains the section.
     pub(in crate::settings_window) fn lead(mut self, text: impl Into<SharedString>) -> Self {
         self.lead = Some(text.into());
@@ -123,6 +142,8 @@ impl IntoElement for Group {
         let Self {
             look,
             selector,
+            title_selector,
+            tracked,
             title,
             tag,
             lead,
@@ -144,7 +165,12 @@ impl IntoElement for Group {
             .flex_col()
             .child(
                 section(&look, title, tag)
-                    .debug_selector(move || format!("settings-group-{selector}")),
+                    .relative()
+                    .debug_selector(move || {
+                        title_selector
+                            .map_or_else(|| format!("settings-group-{selector}"), str::to_owned)
+                    })
+                    .children(tracked.map(super::search::track_bounds)),
             )
             .children(lead.map(|lead| {
                 div()
@@ -156,6 +182,73 @@ impl IntoElement for Group {
                     .child(lead)
             }))
             .child(card)
+    }
+}
+
+/// A section that holds a form rather than setting rows: its title, and a
+/// padded card its fields stack in. Children and styles go to the card, so
+/// a page builds it like the plain block it replaced.
+pub(in crate::settings_window) struct FormCard {
+    title: Div,
+    card: Div,
+}
+
+pub(in crate::settings_window) fn form_card(look: &SettingsLook, title: &'static str) -> FormCard {
+    let selector = slug(title);
+    let card_selector = format!("settings-card-{selector}");
+    FormCard {
+        title: section(look, title, None)
+            .debug_selector(move || format!("settings-group-{selector}")),
+        card: look
+            .card(card_selector)
+            .min_w_0()
+            .gap(look.at(10.))
+            .p(look.at(14.)),
+    }
+}
+
+/// A title as a selector: lower case, words joined by hyphens.
+fn slug(title: &str) -> String {
+    let mut slug = String::with_capacity(title.len());
+    for word in title
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+    {
+        if !slug.is_empty() {
+            slug.push('-');
+        }
+        slug.push_str(&word.to_ascii_lowercase());
+    }
+    slug
+}
+
+impl ParentElement for FormCard {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.card.extend(elements);
+    }
+}
+
+impl Styled for FormCard {
+    fn style(&mut self) -> &mut StyleRefinement {
+        self.card.style()
+    }
+}
+
+impl InteractiveElement for FormCard {
+    fn interactivity(&mut self) -> &mut Interactivity {
+        self.card.interactivity()
+    }
+}
+
+impl IntoElement for FormCard {
+    type Element = Div;
+    fn into_element(self) -> Div {
+        div()
+            .flex()
+            .flex_col()
+            .min_w_0()
+            .child(self.title)
+            .child(self.card)
     }
 }
 

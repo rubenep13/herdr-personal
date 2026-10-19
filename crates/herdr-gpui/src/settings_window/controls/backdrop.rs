@@ -156,13 +156,23 @@ impl SettingsWindow {
                 "The window stays opaque over the picture; lower opacity shows more of it."
             }
         };
+        let look = self.look();
+        // The tiles and their details line up with the row's text, inside the
+        // Window card.
         div()
             .debug_selector(|| "settings-backdrop".into())
             .flex()
             .flex_col()
-            .child(ui::row(&self.look(), "theme-backdrop", "Backdrop").description(description))
-            .child(tiles.py(px(10.)))
-            .child(details)
+            .child(ui::row(&look, "theme-backdrop", "Backdrop").description(description))
+            .child(
+                div()
+                    .px(look.at(14.))
+                    .pb(look.at(12.))
+                    .flex()
+                    .flex_col()
+                    .child(tiles.pb(look.at(10.)))
+                    .child(details),
+            )
     }
 
     fn backdrop_tile(&self, mode: Mode, selected: bool, cx: &mut Context<Self>) -> Stateful<Div> {

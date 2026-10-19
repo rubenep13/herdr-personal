@@ -56,19 +56,25 @@ impl SettingsWindow {
             .flex()
             .flex_col()
             .min_w_0()
-            .child(ui::section(look, "Mode", None))
-            .child(mode_row)
-            .children(side_row)
-            .child(follow_row)
-            .child(contrast_row)
-            .child(ui::section(look, "Themes", None))
-            .child(source_row)
-            .child(div().mt(px(8.)).child(search))
+            .child(
+                ui::group(look, "mode", "Mode", None)
+                    .row(mode_row)
+                    .rows(side_row)
+                    .row(follow_row)
+                    .row(contrast_row)
+                    .row(source_row),
+            )
+            // The grid's themes are cards of their own, so the section has
+            // its title alone.
+            .child(
+                ui::section(look, "Themes", None).debug_selector(|| "settings-group-themes".into()),
+            )
+            .child(search)
             .children(open_file)
             .child(
                 div()
                     .debug_selector(|| "settings-theme-grid".into())
-                    .mt(px(8.))
+                    .mt(look.at(10.))
                     .flex()
                     .flex_col()
                     .flex_1()

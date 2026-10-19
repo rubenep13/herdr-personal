@@ -105,7 +105,7 @@ impl SettingsWindow {
         reports: &[HostReport],
         query: &str,
         cx: &mut Context<Self>,
-    ) -> Div {
+    ) -> crate::settings_window::ui::FormCard {
         let ready = self.controls_shared_ready();
         let layout = &self.config.sidebar_layout;
         let values = sidebar_values(reports, layout);

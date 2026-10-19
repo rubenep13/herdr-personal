@@ -145,22 +145,19 @@ impl SettingsWindow {
     }
 
     pub(in crate::settings_window) fn render_sidebar(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
         let look = &self.look();
         let ready = !self.quitting && self.closing.is_none();
         let mut page = div()
             .relative()
             .flex()
             .flex_col()
-            .child(ui::section(look, "Layout", None))
             .child(
-                ui::row(look, "sidebar-layout", "Layout preset")
+                ui::group(look, "layout", "Layout", None)
+                    .row(ui::row(look, "sidebar-layout", "Layout preset")
                     .tag(ui::Source::Local)
                     .description("Row shape and density; spacing below starts from the preset.")
-                    .control(self.layout_dropdown(ready, cx)),
-            )
-            .child(
-                ui::row(look, "sidebar-select", "Selection marks")
+                    .control(self.layout_dropdown(ready, cx)),)
+                    .row(ui::row(look, "sidebar-select", "Selection marks")
                     .description("What selecting a workspace highlights beyond its own row.")
                     .control(ui::segmented(
                         look,
@@ -177,10 +174,8 @@ impl SettingsWindow {
                             intent.style.select = select;
                             this.commit_sidebar(intent, cx);
                         }),
-                    )),
-            )
-            .child(
-                ui::row(look, "sidebar-device-footer", "Device footer")
+                    )),)
+                    .row(ui::row(look, "sidebar-device-footer", "Device footer")
                     .description(
                         "The device picker and its buttons. Auto shows it with two or more \
                          devices.",
@@ -200,10 +195,11 @@ impl SettingsWindow {
                             intent.style.device_footer = footer;
                             this.commit_sidebar(intent, cx);
                         }),
-                    )),
+                    )),)
             )
             .child(
-                ui::row(look, "sidebar-show-agents", "Show agents")
+                ui::group(look, "show", "Show", None)
+                    .row(ui::row(look, "sidebar-show-agents", "Show agents")
                     .description("List running agents under their workspace.")
                     .control(
                         ui::toggle(
@@ -216,20 +212,16 @@ impl SettingsWindow {
                             let show = !this.config.show_agents;
                             this.save_native(move || Config::save_show_agents(show), cx);
                         })),
-                    ),
-            )
-            .child(
-                ui::row(look, "sidebar-show-search", "Show search")
+                    ),)
+                    .row(ui::row(look, "sidebar-show-search", "Show search")
                     .description("The search field above the workspaces.")
                     .control(self.preference_toggle(
                         "sidebar-show-search-toggle",
                         self.config.show_sidebar_search,
                         Preference::ShowSidebarSearch(!self.config.show_sidebar_search),
                         cx,
-                    )),
-            )
-            .child(
-                ui::row(look, "sidebar-repository-icons", "Show repository icons")
+                    )),)
+                    .row(ui::row(look, "sidebar-repository-icons", "Show repository icons")
                     .description(
                         "The repository owner's avatar at the start of each workspace row.",
                     )
@@ -238,10 +230,8 @@ impl SettingsWindow {
                         self.config.show_repository_icons,
                         Preference::ShowRepositoryIcons(!self.config.show_repository_icons),
                         cx,
-                    )),
-            )
-            .child(
-                ui::row(look, "sidebar-device-icons", "Show device icons")
+                    )),)
+                    .row(ui::row(look, "sidebar-device-icons", "Show device icons")
                     .description(
                         "A mark before each device's name: this machine, a cloud provider or SSH.",
                     )
@@ -250,46 +240,36 @@ impl SettingsWindow {
                         self.config.show_device_icons,
                         Preference::ShowDeviceIcons(!self.config.show_device_icons),
                         cx,
-                    )),
+                    )),),
             )
-            .child(ui::section(look, "Spacing", None));
-        for spacing in Spacing::ALL {
-            page = page.child(self.spacing_row(spacing, ready, cx));
-        }
-        page = page.child(
-            ui::section(look, "Host colours", None)
-                .relative()
-                .debug_selector(|| "sidebar-host-colours".into())
-                .child(super::super::search::track_bounds(
-                    "sidebar-host-colours".into(),
-                )),
-        );
+            .child(
+                ui::group(look, "spacing", "Spacing", None)
+                    .rows(Spacing::ALL.map(|spacing| self.spacing_row(spacing, ready, cx))),
+            );
+        // The section's title also stands for the page's host colours in
+        // search, so it keeps its selector and its tracked bounds.
+        let mut colours = ui::group(look, "host-colours", "Host colours", None)
+            .title_selector("sidebar-host-colours")
+            .track("sidebar-host-colours")
+            .lead(TINT_HINT);
         let rows = self.host_rows(cx);
         if rows.is_empty() {
-            page = page.child(
+            colours = colours.body(
                 div()
                     .debug_selector(|| "sidebar-host-colours-empty".into())
-                    .py(px(6.))
-                    .text_size(px(12.))
-                    .text_color(rgb(theme.muted))
+                    .text_size(px(look.scale().secondary))
+                    .text_color(look.muted())
                     .child("Connect to a host to give it a colour."),
             );
         }
-        let mut tinted = false;
         for (index, (host, color, hint)) in rows.into_iter().enumerate() {
-            let hint = if hint.is_empty() && !tinted {
-                tinted = true;
-                TINT_HINT
-            } else {
-                hint
-            };
             let hex = self
                 .hex_edit
                 .as_ref()
                 .filter(|edit| edit.host == host)
                 .map(|edit| (edit.input.clone(), edit.invalid));
             let (changed, editing) = (host.clone(), host.clone());
-            page = page.child(ui::swatch_row(
+            colours = colours.row(ui::swatch_row(
                 look,
                 &host,
                 index,
@@ -313,6 +293,7 @@ impl SettingsWindow {
                 },
             ));
         }
+        page = page.child(colours);
         #[cfg(all(feature = "integration-test", target_os = "macos"))]
         let page = page.child(super::super::native::probe(
             super::super::native::SIDEBAR_PAGE,

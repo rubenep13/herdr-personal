@@ -64,8 +64,8 @@ fn compact_rows_and_unclipped_picker_at_both_window_sizes(cx: &mut TestAppContex
             inside(row, body);
             assert!(row.size.height >= px(crate::settings_window::ui::ROW_HEIGHT));
             if let Some(previous) = previous {
-                // Rows are divider-separated and sit flush.
-                assert_eq!(row.top(), previous.bottom());
+                // Rows share one card, a 1 px rule between each two.
+                assert_eq!(row.top(), previous.bottom() + px(1.));
             }
             previous = Some(row);
             let family = cx.debug_bounds(FAMILIES[index]).unwrap();

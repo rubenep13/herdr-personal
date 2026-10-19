@@ -15,109 +15,118 @@ impl SettingsWindow {
         let position = shared.map(|shared| shared.tab_bar_position);
         let hide = shared.is_some_and(|shared| shared.hide_tab_bar_when_single_tab);
         let history = shared.is_some_and(|shared| shared.pane_history);
-        let mut page = div()
+        let page = div()
             .flex()
             .flex_col()
-            .child(ui::section(look, "Tab bar", Some(ui::Source::Shared)))
             .child(
-                self.gate_shared(ui::row(look, "tabs-position", "Position"))
-                    .control(ui::segmented(
-                        look,
-                        "tabs-position-control",
-                        &[
-                            (TabBarPosition::Top, "Top"),
-                            (TabBarPosition::Bottom, "Bottom"),
-                        ],
-                        position,
-                        ready,
-                        on_value(cx, |this, choice, _, cx| {
-                            this.save_shared(Edit::TabBarPosition(choice), cx)
-                        }),
-                    )),
-            )
-            .child(
-                self.gate_shared(ui::row(look, "tabs-hide-single", "Hide with a single tab"))
-                    .control(
-                        ui::toggle(look, "tabs-hide-single-toggle", hide, ready).when(
-                            ready,
-                            |toggle| {
-                                toggle.on_click(cx.listener(move |this, _, _, cx| {
-                                    this.save_shared(Edit::HideSingleTabBar(!hide), cx)
-                                }))
-                            },
+                ui::group(look, "tab-bar", "Tab bar", Some(ui::Source::Shared))
+                    .row(
+                        self.gate_shared(ui::row(look, "tabs-position", "Position"))
+                            .control(ui::segmented(
+                                look,
+                                "tabs-position-control",
+                                &[
+                                    (TabBarPosition::Top, "Top"),
+                                    (TabBarPosition::Bottom, "Bottom"),
+                                ],
+                                position,
+                                ready,
+                                on_value(cx, |this, choice, _, cx| {
+                                    this.save_shared(Edit::TabBarPosition(choice), cx)
+                                }),
+                            )),
+                    )
+                    .row(
+                        self.gate_shared(ui::row(
+                            look,
+                            "tabs-hide-single",
+                            "Hide with a single tab",
+                        ))
+                        .control(
+                            ui::toggle(look, "tabs-hide-single-toggle", hide, ready).when(
+                                ready,
+                                |toggle| {
+                                    toggle.on_click(cx.listener(move |this, _, _, cx| {
+                                        this.save_shared(Edit::HideSingleTabBar(!hide), cx)
+                                    }))
+                                },
+                            ),
                         ),
                     ),
             )
-            .child(ui::section(look, "Closing", None))
             .child(
-                ui::row(look, "tabs-confirm-tab", "Confirm before closing a tab").control(
-                    self.preference_toggle(
-                        "tabs-confirm-tab-toggle",
-                        self.config.confirm_close_tab,
-                        Preference::ConfirmCloseTab(!self.config.confirm_close_tab),
-                        cx,
-                    ),
-                ),
-            )
-            .child(
-                ui::row(look, "tabs-confirm-pane", "Confirm before closing a pane").control(
-                    self.preference_toggle(
-                        "tabs-confirm-pane-toggle",
-                        self.config.confirm_close_pane,
-                        Preference::ConfirmClosePane(!self.config.confirm_close_pane),
-                        cx,
-                    ),
-                ),
-            )
-            .child(
-                ui::row(
-                    look,
-                    "tabs-confirm-workspace",
-                    "Confirm before closing a workspace",
-                )
-                .control(self.preference_toggle(
-                    "tabs-confirm-workspace-toggle",
-                    self.config.confirm_close_workspace,
-                    Preference::ConfirmCloseWorkspace(!self.config.confirm_close_workspace),
-                    cx,
-                )),
-            )
-            .child(ui::section(look, "Panes", None))
-            .child(
-                ui::row(look, "tabs-focus-follows-mouse", "Focus follows mouse")
-                    .description("The pointer chooses the active pane within a split terminal tab.")
-                    .control(self.preference_toggle(
-                        "tabs-focus-follows-mouse-toggle",
-                        self.config.focus_follows_mouse,
-                        Preference::FocusFollowsMouse(!self.config.focus_follows_mouse),
-                        cx,
-                    )),
-            )
-            .child(ui::section(look, "Session restore", None))
-            .child(
-                self.gate_shared(
-                    ui::row(
-                        look,
-                        "tabs-pane-history",
-                        "Restore scrollback after Herdr restarts",
+                ui::group(look, "closing", "Closing", None)
+                    .row(
+                        ui::row(look, "tabs-confirm-tab", "Confirm before closing a tab").control(
+                            self.preference_toggle(
+                                "tabs-confirm-tab-toggle",
+                                self.config.confirm_close_tab,
+                                Preference::ConfirmCloseTab(!self.config.confirm_close_tab),
+                                cx,
+                            ),
+                        ),
                     )
-                    .tag(ui::Source::Shared)
-                    .description(
-                        "Experimental. Herdr saves pane output to session-history.json and \
-                         replays it when the daemon restarts.",
+                    .row(
+                        ui::row(look, "tabs-confirm-pane", "Confirm before closing a pane")
+                            .control(self.preference_toggle(
+                                "tabs-confirm-pane-toggle",
+                                self.config.confirm_close_pane,
+                                Preference::ConfirmClosePane(!self.config.confirm_close_pane),
+                                cx,
+                            )),
+                    )
+                    .row(
+                        ui::row(
+                            look,
+                            "tabs-confirm-workspace",
+                            "Confirm before closing a workspace",
+                        )
+                        .control(self.preference_toggle(
+                            "tabs-confirm-workspace-toggle",
+                            self.config.confirm_close_workspace,
+                            Preference::ConfirmCloseWorkspace(!self.config.confirm_close_workspace),
+                            cx,
+                        )),
                     ),
-                )
-                .control(
-                    ui::toggle(look, "tabs-pane-history-toggle", history, ready).when(
-                        ready,
-                        |toggle| {
-                            toggle.on_click(cx.listener(move |this, _, _, cx| {
-                                this.save_shared(Edit::PaneHistory(!history), cx)
-                            }))
-                        },
-                    ),
+            )
+            .child(
+                ui::group(look, "panes", "Panes", None).row(
+                    ui::row(look, "tabs-focus-follows-mouse", "Focus follows mouse")
+                        .description(
+                            "The pointer chooses the active pane within a split terminal tab.",
+                        )
+                        .control(self.preference_toggle(
+                            "tabs-focus-follows-mouse-toggle",
+                            self.config.focus_follows_mouse,
+                            Preference::FocusFollowsMouse(!self.config.focus_follows_mouse),
+                            cx,
+                        )),
                 ),
             );
+        let mut restore = ui::group(look, "session-restore", "Session restore", None).row(
+            self.gate_shared(
+                ui::row(
+                    look,
+                    "tabs-pane-history",
+                    "Restore scrollback after Herdr restarts",
+                )
+                .tag(ui::Source::Shared)
+                .description(
+                    "Experimental. Herdr saves pane output to session-history.json and \
+                         replays it when the daemon restarts.",
+                ),
+            )
+            .control(
+                ui::toggle(look, "tabs-pane-history-toggle", history, ready).when(
+                    ready,
+                    |toggle| {
+                        toggle.on_click(cx.listener(move |this, _, _, cx| {
+                            this.save_shared(Edit::PaneHistory(!history), cx)
+                        }))
+                    },
+                ),
+            ),
+        );
         let open = !self.quitting && self.closing.is_none();
         for (index, host) in self.remote_history.hosts().iter().enumerate() {
             let (checked, settled) = match &host.state {
@@ -136,8 +145,9 @@ impl SettingsWindow {
                 HostState::Ready(_) => "Each SSH host keeps its own setting.".to_owned(),
             };
             let id = format!("tabs-pane-history-host-{index}");
-            page = page.child(
+            restore = restore.row(
                 ui::row(look, id.clone(), host.label.clone())
+                    .sub()
                     .description(note)
                     .control(
                         ui::toggle(look, format!("{id}-toggle"), checked, enabled).when(
@@ -151,6 +161,6 @@ impl SettingsWindow {
                     ),
             );
         }
-        page
+        page.child(restore)
     }
 }
