@@ -1,6 +1,15 @@
 //! Compact per-role controls and a root-level, transient family chooser.
 use super::*;
-use crate::{config::FontConfig, fonts::StyledFont};
+use crate::{
+    config::FontConfig,
+    design::{Header, ItemState, Leading},
+    fonts::StyledFont,
+};
+
+/// The family picker's width, and how much of the window shows through the
+/// layer behind it.
+const PICKER_WIDTH: f32 = 440.;
+const BACKDROP_OPACITY: f32 = 0.55;
 
 #[cfg(all(feature = "integration-test", target_os = "macos"))]
 #[derive(Default)]
@@ -125,8 +134,26 @@ impl SettingsWindow {
         self.controls.search.update(cx, |input, cx| input.clear(cx));
         self.controls.filtered = filter_fonts(&self.controls.names, "");
         self.controls.selected = 0;
+        self.controls.hover_origin = None;
         self.controls.scroll.scroll_to_item(0, ScrollStrategy::Top);
         window.focus(&self.controls.search.read(cx).focus.clone(), cx);
+        cx.notify();
+    }
+
+    /// The pointer entered or left result `index`: it takes the highlight
+    /// while there, and the keys' row gets it back when it leaves.
+    fn hover_control_family(&mut self, index: usize, hovered: bool, cx: &mut Context<Self>) {
+        let controls = &mut self.controls;
+        if hovered {
+            controls.hover_origin.get_or_insert(controls.selected);
+            controls.selected = index;
+        } else if controls.selected == index
+            && let Some(origin) = controls.hover_origin.take()
+        {
+            controls.selected = origin;
+        } else {
+            return;
+        }
         cx.notify();
     }
 
@@ -216,11 +243,15 @@ impl SettingsWindow {
         }
     }
 
+    /// A control's box that opens the family picker, as the dropdowns draw
+    /// theirs.
     pub(in crate::settings_window) fn font_button(
         &self,
         id: String,
         label: impl Into<SharedString>,
     ) -> Stateful<Div> {
+        let look = self.look();
+        let ring = look.raised();
         let selector = id.clone();
         #[cfg(all(feature = "integration-test", target_os = "macos"))]
         let probe = native_probe(id.clone());
@@ -230,12 +261,19 @@ impl SettingsWindow {
             .flex()
             .items_center()
             .justify_center()
-            .h(px(28.))
-            .px(px(8.))
+            .flex_none()
+            .h(px(look.control_height()))
+            .pl(look.at(12.))
+            .pr(look.at(8.))
             .min_w_0()
-            .rounded(px(corners::CONTROL))
+            .rounded(look.at(8.))
+            .border_1()
+            .border_color(look.line())
+            .bg(look.well())
+            .text_color(look.title())
+            .whitespace_nowrap()
             .cursor_pointer()
-            .hover(|style| style.bg(rgb(self.theme.active)))
+            .hover(move |style| style.border_color(ring))
             .child(label.into())
             .map(|button| {
                 #[cfg(all(feature = "integration-test", target_os = "macos"))]
@@ -284,15 +322,11 @@ impl SettingsWindow {
                 let specimen = specimen.child(native_probe("settings-font-specimen"));
                 specimen
             })
-            .mt(px(12.))
             .flex()
             .flex_col()
             .min_w_0()
             .overflow_hidden()
             .gap(px(20.))
-            .p(px(20.))
-            .rounded(px(corners::CONTROL))
-            .bg(rgb(self.theme.surface))
             .child(self.control_note(format!("{} px", font.size)))
             .child(
                 div()
@@ -323,16 +357,213 @@ impl SettingsWindow {
             FontTarget::All => "All roles",
             FontTarget::Face(face) => role_label(face),
         };
-        let list_height = (f32::from(window.viewport_size().height) - 340.).clamp(84., 336.);
+        // The family in effect for one face gets the check; "all roles" may
+        // mix several, so none does.
+        let current = match target {
+            FontTarget::All => None,
+            FontTarget::Face(face) => Some(face_font(&self.config, face).family.clone()),
+        };
+        let look = self.menu_look(cx);
+        let list_height = (f32::from(window.viewport_size().height) - 340.).clamp(96., 320.);
+        let title = format!("Font family / {label}");
+        let count = if self.controls.discovering {
+            "Loading installed fonts...".to_owned()
+        } else {
+            format!(
+                "{} of {} installed families",
+                self.controls.filtered.len(),
+                self.controls.names.len()
+            )
+        };
+        let default_state = ItemState::default();
+        let default_hover = look.fill(ItemState {
+            selected: true,
+            ..ItemState::default()
+        });
+        let panel = look
+            .panel(
+                div()
+                    .id("settings-font-picker")
+                    .debug_selector(|| "settings-font-picker".into())
+                    .relative()
+                    .occlude()
+                    .w(look.at(PICKER_WIDTH))
+                    .max_w_full()
+                    .p(look.at(6.))
+                    .flex()
+                    .flex_col()
+                    .min_w_0(),
+            )
+            .map(|picker| {
+                #[cfg(all(feature = "integration-test", target_os = "macos"))]
+                let picker = picker.child(native_probe("settings-font-picker"));
+                picker
+            })
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_key_down(cx.listener(Self::control_font_key))
+            .child(look.header(Header {
+                selector: "settings-font-picker-header",
+                icon: "icons/text-size.svg",
+                title: ("settings-font-picker-title", &title),
+                sub: None,
+            }))
+            .child(
+                look.close_button("settings-font-picker-close")
+                    .absolute()
+                    .top(look.at(6.))
+                    .right(look.at(6.))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.dismiss_control_font_picker(window, cx)
+                    })),
+            )
+            .child(
+                look.query(
+                    "settings-font-search-icon",
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(look.at(10.))
+                        .child(
+                            div()
+                                .debug_selector(|| "settings-font-search".into())
+                                .flex_1()
+                                .min_w_0()
+                                .map(|search| {
+                                    #[cfg(all(feature = "integration-test", target_os = "macos"))]
+                                    let search = search.child(native_probe("settings-font-search"));
+                                    search
+                                })
+                                .child(self.controls.search.clone()),
+                        )
+                        .child(look.detail("settings-font-count".into(), count)),
+                ),
+            )
+            .child(
+                uniform_list(
+                    "settings-font-results",
+                    self.controls.filtered.len(),
+                    cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
+                        let look = this.menu_look(cx);
+                        range
+                            .map(|index| {
+                                let family =
+                                    this.controls.names[this.controls.filtered[index]].clone();
+                                let state = ItemState {
+                                    selected: index == this.controls.selected,
+                                    ..ItemState::default()
+                                };
+                                let checked = current.as_deref() == Some(family.as_str());
+                                look.row(
+                                    ("settings-font-result", index),
+                                    format!("settings-font-result-{index}"),
+                                    Leading::Empty,
+                                    state,
+                                )
+                                .relative()
+                                .map(|row| {
+                                    #[cfg(all(feature = "integration-test", target_os = "macos"))]
+                                    let row = row.child(native_probe(format!(
+                                        "settings-font-result-{index}"
+                                    )));
+                                    row
+                                })
+                                .child(look.label(
+                                    format!("settings-font-result-{index}-label"),
+                                    family_label(&family).to_owned(),
+                                ))
+                                .when(checked, |row| {
+                                    row.child(
+                                        svg()
+                                            .path("icons/check.svg")
+                                            .size(look.at(16.))
+                                            .flex_none()
+                                            .text_color(look.accent())
+                                            .debug_selector(move || {
+                                                format!("settings-font-result-{index}-check")
+                                            }),
+                                    )
+                                })
+                                .on_hover(cx.listener(move |this, hovered: &bool, _, cx| {
+                                    this.hover_control_family(index, *hovered, cx)
+                                }))
+                                .on_click(cx.listener(
+                                    move |this, _, window, cx| {
+                                        this.commit_control_family(
+                                            target,
+                                            Some(family.clone()),
+                                            window,
+                                            cx,
+                                        );
+                                    },
+                                ))
+                            })
+                            .collect()
+                    }),
+                )
+                .debug_selector(|| "settings-font-results".into())
+                .mt(look.at(6.))
+                .h(px(list_height))
+                .track_scroll(&self.controls.scroll)
+                .map(|list| {
+                    #[cfg(all(feature = "integration-test", target_os = "macos"))]
+                    let list = div()
+                        .h(px(list_height))
+                        .child(native_probe("settings-font-results"))
+                        .child(list);
+                    list
+                }),
+            )
+            .when(
+                !self.controls.discovering && self.controls.filtered.is_empty(),
+                |panel| {
+                    panel.child(
+                        div()
+                            .px(look.at(10.))
+                            .py(look.at(6.))
+                            .text_color(look.muted())
+                            .child("No matching fonts."),
+                    )
+                },
+            )
+            .child(look.separator())
+            .child(
+                look.row(
+                    "settings-font-default",
+                    "settings-font-default".into(),
+                    Leading::Icon("icons/refresh.svg", "settings-font-default-icon".into()),
+                    default_state,
+                )
+                .relative()
+                .when_some(default_hover, |row, fill| {
+                    row.hover(move |row| row.bg(fill))
+                })
+                .map(|row| {
+                    #[cfg(all(feature = "integration-test", target_os = "macos"))]
+                    let row = row.child(native_probe("settings-font-default"));
+                    row
+                })
+                .child(look.label(
+                    "settings-font-default-label".into(),
+                    format!("Use platform default family / {label}"),
+                ))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.commit_control_family(target, None, window, cx)
+                })),
+            );
+        // Under the window's header, the page dims behind the picker; a click
+        // there closes it.
         Some(
             div()
                 .absolute()
                 .top(px(36.))
-                .bottom(px(36.))
-                .left(px(self.navigation_width.width(self.viewport_width)))
+                .bottom_0()
+                .left_0()
                 .right_0()
+                .flex()
+                .items_center()
+                .justify_center()
                 .occlude()
-                .bg(rgb(self.theme.background).opacity(0.75))
+                .bg(rgb(self.theme.background).opacity(BACKDROP_OPACITY))
                 .child(
                     div()
                         .id("settings-font-backdrop")
@@ -346,133 +577,7 @@ impl SettingsWindow {
                             }),
                         ),
                 )
-                .child(
-                    div()
-                        .absolute()
-                        .top(px(64.))
-                        .left(px(20.))
-                        .right(px(20.))
-                        .occlude()
-                        .id("settings-font-picker")
-                        .debug_selector(|| "settings-font-picker".into())
-                        .map(|picker| {
-                            #[cfg(all(feature = "integration-test", target_os = "macos"))]
-                            let picker = picker.child(native_probe("settings-font-picker"));
-                            picker
-                        })
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .on_key_down(cx.listener(Self::control_font_key))
-                        .p(px(16.))
-                        .flex()
-                        .flex_col()
-                        .min_w_0()
-                        .gap(px(12.))
-                        .rounded(px(corners::PANEL))
-                        .border_1()
-                        .border_color(rgb(self.theme.active))
-                        .bg(rgb(self.theme.surface))
-                        .shadow_lg()
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .child(format!("Font family / {label}"))
-                                .child(
-                                    self.font_button("settings-font-picker-close".into(), "Close")
-                                        .on_click(cx.listener(|this, _, window, cx| {
-                                            this.dismiss_control_font_picker(window, cx)
-                                        })),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .debug_selector(|| "settings-font-search".into())
-                                .map(|search| {
-                                    #[cfg(all(feature = "integration-test", target_os = "macos"))]
-                                    let search = search.child(native_probe("settings-font-search"));
-                                    search
-                                })
-                                .child(self.controls.search.clone()),
-                        )
-                        .child(self.control_note(if self.controls.discovering {
-                            "Loading installed fonts...".into()
-                        } else {
-                            format!(
-                                "{} of {} installed families",
-                                self.controls.filtered.len(),
-                                self.controls.names.len()
-                            )
-                        }))
-                        .child(
-                            uniform_list(
-                                "settings-font-results",
-                                self.controls.filtered.len(),
-                                cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
-                                    range
-                                        .map(|index| {
-                                            let family = this.controls.names
-                                                [this.controls.filtered[index]]
-                                                .clone();
-                                            this.font_button(
-                                                format!("settings-font-result-{index}"),
-                                                "",
-                                            )
-                                            .w_full()
-                                            .h(px(28.))
-                                            .justify_start()
-                                            .overflow_hidden()
-                                            .when(index == this.controls.selected, |row| {
-                                                row.bg(rgb(this.theme.active))
-                                            })
-                                            .child(
-                                                div()
-                                                    .min_w_0()
-                                                    .truncate()
-                                                    .child(family_label(&family).to_owned()),
-                                            )
-                                            .on_click(
-                                                cx.listener(move |this, _, window, cx| {
-                                                    this.commit_control_family(
-                                                        target,
-                                                        Some(family.clone()),
-                                                        window,
-                                                        cx,
-                                                    );
-                                                }),
-                                            )
-                                        })
-                                        .collect()
-                                }),
-                            )
-                            .debug_selector(|| "settings-font-results".into())
-                            .h(px(list_height))
-                            .track_scroll(&self.controls.scroll)
-                            .map(|list| {
-                                #[cfg(all(feature = "integration-test", target_os = "macos"))]
-                                let list = div()
-                                    .h(px(list_height))
-                                    .child(native_probe("settings-font-results"))
-                                    .child(list);
-                                list
-                            }),
-                        )
-                        .when(
-                            !self.controls.discovering && self.controls.filtered.is_empty(),
-                            |panel| panel.child(self.control_note("No matching fonts.")),
-                        )
-                        .child(
-                            self.font_button(
-                                "settings-font-default".into(),
-                                format!("Use platform default family / {label}"),
-                            )
-                            .on_click(cx.listener(
-                                move |this, _, window, cx| {
-                                    this.commit_control_family(target, None, window, cx)
-                                },
-                            )),
-                        ),
-                ),
+                .child(panel),
         )
     }
 }

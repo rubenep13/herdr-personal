@@ -80,15 +80,17 @@ fn compact_rows_and_unclipped_picker_at_both_window_sizes(cx: &mut TestAppContex
         let button = cx.debug_bounds("fonts-terminal-family").unwrap();
         cx.simulate_click(button.center(), Modifiers::default());
         cx.update(|window, cx| window.draw(cx).clear(cx));
+        // The picker is centred over the whole window, past the page.
         let picker = cx.debug_bounds("settings-font-picker").unwrap();
-        inside(picker, body);
+        let window = Bounds::new(point(px(0.), px(0.)), size(px(width), px(height)));
+        inside(picker, window);
         inside(cx.debug_bounds("settings-font-results").unwrap(), picker);
         assert_eq!(
             cx.debug_bounds("settings-font-result-0")
                 .unwrap()
                 .size
                 .height,
-            px(28.)
+            px(32.)
         );
         assert!(cx.debug_bounds("settings-font-result-471").is_none());
         view.read_with(cx, |view, cx| {

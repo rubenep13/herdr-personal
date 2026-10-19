@@ -34,6 +34,9 @@ pub(super) struct Controls {
     picker: Option<FontTarget>,
     active_face: FontFace,
     selected: usize,
+    /// The keys' row while the pointer rests on another, given back when it
+    /// leaves.
+    hover_origin: Option<usize>,
     #[cfg(test)]
     family_io: Option<fonts::FamilyIo>,
     names: Vec<String>,
@@ -53,7 +56,9 @@ impl Controls {
     pub(super) fn new(cx: &mut Context<SettingsWindow>) -> Self {
         let search = cx.new(SearchInput::new);
         search.update(cx, |input, cx| {
-            input.set_placeholder("Search installed fonts...", cx)
+            input.set_placeholder("Search installed fonts...", cx);
+            // The picker's query row draws the field.
+            input.set_frameless(cx);
         });
         let subscription = cx.subscribe(&search, |this, search, _: &Changed, cx| {
             this.controls.filtered = filter_fonts(&this.controls.names, search.read(cx).text());
@@ -78,6 +83,7 @@ impl Controls {
             picker: None,
             active_face: FontFace::Terminal,
             selected: 0,
+            hover_origin: None,
             #[cfg(test)]
             family_io: None,
             names: Vec::new(),

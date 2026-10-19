@@ -59,9 +59,6 @@ impl SettingsWindow {
 
     fn all_families_button(&self) -> Stateful<Div> {
         self.font_button("fonts-all".into(), "Use one family for all\u{2026}")
-            .border_1()
-            .border_color(rgb(self.theme.active))
-            .bg(rgb(self.theme.surface))
     }
 
     fn face_row(
@@ -120,13 +117,11 @@ impl SettingsWindow {
 
     /// The family as a dropdown-styled button that opens the font picker.
     fn family_button(&self, face: FontFace, cx: &mut Context<Self>) -> Stateful<Div> {
+        let look = self.look();
         self.font_button(format!("fonts-{}-family", face.name()), "")
-            .w(px(220.))
+            .w(look.at(220.))
             .justify_between()
-            .gap(px(6.))
-            .border_1()
-            .border_color(rgb(self.theme.active))
-            .bg(rgb(self.theme.surface))
+            .gap(look.at(8.))
             .child(
                 div()
                     .min_w_0()
@@ -137,9 +132,9 @@ impl SettingsWindow {
             .child(
                 svg()
                     .path("icons/chevron-down.svg")
-                    .size(px(12.))
+                    .size(look.at(14.))
                     .flex_none()
-                    .text_color(rgb(self.theme.muted)),
+                    .text_color(look.muted()),
             )
             .on_click(cx.listener(move |this, _, window, cx| {
                 this.open_control_font_picker(FontTarget::Face(face), window, cx);

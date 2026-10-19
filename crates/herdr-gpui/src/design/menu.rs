@@ -4,7 +4,7 @@
 //! drift apart again. Behaviour (selection, hover, clicks, keys) stays with
 //! each menu; these pieces only paint.
 
-use super::{SELECTION_RADIUS, TypeScale};
+use super::{ICON_BUTTON, ICON_BUTTON_RADIUS, SELECTION_RADIUS, TypeScale};
 use crate::config::{FontConfig, Theme, corners};
 use gpui::{
     BoxShadow, Div, ElementId, FontFeatures, FontWeight, IntoElement, Pixels, Rgba, SharedString,
@@ -21,6 +21,8 @@ const ROW_PADDING: f32 = 10.;
 const ROW_GAP: f32 = 10.;
 const ICON: f32 = 16.;
 const SUBMENU_ICON: f32 = 14.;
+/// The cross a picker closes with.
+const CLOSE_ICON: f32 = 14.;
 const SEPARATOR_INSET: f32 = 10.;
 const SEPARATOR_GAP: f32 = 5.;
 const HEADER_ICON: f32 = 16.;
@@ -455,6 +457,30 @@ impl MenuLook {
                 tab.text_color(self.muted)
                     .hover(move |tab| tab.text_color(hover))
             })
+    }
+
+    /// A picker's close button: a square holding the cross, filled while
+    /// hovered. The caller places it and adds its click.
+    pub(crate) fn close_button(&self, id: &'static str) -> Stateful<Div> {
+        let hover = self.selection;
+        div()
+            .id(id)
+            .debug_selector(move || id.into())
+            .flex_none()
+            .size(self.at(ICON_BUTTON))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(self.at(ICON_BUTTON_RADIUS))
+            .cursor_pointer()
+            .hover(move |button| button.bg(hover))
+            .child(
+                svg()
+                    .path("icons/close.svg")
+                    .size(self.at(CLOSE_ICON))
+                    .flex_none()
+                    .text_color(self.muted),
+            )
     }
 
     pub(crate) fn header(&self, header: Header<'_>) -> Div {

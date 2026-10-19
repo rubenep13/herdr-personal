@@ -113,3 +113,20 @@ fn shortcuts_split_into_keys() {
 fn an_empty_shortcut_has_no_keys() {
     assert_eq!(keycaps("").count(), 0);
 }
+
+struct CloseHarness;
+
+impl Render for CloseHarness {
+    fn render(&mut self, _: &mut gpui::Window, _: &mut Context<Self>) -> impl IntoElement {
+        let look = MenuLook::of(&Theme::default(), &font(12.), false);
+        div().child(look.close_button("close-demo"))
+    }
+}
+
+#[gpui::test]
+fn close_button_is_a_28px_square(cx: &mut gpui::TestAppContext) {
+    let (_, cx) = cx.add_window_view(|_, _| CloseHarness);
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let close = cx.debug_bounds("close-demo").unwrap();
+    assert_eq!((close.size.width, close.size.height), (px(28.), px(28.)));
+}
