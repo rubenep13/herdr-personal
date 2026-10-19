@@ -1,12 +1,13 @@
 use super::*;
 
-/// Menus and pickers take the redesigned panel; dialogs, forms and
-/// Settings' pickers keep theirs until their own phases.
+/// Menus and pickers take the redesigned panel; dialogs and forms keep
+/// theirs until their own phase.
 #[test]
 fn redesign_dresses_menus_and_pickers_only() {
     for page in [
         Page::Application,
         Page::CodeSearch,
+        Page::DeviceTheme,
         Page::Devices,
         Page::Git,
         Page::Group,
@@ -17,6 +18,7 @@ fn redesign_dresses_menus_and_pickers_only() {
         Page::Pane,
         Page::Sessions,
         Page::Tab,
+        Page::Themes,
         Page::Workspace,
     ] {
         assert!(page.redesigned(), "{page:?}");
@@ -24,7 +26,6 @@ fn redesign_dresses_menus_and_pickers_only() {
     for page in [
         Page::About,
         Page::ConfirmClose,
-        Page::DeviceTheme,
         Page::Dialog(WorkspaceAction::Rename),
         Page::ForwardPort,
         Page::GitCommit,
@@ -35,7 +36,6 @@ fn redesign_dresses_menus_and_pickers_only() {
         Page::RenameDevice,
         Page::RenamePane,
         Page::RenameTab,
-        Page::Themes,
     ] {
         assert!(!page.redesigned(), "{page:?}");
     }

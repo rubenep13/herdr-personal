@@ -133,13 +133,14 @@ pub(crate) enum WorkspaceMenuAction {
 }
 
 impl Page {
-    /// Menus and pickers, drawn in the redesigned menu look. Dialogs, forms
-    /// and Settings' pickers keep their own panel until their phases.
+    /// Menus and pickers, drawn in the redesigned menu look. Dialogs and
+    /// forms keep their own panel until their phase.
     pub(crate) fn redesigned(self) -> bool {
         matches!(
             self,
             Self::Application
                 | Self::CodeSearch
+                | Self::DeviceTheme
                 | Self::Devices
                 | Self::Git
                 | Self::Group
@@ -150,6 +151,7 @@ impl Page {
                 | Self::Pane
                 | Self::Sessions
                 | Self::Tab
+                | Self::Themes
                 | Self::Workspace
         )
     }

@@ -8,6 +8,7 @@ mod device_theme;
 mod forwards;
 mod look;
 mod menu_width;
+mod theme_look;
 
 // Endpoint IDs carry the `ssh:` prefix; the profile ID is the rest.
 const HOST: &str = "ssh:0123456789abcdef0123456789abcdef";

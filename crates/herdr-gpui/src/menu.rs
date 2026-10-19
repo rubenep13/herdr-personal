@@ -21,6 +21,7 @@ mod shortcut_editor;
 pub(crate) use shortcut_editor::verify_native as verify_shortcut_editor;
 mod state;
 mod teleport;
+mod theme_rows;
 mod version_mismatch;
 mod whats_new;
 mod workspace;
@@ -53,6 +54,7 @@ pub(crate) use {
     colors::{accent, danger, online, teleported, tint},
     page::{Page, WorkspaceAction},
     state::{MenuState, Removal},
+    theme_rows::{picker_footer, theme_row},
     version_mismatch::Notice as VersionNotice,
     worktree_shortcut::WorktreeShortcut,
     worktree_source::WorktreeSource,
