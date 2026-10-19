@@ -233,6 +233,10 @@ struct SettingsWindow {
     _theme_guard: Subscription,
     #[cfg(test)]
     theme_io: Option<themes::ThemeIo>,
+    /// Records Herdr's shared edits in place of writing them, so a test never
+    /// reaches the real config or its reload.
+    #[cfg(test)]
+    shared_edits: Option<std::sync::Arc<std::sync::Mutex<Vec<herdr_settings::Edit>>>>,
 }
 
 impl SettingsWindow {
@@ -387,6 +391,8 @@ impl SettingsWindow {
             }),
             #[cfg(test)]
             theme_io: None,
+            #[cfg(test)]
+            shared_edits: None,
         }
     }
 

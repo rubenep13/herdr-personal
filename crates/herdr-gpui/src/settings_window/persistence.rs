@@ -349,6 +349,13 @@ impl SettingsWindow {
     }
 
     pub(super) fn save_shared(&mut self, edit: Edit, cx: &mut Context<Self>) {
+        #[cfg(test)]
+        if let Some(edits) = &self.shared_edits {
+            if let Ok(mut edits) = edits.lock() {
+                edits.push(edit);
+            }
+            return;
+        }
         let Some(shared) = self.shared.clone() else {
             return;
         };
