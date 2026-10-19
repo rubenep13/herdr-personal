@@ -145,6 +145,7 @@ impl Page {
                 | Self::Git
                 | Self::Group
                 | Self::Host
+                | Self::Keybinds
                 | Self::Menu
                 | Self::MovePane
                 | Self::Palette
