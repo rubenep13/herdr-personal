@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used)]
 use super::*;
 
 const STRIP: [u32; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
