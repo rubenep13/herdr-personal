@@ -351,11 +351,13 @@ size = 13
 # fallback = ["Symbols Nerd Font Mono"]
 # What each tab shows besides its name: "name" (nothing more), "agent" (its
 # agent's logo, or a terminal icon for a tab without one), or "status" (the
-# logo and the agent's state badge). Default "name".
+# logo and the agent's state badge). Default "name". Also under Settings >
+# Tabs & panes.
 # content = "name"
 # Where the tab strips sit: "subheader" (under the main header), "bottom" (at
 # the foot, above the status bar), or "herdr" (where Herdr's
-# tab_bar_position puts them). Default "subheader".
+# tab_bar_position puts them). Default "subheader". Also under Settings >
+# Tabs & panes.
 # position = "subheader"
 
 [terminal]

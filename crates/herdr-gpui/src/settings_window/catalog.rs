@@ -308,7 +308,19 @@ pub(super) const CATALOG: &[Entry] = &[
         "Install beta releases",
         "Betas ship before they are promoted to stable. Turning this off never downgrades; Homebrew installations always follow stable.",
     ),
-    entry(Section::Tabs, "tabs-position", "Position", ""),
+    entry(
+        Section::Tabs,
+        "tabs-placement",
+        "Position",
+        "Where the tab strips sit.",
+    ),
+    entry(Section::Tabs, "tabs-position", "Herdr's position", ""),
+    entry(
+        Section::Tabs,
+        "tabs-content",
+        "Content",
+        "What each tab shows besides its name.",
+    ),
     entry(
         Section::Tabs,
         "tabs-hide-single",

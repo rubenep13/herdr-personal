@@ -39,6 +39,7 @@ mod sound_volume;
 mod status_bar;
 mod status_icons;
 mod system_themes;
+mod tab_preferences;
 mod tabs_style;
 mod terminal_padding;
 mod theme_files;

@@ -237,9 +237,11 @@ fn shared_rows_say_why_they_are_disabled(cx: &mut TestAppContext) {
     show(&view, Section::Tabs, cx);
     let gate = view.read_with(cx, |view, _| view.shared_gate());
     if cfg!(unix) {
-        // Loaded shared settings make the rows editable again.
+        // Loaded shared settings make the rows editable again; Herdr's tab
+        // position still waits for Position to follow Herdr.
         assert_eq!(gate, None);
-        assert!(cx.debug_bounds("tabs-position-reason").is_none());
+        assert!(cx.debug_bounds("tabs-hide-single-reason").is_none());
+        assert!(cx.debug_bounds("tabs-position-reason").is_some());
         assert!(cx.debug_bounds("tabs-pane-history-reason").is_none());
         assert!(cx.debug_bounds("tabs-pane-history-description").is_some());
     } else {

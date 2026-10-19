@@ -53,6 +53,10 @@ pub(crate) enum Preference {
     SidebarStateText(bool),
     /// `[sidebar] agent_details`: whether agent rows add Herdr's extra lines.
     SidebarAgentDetails(AgentDetails),
+    /// `[tabs] position`: where the tab strips sit.
+    TabsPosition(TabPlacement),
+    /// `[tabs] content`: what each tab shows besides its name.
+    TabsContent(TabContent),
     /// `None` removes the host's colour.
     HostColor {
         host: String,
@@ -216,6 +220,16 @@ impl Config {
                     Some("sidebar"),
                     "agent_details",
                     Some(toml_edit::Value::from(details.as_str())),
+                ),
+                Preference::TabsPosition(placement) => (
+                    Some("tabs"),
+                    "position",
+                    Some(toml_edit::Value::from(placement.as_str())),
+                ),
+                Preference::TabsContent(content) => (
+                    Some("tabs"),
+                    "content",
+                    Some(toml_edit::Value::from(content.as_str())),
                 ),
                 Preference::HostColor { host, color } => {
                     if let Some(color) = color.filter(|color| *color > 0xFF_FFFF) {
