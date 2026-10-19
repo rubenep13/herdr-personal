@@ -271,7 +271,11 @@ impl SettingsWindow {
             }
         });
         let nav_search = cx.new(crate::search_input::SearchInput::new);
-        nav_search.update(cx, |input, cx| input.set_placeholder("Search settings", cx));
+        nav_search.update(cx, |input, cx| {
+            input.set_placeholder("Search settings", cx);
+            // The section list draws the field around it.
+            input.set_frameless(cx);
+        });
         let search_changed = cx.subscribe(
             &nav_search,
             |this, input, _: &crate::search_input::Changed, cx| {
@@ -676,13 +680,15 @@ impl Render for SettingsWindow {
             },
         };
         self.viewport_width = f32::from(window.viewport_size().width);
-        let navigation = self.navigation(cx);
+        let search_focused = self.nav_search.focus_handle(cx).is_focused(window);
+        let navigation = self.navigation(search_focused, cx);
         let font_picker = self.render_control_font_picker(window, cx);
         let this = cx.entity().downgrade();
         let header = crate::titlebar::header(&self.theme, window, move |window, cx| {
             let _ = this.update(cx, |view, cx| view.close(window, cx));
         });
         let theme = &self.theme;
+        let look = self.look();
         let root = div()
             .key_context("SettingsWindow")
             .relative()
@@ -714,9 +720,9 @@ impl Render for SettingsWindow {
             .flex_col()
             .overflow_hidden()
             .text_font(&self.config.ui)
-            .text_size(px(12.))
-            .line_height(px(18.))
-            .bg(rgb(theme.background))
+            .text_size(px(look.scale().secondary))
+            .line_height(relative(1.5))
+            .bg(look.page())
             .text_color(rgb(theme.foreground))
             .children(header)
             .child(
@@ -731,30 +737,43 @@ impl Render for SettingsWindow {
                             .min_h_0()
                             .overflow_y_scroll()
                             .track_scroll(&self.body_scroll)
-                            .p(px(28.))
+                            .pt(look.at(26.))
+                            .px(look.at(36.))
+                            .pb(look.at(40.))
                             .child(
+                                // One column, as wide as the mockup's at most and
+                                // kept to the left.
                                 div()
-                                    .text_size(px(18.))
-                                    .line_height(px(26.))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(if searching.is_some() {
-                                        "Results"
-                                    } else {
-                                        self.section.label()
-                                    }),
-                            )
-                            .child(div().mb(px(16.)).when_some(
-                                self.section.lead().filter(|_| searching.is_none()),
-                                |header, lead| {
-                                    header.mt(px(2.)).child(
+                                    .debug_selector(|| "settings-page".into())
+                                    .w_full()
+                                    .max_w(look.at(700.))
+                                    .flex()
+                                    .flex_col()
+                                    .child(
                                         div()
-                                            .text_size(px(12.))
-                                            .text_color(rgb(theme.subtext()))
-                                            .child(lead),
+                                            .text_size(look.at(20.))
+                                            .line_height(relative(1.3))
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(look.title())
+                                            .child(if searching.is_some() {
+                                                "Results"
+                                            } else {
+                                                self.section.label()
+                                            }),
                                     )
-                                },
-                            ))
-                            .child(content),
+                                    .child(div().mb(look.at(6.)).when_some(
+                                        self.section.lead().filter(|_| searching.is_none()),
+                                        |header, lead| {
+                                            header.mt(look.at(4.)).child(
+                                                div()
+                                                    .text_size(px(look.scale().name))
+                                                    .text_color(look.muted())
+                                                    .child(lead),
+                                            )
+                                        },
+                                    ))
+                                    .child(content),
+                            ),
                         cx,
                     ),
                 ),

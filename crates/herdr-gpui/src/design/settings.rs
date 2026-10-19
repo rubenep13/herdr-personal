@@ -40,6 +40,8 @@ const FIELD_GAP: f32 = 8.;
 const CARD_PERCENT: u32 = 30;
 /// A hovered row of the section list, as the tree's rows.
 const NAV_HOVER_PERCENT: u32 = 60;
+/// A hovered row or theme card on the page: more of the hairline than a card.
+const HOVER_PERCENT: u32 = 60;
 const SHARED_PERCENT: u32 = 14;
 const LOCAL_PERCENT: u32 = 70;
 /// A status chip's wash of its own colour.
@@ -77,6 +79,8 @@ pub(crate) struct SettingsLook {
     page: Rgba,
     nav: Rgba,
     nav_hover: Rgba,
+    /// A hovered row or card on the page.
+    hover: Rgba,
     card: Rgba,
     /// A control's box and the footer, as the palette's footer.
     well: Rgba,
@@ -116,6 +120,7 @@ impl SettingsLook {
                 theme.active,
                 NAV_HOVER_PERCENT,
             )),
+            hover: rgb(mix(theme.background, theme.active, HOVER_PERCENT)),
             card: rgb(mix(theme.background, theme.active, CARD_PERCENT)),
             well: rgb(theme.surface),
             line: rgb(theme.active),
@@ -185,6 +190,10 @@ impl SettingsLook {
 
     pub(crate) fn nav_hover(&self) -> Rgba {
         self.nav_hover
+    }
+
+    pub(crate) fn hover(&self) -> Rgba {
+        self.hover
     }
 
     /// A card's fill. The card itself is [`Self::card`].

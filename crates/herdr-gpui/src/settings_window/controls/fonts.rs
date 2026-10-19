@@ -329,7 +329,7 @@ impl SettingsWindow {
                 .absolute()
                 .top(px(36.))
                 .bottom(px(36.))
-                .left(px(184.))
+                .left(px(self.navigation_width.width(self.viewport_width)))
                 .right_0()
                 .occlude()
                 .bg(rgb(self.theme.background).opacity(0.75))

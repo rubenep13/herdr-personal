@@ -203,7 +203,7 @@ fn picker_search_keyboard_refresh_and_dismissal_are_local(cx: &mut TestAppContex
     });
     cx.update(|window, cx| window.draw(cx).clear(cx));
     // Outside the panel but inside its body-level backdrop.
-    cx.simulate_click(point(px(190.), px(50.)), Modifiers::default());
+    cx.simulate_click(point(px(240.), px(50.)), Modifiers::default());
     view.read_with(cx, |view, _| assert!(view.controls.picker.is_none()));
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {

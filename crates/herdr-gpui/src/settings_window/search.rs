@@ -1,7 +1,7 @@
 //! Searching the Settings: the query in the section list's box swaps the body
 //! for a list of matching rows, and picking one opens its page at that row.
 use super::{SettingsWindow, catalog, ui};
-use crate::config::ThemeName;
+use crate::{config::ThemeName, design::Tone};
 use gpui::{prelude::*, *};
 use std::collections::HashMap;
 
@@ -130,47 +130,48 @@ impl SettingsWindow {
         cx.notify();
     }
 
-    /// The body while a query is typed: one row per match, in catalog order.
+    /// The body while a query is typed: one row per match, in catalog order,
+    /// together in one card; each names its page in a chip.
     pub(super) fn render_search_results(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
         let look = &self.look();
         let results = self.visible_results();
         if results.is_empty() {
             return div()
                 .debug_selector(|| "settings-search-empty".into())
-                .text_color(rgb(theme.subtext()))
+                .mt(look.at(24.))
+                .text_color(look.muted())
                 .child("No settings match.");
         }
-        div().flex().flex_col().children(
-            results
-                .iter()
-                .copied()
-                .filter_map(|index| catalog::CATALOG.get(index).map(|entry| (index, entry)))
-                .enumerate()
-                .map(|(n, (index, entry))| {
-                    let id = format!("settings-search-result-{n}");
-                    let mut row = ui::row(
-                        look,
-                        id.clone(),
-                        format!("{} \u{203a} {}", entry.section.label(), entry.title),
-                    );
-                    if !entry.description.is_empty() {
-                        row = row.description(entry.description);
-                    }
-                    row.control(
-                        div()
-                            .text_size(px(10.))
-                            .text_color(rgb(theme.subtext()))
-                            .child(entry.section.label()),
-                    )
+        let hover = look.hover();
+        let mut card = look
+            .card("settings-search-results-card".into())
+            .mt(look.at(24.))
+            .overflow_hidden();
+        let entries = results
+            .iter()
+            .copied()
+            .filter_map(|index| catalog::CATALOG.get(index).map(|entry| (index, entry)));
+        for (n, (index, entry)) in entries.enumerate() {
+            if n > 0 {
+                card = card.child(look.rule());
+            }
+            let id = format!("settings-search-result-{n}");
+            let page = format!("{id}-page");
+            let mut row = ui::row(look, id.clone(), entry.title);
+            if !entry.description.is_empty() {
+                row = row.description(entry.description);
+            }
+            card = card.child(
+                row.control(look.chip(page, entry.section.label(), Tone::Neutral))
                     .into_element()
                     .id(ElementId::Name(id.into()))
                     .cursor_pointer()
-                    .hover(|row| row.bg(rgb(theme.active)))
+                    .hover(move |row| row.bg(hover))
                     .on_click(
                         cx.listener(move |this, _, window, cx| this.open_result(index, window, cx)),
-                    )
-                }),
-        )
+                    ),
+            );
+        }
+        div().flex().flex_col().child(card)
     }
 }

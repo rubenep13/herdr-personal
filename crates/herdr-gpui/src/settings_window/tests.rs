@@ -8,6 +8,7 @@ use std::sync::{
 
 mod cards;
 mod config_watch;
+mod frame_look;
 mod layout_drafts;
 mod load_save;
 mod navigation_groups;

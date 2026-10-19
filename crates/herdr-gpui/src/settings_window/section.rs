@@ -119,10 +119,10 @@ impl Section {
         match self {
             Self::Theme => "icons/theme.svg",
             Self::Sidebar => "icons/panel-left.svg",
-            Self::Fonts => "icons/pencil.svg",
+            Self::Fonts => "icons/text-size.svg",
             Self::StatusBar => "icons/status-bar.svg",
             Self::General => "icons/settings.svg",
-            Self::Tabs => "icons/sessions.svg",
+            Self::Tabs => "icons/tab.svg",
             Self::Code => "icons/vscode.svg",
             Self::Notifications => "icons/bell.svg",
             Self::Integrations => "icons/agent-generic.svg",
