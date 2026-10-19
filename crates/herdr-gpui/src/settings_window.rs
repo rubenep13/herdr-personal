@@ -503,6 +503,15 @@ impl SettingsWindow {
         crate::design::SettingsLook::of(&self.theme, &self.config.ui)
     }
 
+    /// The redesigned menus' look, for the lists and pickers Settings opens.
+    pub(super) fn menu_look(&self, cx: &App) -> crate::design::MenuLook {
+        crate::design::MenuLook::of(
+            &self.theme,
+            &self.config.ui,
+            crate::app::light_appearance(cx),
+        )
+    }
+
     pub(super) fn busy(&self) -> bool {
         self.loading || self.saving || self.quitting
     }

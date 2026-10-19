@@ -40,6 +40,7 @@ impl Render for LookHarness {
             ))
             .child(dropdown(
                 look,
+                &crate::design::MenuLook::of(&Theme::default(), &Config::default().ui, false),
                 "look-dd",
                 "Tree",
                 false,
@@ -47,6 +48,7 @@ impl Render for LookHarness {
                 None,
                 |_, _| {},
                 |_, _, _| {},
+                |_, _, _, _| {},
                 |_, _| {},
             ))
             .child(number(

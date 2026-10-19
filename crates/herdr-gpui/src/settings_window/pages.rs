@@ -69,9 +69,10 @@ impl SettingsWindow {
             .collect();
         let selected = local.map_or(0, |index| index + 1);
         let view = cx.entity().downgrade();
-        let (opener, picker, dismisser) = (view.clone(), view.clone(), view);
+        let (opener, picker, hoverer, dismisser) = (view.clone(), view.clone(), view.clone(), view);
         ui::dropdown(
             &self.look(),
+            &self.menu_look(cx),
             field.selector(),
             label,
             true,
@@ -88,6 +89,9 @@ impl SettingsWindow {
                     this.pick_dropdown(field, index, cx);
                     window.focus(&this.focus, cx);
                 });
+            },
+            move |index, hovered, _, cx| {
+                let _ = hoverer.update(cx, |this, cx| this.hover_dropdown(index, hovered, cx));
             },
             move |window, cx| {
                 let _ = dismisser.update(cx, |this, cx| this.close_dropdown(window, cx));

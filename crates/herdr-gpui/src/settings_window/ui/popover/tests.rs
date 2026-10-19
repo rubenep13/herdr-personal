@@ -44,6 +44,11 @@ impl Render for Harness {
             })
             .child(dropdown(
                 &look,
+                &MenuLook::of(
+                    &Theme::default(),
+                    &crate::config::Config::default().ui,
+                    false,
+                ),
                 "notif-position-control",
                 "Top right",
                 false,
@@ -71,6 +76,7 @@ impl Render for Harness {
                         cx.notify();
                     });
                 },
+                |_, _, _, _| {},
                 move |_, cx| {
                     let _ = dismisser.update(cx, |this, cx| {
                         this.open = None;
@@ -203,3 +209,5 @@ fn dropdown_opens_picks_and_dismisses(cx: &mut TestAppContext) {
     draw(cx);
     assert!(cx.debug_bounds("notif-position-control-option-0").is_none());
 }
+
+mod look;
