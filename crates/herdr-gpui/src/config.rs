@@ -67,6 +67,7 @@ pub use notifications::{
     BellConfig, ClipboardToast, ClipboardToastPosition, NotificationConfig, SoundConfig,
 };
 use notifications::{ClipboardToastSettings, NotificationSettings};
+pub(crate) use omarchy::NAME as OMARCHY_THEME;
 pub use padding::Padding;
 pub(crate) use padding::{Axis, MAX_PADDING, Side, Sides};
 use serde::Deserialize;

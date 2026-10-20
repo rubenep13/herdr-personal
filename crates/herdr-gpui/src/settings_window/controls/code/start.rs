@@ -43,7 +43,11 @@ impl SettingsWindow {
 
     /// The two ways to get a server. Starting VS Code needs it installed,
     /// in a build that shows pages.
-    pub(super) fn render_code_mode(&self, mode: Option<CodeMode>, cx: &mut Context<Self>) -> Div {
+    pub(super) fn render_code_mode(
+        &self,
+        mode: Option<CodeMode>,
+        cx: &mut Context<Self>,
+    ) -> crate::settings_window::ui::FormCard {
         let cli = Launcher::cli(cx);
         let can_start = crate::browser::EMBEDDED && matches!(cli, Some(Cli::Found(_)));
         let choice = |id: &'static str, label: &'static str, choice: CodeMode, enabled: bool| {
@@ -98,7 +102,10 @@ impl SettingsWindow {
     }
 
     /// The server the app starts: its license until accepted, then how it is.
-    pub(super) fn render_code_start(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn render_code_start(
+        &self,
+        cx: &mut Context<Self>,
+    ) -> crate::settings_window::ui::FormCard {
         let card = self.control_card("Server").child(self.control_note(
             "The app runs `code serve-web` on 127.0.0.1 when a VS Code tab first needs it, \
              and stops it when it quits.",

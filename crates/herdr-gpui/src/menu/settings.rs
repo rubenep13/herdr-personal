@@ -2,8 +2,8 @@
 //! load is a cancellable background task: config parsing never runs on the UI
 //! thread, and a superseded load cannot overwrite a newer one.
 
-use super::{Page, accent};
-use crate::design::keycaps;
+use super::Page;
+use crate::design::{Header, ItemState, MenuLook, keycaps};
 use crate::{HerdrWindow, config::Config, keymap::Reach};
 use gpui::{prelude::*, *};
 use herdr_client::protocol::ClientShellCommand;
@@ -11,6 +11,14 @@ use std::borrow::Cow;
 
 /// The semantic paste row, which no keymap command holds.
 const PASTE_LABEL: &str = "Paste into terminal";
+/// The shortcut list's groups, in the order it shows them; commands index
+/// into it.
+pub(super) const KEYBIND_GROUPS: &[&str] = &[
+    "Workspaces & panes",
+    "Navigation",
+    "Application",
+    "Plugin & custom commands",
+];
 
 impl HerdrWindow {
     pub(crate) fn reload_notification_config(&mut self, cx: &mut Context<Self>) {
@@ -102,6 +110,8 @@ impl HerdrWindow {
         search.update(cx, |input, cx| {
             input.set_placeholder("Search shortcuts...", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            // The query row draws the field.
+            input.set_frameless(cx);
             window.focus(&input.focus, cx);
         });
         self.menu._keybinds_subscription = Some(cx.subscribe(
@@ -266,8 +276,7 @@ impl HerdrWindow {
     pub(super) fn render_keybinds(&self, cx: &mut Context<Self>) -> Div {
         use crate::controls::{COMMANDS, Command};
 
-        let theme = &self.theme;
-        let font = &self.config.ui;
+        let look = self.menu_look();
         let editor = self.render_shortcut_editor(cx);
         let query = self
             .menu
@@ -275,7 +284,6 @@ impl HerdrWindow {
             .as_ref()
             .map(|search| search.read(cx).text())
             .unwrap_or("");
-        let accent = accent(theme);
         let mut body = div()
             .id("keybinds-body")
             .debug_selector(|| "keybinds-body".into())
@@ -283,21 +291,21 @@ impl HerdrWindow {
             .min_h_0()
             .overflow_y_scroll()
             .track_scroll(&self.menu.keybinds_scroll)
-            .px(px(16.))
-            .py(px(8.))
+            .pt(look.at(4.))
+            .pb(look.at(10.))
             .children(editor);
         let mut groups = [
-            ("WORKSPACES & PANES", Vec::new()),
-            ("NAVIGATION", Vec::new()),
+            (KEYBIND_GROUPS[0], Vec::new()),
+            (KEYBIND_GROUPS[1], Vec::new()),
             (
-                "APPLICATION",
+                KEYBIND_GROUPS[2],
                 vec![(
                     vec![(Cow::Borrowed(crate::actions::EDIT_KEYS[2]), None)],
                     Cow::Borrowed(PASTE_LABEL),
                     None,
                 )],
             ),
-            ("PLUGIN & CUSTOM COMMANDS", Vec::new()),
+            (KEYBIND_GROUPS[3], Vec::new()),
         ];
         for info in COMMANDS {
             let mut keys: Vec<&str> = self.keymap().shortcuts(info.command).collect();
@@ -461,185 +469,76 @@ impl HerdrWindow {
                 continue;
             }
             count += shortcuts.len();
-            body = body.child(
-                div()
-                    .pt(px(12.))
-                    .pb(px(6.))
-                    .text_size(px(font.size * 0.85))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(accent)
-                    .child(section),
-            );
+            body = body.child(look.section(format!("keybinds-group-{section}"), section));
             for (keys, description, info) in shortcuts {
-                body = body.child(
-                    div()
-                        .debug_selector(|| format!("shortcut-{description}"))
-                        .flex()
-                        .items_center()
-                        .gap(px(12.))
-                        .py(px(7.))
-                        .border_b_1()
-                        .border_color(rgb(theme.active))
-                        .child(
-                            div()
-                                .debug_selector(|| format!("keys-{description}"))
-                                .w(relative(0.45))
-                                .flex_none()
-                                .flex()
-                                .flex_wrap()
-                                .gap(px(10.))
-                                .when(keys.is_empty(), |column| {
-                                    column.child(
-                                        div()
-                                            .text_color(rgb(theme.muted))
-                                            .child("No shortcut assigned"),
-                                    )
-                                })
-                                .children(keys.into_iter().map(|(keys, note)| {
-                                    div()
-                                        .flex()
-                                        .flex_col()
-                                        .gap(px(3.))
-                                        .child(div().flex().flex_wrap().gap(px(4.)).children(
-                                            keycaps(&keys).map(|key| {
-                                                div()
-                                                    .flex_none()
-                                                    .px(px(6.))
-                                                    .py(px(2.))
-                                                    .rounded(px(crate::config::corners::SMALL))
-                                                    .border_1()
-                                                    .border_color(rgb(theme.active))
-                                                    .bg(rgb(theme.background))
-                                                    .text_size(px(font.size * 0.9))
-                                                    .font_weight(FontWeight::MEDIUM)
-                                                    .child(key)
-                                            }),
-                                        ))
-                                        .when_some(note, |binding, note| {
-                                            binding.child(
-                                                div()
-                                                    .text_size(px(font.size * 0.85))
-                                                    .text_color(rgb(theme.muted))
-                                                    .child(note),
-                                            )
-                                        })
-                                })),
-                        )
-                        .child(
-                            div()
-                                .debug_selector(|| format!("description-{description}"))
-                                .flex_1()
-                                .min_w_0()
-                                .child(description),
-                        )
-                        .when_some(info, |row, info| {
-                            row.child(
-                                div()
-                                    .id(SharedString::from(format!("edit-shortcut-{}", info.name)))
-                                    .debug_selector(move || format!("edit-shortcut-{}", info.name))
-                                    .flex_none()
-                                    .px(px(6.))
-                                    .py(px(4.))
-                                    .cursor_pointer()
-                                    .text_color(accent)
-                                    .child("Edit")
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.edit_shortcut(info, window, cx)
-                                    })),
-                            )
-                        }),
-                );
+                body = body.child(self.shortcut_row(&look, keys, description, info, cx));
             }
         }
         if count == 0 {
             body = body.child(
                 div()
                     .debug_selector(|| "keybinds-empty".into())
-                    .py(px(20.))
-                    .text_color(rgb(theme.muted))
+                    .px(look.at(10.))
+                    .py(look.at(20.))
+                    .text_color(look.muted())
                     .child("No matching shortcuts. Try an action name or key combination."),
             );
         }
         body = body.child(
             div()
-                .py(px(14.))
-                .text_color(rgb(theme.subtext()))
+                .px(look.at(10.))
+                .pt(look.at(10.))
+                .pb(look.at(4.))
+                .text_size(px(look.scale().secondary))
+                .line_height(relative(1.5))
+                .text_color(look.muted())
                 .child("Includes Herdr's [keys] prefix chords and the connected daemon's plugin and custom commands. A binding that cannot run says why. Terminal applications keep their own shortcuts."),
         );
+        let search = self.menu.keybinds_search.clone();
         div()
             .flex()
             .flex_col()
             .size_full()
             .min_h_0()
+            .relative()
             .child(
-                div()
-                    .debug_selector(|| "keybinds-header".into())
-                    .flex()
-                    .items_center()
-                    .flex_none()
-                    .gap(px(12.))
-                    .p(px(16.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        div()
-                            .w(px(3.))
-                            .h(px(font.size * 2.5))
-                            .rounded_full()
-                            .bg(accent),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Keyboard Shortcuts"),
-                            )
-                            .child(
-                                div()
-                                    .text_color(rgb(theme.muted))
-                                    .child("View and edit shortcuts"),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .id("menu-close")
-                            .debug_selector(|| "keybinds-close".into())
-                            .flex_none()
-                            .px(px(8.))
-                            .py(px(4.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .cursor_pointer()
-                            .text_color(rgb(theme.muted))
-                            .hover(|style| {
-                                style
-                                    .bg(rgb(theme.active))
-                                    .text_color(rgb(theme.foreground))
-                            })
-                            .child("Close")
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)),
-                            ),
-                    ),
+                look.header(Header {
+                    selector: "keybinds-header",
+                    icon: "icons/keyboard.svg",
+                    title: ("keybinds-title", "Keyboard Shortcuts"),
+                    sub: None,
+                })
+                .child(
+                    div()
+                        .pl(look.at(24.))
+                        .text_size(px(look.scale().secondary))
+                        .text_color(look.muted())
+                        .child("View and edit shortcuts"),
+                ),
+            )
+            .child(
+                look.close_button("keybinds-close")
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
             )
             .child(
                 div()
                     .debug_selector(|| "keybinds-search-area".into())
-                    .flex_none()
-                    .px(px(16.))
-                    .py(px(8.))
-                    .when_some(self.menu.keybinds_search.clone(), |area, search| {
-                        area.child(search)
-                    })
                     .child(
-                        div()
-                            .debug_selector(|| "keybinds-count".into())
-                            .pt(px(4.))
-                            .text_color(rgb(theme.muted))
-                            .child(format!("{count} of {total} shortcuts")),
+                        look.query(
+                            "keybinds-search-icon",
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap(look.at(10.))
+                                .child(div().flex_1().min_w_0().children(search))
+                                .child(look.detail(
+                                    "keybinds-count".into(),
+                                    format!("{count} of {total} shortcuts"),
+                                )),
+                        ),
                     ),
             )
             .child(body)
@@ -647,15 +546,141 @@ impl HerdrWindow {
                 div()
                     .debug_selector(|| "keybinds-footer".into())
                     .flex_none()
-                    .px(px(16.))
-                    .py(px(10.))
+                    .h(look.at(36.))
+                    .px(look.at(16.))
+                    .flex()
+                    .items_center()
                     .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .text_color(rgb(theme.muted))
+                    .border_color(look.line())
+                    .bg(look.well())
+                    .text_size(px(look.scale().detail))
+                    .text_color(look.muted())
                     .child("Esc to close  /  click outside to dismiss"),
             )
     }
+
+    /// One action: what it does, then its keys as chips, with any note on a
+    /// binding that cannot run, and the pencil that edits it, shown on hover.
+    fn shortcut_row(
+        &self,
+        look: &MenuLook,
+        keys: Vec<(Cow<'_, str>, Option<&'static str>)>,
+        description: Cow<'_, str>,
+        info: Option<&'static crate::controls::CommandInfo>,
+        cx: &Context<Self>,
+    ) -> Div {
+        let description = description.into_owned();
+        let selection = look.fill(ItemState {
+            selected: true,
+            ..ItemState::default()
+        });
+        let title = look.ink(ItemState {
+            selected: true,
+            ..ItemState::default()
+        });
+        let warn = self.theme.ink(self.theme.palette[3]);
+        let keys_id = format!("keys-{description}");
+        let row_id = format!("shortcut-{description}");
+        let description_id = format!("description-{description}");
+        div()
+            .debug_selector(move || row_id)
+            .group(SHORTCUT_ROW)
+            .flex()
+            .items_center()
+            .gap(look.at(12.))
+            .min_h(look.at(36.))
+            .px(look.at(10.))
+            .py(look.at(4.))
+            .rounded(look.at(8.))
+            .when_some(selection, |row, fill| row.hover(move |row| row.bg(fill)))
+            .child(
+                div()
+                    .debug_selector(move || description_id)
+                    .flex_1()
+                    .min_w_0()
+                    .text_color(look.ink(ItemState::default()))
+                    .group_hover(SHORTCUT_ROW, move |text| text.text_color(title))
+                    .child(description.clone()),
+            )
+            .child(
+                div()
+                    .debug_selector(move || keys_id)
+                    .flex_none()
+                    .flex()
+                    .flex_col()
+                    .items_end()
+                    .gap(look.at(3.))
+                    .when(keys.is_empty(), |column| {
+                        column.child(
+                            div()
+                                .text_size(px(look.scale().secondary))
+                                .text_color(look.muted())
+                                .child("No shortcut assigned"),
+                        )
+                    })
+                    .children(keys.into_iter().enumerate().map(|(index, (keys, note))| {
+                        let caps = keycaps(&keys)
+                            .enumerate()
+                            .map(|(key, cap)| {
+                                look.keycap(
+                                    format!("shortcut-{description}-{index}-key-{key}"),
+                                    cap,
+                                )
+                            })
+                            .collect::<Vec<_>>();
+                        div()
+                            .flex()
+                            .flex_col()
+                            .items_end()
+                            .child(div().flex().flex_wrap().gap(look.at(3.)).children(caps))
+                            .when_some(note, |binding, note| {
+                                binding.child(
+                                    div()
+                                        .mt(look.at(2.))
+                                        .text_size(px(look.scale().detail))
+                                        .text_color(rgb(warn))
+                                        .child(note),
+                                )
+                            })
+                    })),
+            )
+            .child(match info {
+                Some(info) => div().child(
+                    div()
+                        .id(SharedString::from(format!("edit-shortcut-{}", info.name)))
+                        .debug_selector(move || format!("edit-shortcut-{}", info.name))
+                        .size(look.at(26.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(look.at(6.))
+                        .cursor_pointer()
+                        // Always in the tree, seen only while its row is
+                        // hovered: what the row is about is its keys.
+                        .opacity(0.)
+                        .group_hover(SHORTCUT_ROW, |edit| edit.opacity(1.))
+                        .when_some(selection, |edit, fill| {
+                            edit.hover(move |edit| edit.bg(fill))
+                        })
+                        .child(
+                            svg()
+                                .path("icons/pencil.svg")
+                                .size(look.at(14.))
+                                .flex_none()
+                                .text_color(look.muted()),
+                        )
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.edit_shortcut(info, window, cx)
+                        })),
+                ),
+                // Rows without an editor keep the pencil's room, so keys align.
+                None => div().flex_none().size(look.at(26.)),
+            })
+    }
 }
+
+/// The hover group a shortcut row's description and pencil answer to.
+const SHORTCUT_ROW: &str = "shortcut-row";
 
 /// The keycaps of a shortcut, capitalized for display, a prefix chord's
 /// keystrokes in turn. `cmd--` splits into `cmd` and a `-` key rather than an

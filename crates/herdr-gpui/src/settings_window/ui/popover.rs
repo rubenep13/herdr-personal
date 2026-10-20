@@ -2,7 +2,7 @@
 //! list renders inside the button's subtree via `deferred(anchored(..))`, so
 //! no bounds are passed around and it paints above the page.
 use crate::{
-    config::{Theme, corners},
+    design::{ItemState, Leading, MenuLook, SettingsLook},
     settings_window::inputs::DropdownField,
 };
 use gpui::{prelude::*, *};
@@ -18,7 +18,11 @@ thread_local! {
 pub(in crate::settings_window) struct Dropdown {
     pub field: DropdownField,
     pub options: Vec<SharedString>,
+    /// The option the keys or the pointer are on.
     pub selected: usize,
+    /// The option in effect when the list opened; it keeps the check, and the
+    /// highlight returns to it when the pointer leaves a row.
+    pub current: usize,
     focus: FocusHandle,
 }
 
@@ -36,8 +40,23 @@ impl Dropdown {
             field,
             options,
             selected,
+            current: selected,
             focus,
         }
+    }
+
+    /// The pointer entered or left option `index`.
+    pub(in crate::settings_window) fn hover(&mut self, index: usize, hovered: bool) -> bool {
+        let next = if hovered {
+            index
+        } else if self.selected == index {
+            self.current
+        } else {
+            return false;
+        };
+        let changed = self.selected != next;
+        self.selected = next;
+        changed
     }
 
     pub(in crate::settings_window) fn focus(&self) -> &FocusHandle {
@@ -62,7 +81,8 @@ impl Dropdown {
 /// The button, plus its list when `open` is this dropdown.
 #[allow(clippy::too_many_arguments)]
 pub(in crate::settings_window) fn dropdown(
-    theme: &Theme,
+    look: &SettingsLook,
+    menu: &MenuLook,
     id: &'static str,
     label: impl Into<SharedString>,
     shared_prefix: bool,
@@ -70,6 +90,7 @@ pub(in crate::settings_window) fn dropdown(
     open: Option<&Dropdown>,
     on_open: impl Fn(&mut Window, &mut App) + 'static,
     on_pick: impl Fn(usize, &mut Window, &mut App) + 'static,
+    on_hover: impl Fn(usize, bool, &mut Window, &mut App) + 'static,
     on_dismiss: impl Fn(&mut Window, &mut App) + 'static,
 ) -> Stateful<Div> {
     let label: SharedString = label.into();
@@ -82,10 +103,11 @@ pub(in crate::settings_window) fn dropdown(
     let label_el = match label.strip_prefix(prefix).filter(|_| shared_prefix) {
         Some(rest) => div()
             .flex()
-            .child(div().text_color(rgb(theme.muted)).child(prefix))
+            .child(div().text_color(look.muted()).child(prefix))
             .child(rest.to_string()),
         None => div().child(label.clone()),
     };
+    let ring = look.raised();
     div()
         .id(id)
         .debug_selector(move || id.to_string())
@@ -93,20 +115,24 @@ pub(in crate::settings_window) fn dropdown(
         .flex()
         .items_center()
         .justify_between()
-        .gap(px(8.))
+        .gap(look.at(8.))
         .flex_none()
-        .min_w(px(150.))
-        .px(px(10.))
-        .py(px(4.))
-        .rounded(px(corners::CONTROL))
+        .h(px(look.control_height()))
+        .min_w(look.at(170.))
+        .pl(look.at(12.))
+        .pr(look.at(8.))
+        .rounded(look.at(8.))
         .border_1()
-        .border_color(rgb(theme.active))
-        .bg(rgb(theme.surface))
-        .text_color(rgb(theme.foreground))
+        .border_color(look.line())
+        .bg(look.well())
+        .text_size(px(look.scale().name))
+        .text_color(look.title())
+        .whitespace_nowrap()
         .when(!enabled, |button| button.opacity(0.5))
         .when(enabled, |button| {
             button
                 .cursor_pointer()
+                .hover(move |button| button.border_color(ring))
                 .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                     if was_open {
                         CLOSING.with(|closing| closing.borrow_mut().insert(id));
@@ -123,65 +149,94 @@ pub(in crate::settings_window) fn dropdown(
                 })
         })
         .child(label_el)
-        .child(div().text_color(rgb(theme.subtext())).child("⌄"))
+        .child(
+            svg()
+                .path("icons/chevron-down.svg")
+                .size(look.at(14.))
+                .flex_none()
+                .text_color(look.muted()),
+        )
         .children(open.map(|open| {
-            deferred(
-                anchored()
-                    .snap_to_window_with_margin(px(8.))
-                    .child(popover_list(theme, open, on_pick, move |window, cx| {
-                        dismiss_list(window, cx)
-                    })),
+            // A point at the button's bottom right corner: the list hangs
+            // from it, its right edge along the button's.
+            div().absolute().top_full().right_0().mt(look.at(4.)).child(
+                deferred(
+                    anchored()
+                        .anchor(Anchor::TopRight)
+                        .snap_to_window_with_margin(px(8.))
+                        .child(popover_list(
+                            menu,
+                            open,
+                            on_pick,
+                            on_hover,
+                            move |window, cx| dismiss_list(window, cx),
+                        )),
+                )
+                .with_priority(1),
             )
-            .with_priority(1)
         }))
 }
 
-/// The floating list; also usable on its own where the view wants it elsewhere.
+/// The floating list: the redesigned menus' panel and rows, the option in
+/// effect checked.
 pub(in crate::settings_window) fn popover_list(
-    theme: &Theme,
+    look: &MenuLook,
     open: &Dropdown,
     on_pick: impl Fn(usize, &mut Window, &mut App) + 'static,
+    on_hover: impl Fn(usize, bool, &mut Window, &mut App) + 'static,
     on_dismiss: impl Fn(&mut Window, &mut App) + 'static,
 ) -> Stateful<Div> {
     let id = open.field.selector();
     let on_pick = Rc::new(on_pick);
-    div()
-        .id(SharedString::from(format!("{id}-list")))
-        .debug_selector(move || format!("{id}-list"))
-        .absolute()
-        .top_full()
-        .left_0()
-        .mt(px(4.))
-        .min_w(px(180.))
-        .max_h(px(260.))
-        .overflow_y_scroll()
-        .p(px(4.))
-        .rounded(px(corners::CONTROL))
-        .border_1()
-        .border_color(rgb(theme.active))
-        .bg(rgb(theme.surface))
-        .shadow_md()
-        .occlude()
-        .track_focus(&open.focus)
-        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-        .on_click(|_, _, cx| cx.stop_propagation())
-        .on_mouse_down_out(move |_, window, cx| on_dismiss(window, cx))
-        .children(open.options.iter().enumerate().map(|(index, option)| {
-            let on_pick = on_pick.clone();
-            div()
-                .id((id, index))
-                .debug_selector(move || format!("{id}-option-{index}"))
-                .px(px(8.))
-                .py(px(4.))
-                .rounded(px(corners::SMALL))
-                .whitespace_nowrap()
-                .cursor_pointer()
-                .text_color(rgb(theme.foreground))
-                .when(index == open.selected, |item| item.bg(rgb(theme.active)))
-                .on_click(move |_, window, cx| on_pick(index, window, cx))
-                .child(option.clone())
-        }))
+    let on_hover = Rc::new(on_hover);
+    look.panel(
+        div()
+            .id(SharedString::from(format!("{id}-list")))
+            .debug_selector(move || format!("{id}-list"))
+            .min_w(look.at(LIST_WIDTH))
+            .max_h(look.at(LIST_HEIGHT))
+            .overflow_y_scroll()
+            .p(look.at(6.))
+            .flex()
+            .flex_col(),
+    )
+    .occlude()
+    .track_focus(&open.focus)
+    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+    .on_click(|_, _, cx| cx.stop_propagation())
+    .on_mouse_down_out(move |_, window, cx| on_dismiss(window, cx))
+    .children(open.options.iter().enumerate().map(|(index, option)| {
+        let (on_pick, on_hover) = (on_pick.clone(), on_hover.clone());
+        let state = ItemState {
+            selected: index == open.selected,
+            ..ItemState::default()
+        };
+        look.row(
+            (id, index),
+            format!("{id}-option-{index}"),
+            Leading::Empty,
+            state,
+        )
+        .child(look.label(format!("{id}-option-{index}-label"), option.clone()))
+        .when(index == open.current, |row| {
+            row.child(
+                svg()
+                    .path("icons/check.svg")
+                    .size(look.at(16.))
+                    .flex_none()
+                    .text_color(look.accent())
+                    .debug_selector(move || format!("{id}-option-{index}-check")),
+            )
+        })
+        .on_hover(move |hovered, window, cx| on_hover(index, *hovered, window, cx))
+        .on_click(move |_, window, cx| on_pick(index, window, cx))
+    }))
 }
+
+/// The list's least width and its height before it scrolls, at the default
+/// `[ui]` size.
+const LIST_WIDTH: f32 = 200.;
+const LIST_HEIGHT: f32 = 300.;
 
 #[cfg(test)]
 mod tests;

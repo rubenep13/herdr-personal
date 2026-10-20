@@ -11,7 +11,7 @@ use gpui::{prelude::*, *};
 
 impl SettingsWindow {
     pub(in crate::settings_window) fn render_general(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         let ready = self.controls_shared_ready();
         let copy = self
             .shared
@@ -48,131 +48,142 @@ impl SettingsWindow {
         div()
             .flex()
             .flex_col()
-            .child(ui::section(theme, "Interface", None))
             .child(
-                ui::row(theme, "general-ports", "Show listening ports")
-                    .description("Port chips on workspaces with a dev server.")
-                    .control(self.preference_toggle(
-                        "general-ports-toggle",
-                        self.config.show_listening_ports,
-                        Preference::ShowListeningPorts(!self.config.show_listening_ports),
-                        cx,
-                    )),
+                ui::group(look, "interface", "Interface", None)
+                    .row(
+                        ui::row(look, "general-ports", "Show listening ports")
+                            .description("Port chips on workspaces with a dev server.")
+                            .control(self.preference_toggle(
+                                "general-ports-toggle",
+                                self.config.show_listening_ports,
+                                Preference::ShowListeningPorts(!self.config.show_listening_ports),
+                                cx,
+                            )),
+                    )
+                    .row(
+                        ui::row(look, "general-checkpoints", "Checkpoint agent turns")
+                            .description("Snapshot the worktree after each agent turn.")
+                            .control(self.preference_toggle(
+                                "general-checkpoints-toggle",
+                                self.config.agent_checkpoints,
+                                Preference::AgentCheckpoints(!self.config.agent_checkpoints),
+                                cx,
+                            )),
+                    )
+                    .row(
+                        ui::row(look, "general-smooth-scroll", "Smooth scrolling")
+                            .description(
+                                "Scroll terminal history between rows; off steps whole rows.",
+                            )
+                            .control(self.preference_toggle(
+                                "general-smooth-scroll-toggle",
+                                self.config.smooth_scroll,
+                                Preference::SmoothScroll(!self.config.smooth_scroll),
+                                cx,
+                            )),
+                    ),
+            )
+            .child(ui::group(look, "features", "Features", None).rows(self.feature_rows(cx)))
+            .child(
+                ui::group(look, "clipboard", "Clipboard", None)
+                    .row(
+                        self.gate_shared(
+                            ui::row(look, "general-copy-on-select", "Copy on select")
+                                .tag(ui::Source::Shared)
+                                .description(
+                                    "Off: \u{2318}C / Ctrl-C copies the highlighted selection.",
+                                ),
+                        )
+                        .control(
+                            ui::toggle(look, "general-copy-on-select-toggle", copy, ready).when(
+                                ready,
+                                |toggle| {
+                                    toggle.on_click(cx.listener(move |this, _, _, cx| {
+                                        this.save_shared(Edit::CopyOnSelect(!copy), cx)
+                                    }))
+                                },
+                            ),
+                        ),
+                    )
+                    .row(
+                        ui::row(look, "general-copied-toast", "Copied notification")
+                            .tag(ui::Source::Local)
+                            .control(self.override_dropdown(
+                                DropdownField::ClipboardEnabled,
+                                on_off(base.0),
+                                &["On", "Off"],
+                                overrides.enabled().map(|on| usize::from(!on)),
+                                cx,
+                            )),
+                    )
+                    .row(
+                        ui::row(look, "general-clipboard-position", "Notification position")
+                            .tag(ui::Source::Local)
+                            .control(self.override_dropdown(
+                                DropdownField::ClipboardPosition,
+                                base_position,
+                                &position_names,
+                                position,
+                                cx,
+                            )),
+                    ),
             )
             .child(
-                ui::row(theme, "general-checkpoints", "Checkpoint agent turns")
-                    .description("Snapshot the worktree after each agent turn.")
+                ui::group(look, "worktrees", "Worktrees", None).row(
+                    ui::row(
+                        look,
+                        "general-merged-worktrees",
+                        "Remove worktrees of merged PRs",
+                    )
+                    .description(
+                        "Deletes a clean linked worktree and closes its workspace once its PR is \
+                     merged. The focused workspace asks first.",
+                    )
                     .control(self.preference_toggle(
-                        "general-checkpoints-toggle",
-                        self.config.agent_checkpoints,
-                        Preference::AgentCheckpoints(!self.config.agent_checkpoints),
+                        "general-merged-worktrees-toggle",
+                        merged,
+                        Preference::RemoveMergedWorktrees(!merged),
                         cx,
                     )),
+                ),
             )
             .child(
-                ui::row(theme, "general-smooth-scroll", "Smooth scrolling")
-                    .description("Scroll terminal history between rows; off steps whole rows.")
-                    .control(self.preference_toggle(
-                        "general-smooth-scroll-toggle",
-                        self.config.smooth_scroll,
-                        Preference::SmoothScroll(!self.config.smooth_scroll),
-                        cx,
-                    )),
-            )
-            .child(ui::section(theme, "Features", None))
-            .children(self.feature_rows(cx))
-            .child(ui::section(theme, "Clipboard", None))
-            .child(
-                self.gate_shared(
-                    ui::row(theme, "general-copy-on-select", "Copy on select")
-                        .tag(ui::Source::Shared)
-                        .description("Off: \u{2318}C / Ctrl-C copies the highlighted selection."),
-                )
-                .control(
-                    ui::toggle(theme, "general-copy-on-select-toggle", copy, ready).when(
-                        ready,
-                        |toggle| {
-                            toggle.on_click(cx.listener(move |this, _, _, cx| {
-                                this.save_shared(Edit::CopyOnSelect(!copy), cx)
-                            }))
-                        },
+                ui::group(look, "browser-skill", "Browser skill", None).row(
+                    ui::row(
+                        look,
+                        "general-browser-skill",
+                        "Teach local agents to use browser tabs",
+                    )
+                    .description(if installed {
+                        "Installed in ~/.claude and ~/.agents, kept up to date."
+                    } else {
+                        "Not installed."
+                    })
+                    .control(
+                        ui::button(look, skill_id, skill_label, true).on_click(
+                            cx.listener(move |this, _, _, cx| this.save_skill(choice, cx)),
+                        ),
                     ),
                 ),
             )
             .child(
-                ui::row(theme, "general-copied-toast", "Copied notification")
-                    .tag(ui::Source::Local)
-                    .control(self.override_dropdown(
-                        DropdownField::ClipboardEnabled,
-                        on_off(base.0),
-                        &["On", "Off"],
-                        overrides.enabled().map(|on| usize::from(!on)),
-                        cx,
-                    )),
-            )
-            .child(
-                ui::row(theme, "general-clipboard-position", "Notification position")
-                    .tag(ui::Source::Local)
-                    .control(self.override_dropdown(
-                        DropdownField::ClipboardPosition,
-                        base_position,
-                        &position_names,
-                        position,
-                        cx,
-                    )),
-            )
-            .child(ui::section(theme, "Worktrees", None))
-            .child(
-                ui::row(
-                    theme,
-                    "general-merged-worktrees",
-                    "Remove worktrees of merged PRs",
-                )
-                .description(
-                    "Deletes a clean linked worktree and closes its workspace once its PR is \
-                     merged. The focused workspace asks first.",
-                )
-                .control(self.preference_toggle(
-                    "general-merged-worktrees-toggle",
-                    merged,
-                    Preference::RemoveMergedWorktrees(!merged),
-                    cx,
-                )),
-            )
-            .child(ui::section(theme, "Browser skill", None))
-            .child(
-                ui::row(
-                    theme,
-                    "general-browser-skill",
-                    "Teach local agents to use browser tabs",
-                )
-                .description(if installed {
-                    "Installed in ~/.claude and ~/.agents, kept up to date."
-                } else {
-                    "Not installed."
-                })
-                .control(
-                    ui::button(theme, skill_id, skill_label, true)
-                        .on_click(cx.listener(move |this, _, _, cx| this.save_skill(choice, cx))),
-                ),
-            )
-            .child(ui::section(theme, "Updates", None))
-            .child(
-                ui::row(theme, "general-update-beta", "Install beta releases")
-                    .description(
-                        "Betas ship before they are promoted to stable. Turning this off never \
+                ui::group(look, "updates", "Updates", None).row(
+                    ui::row(look, "general-update-beta", "Install beta releases")
+                        .description(
+                            "Betas ship before they are promoted to stable. Turning this off never \
                          downgrades; Homebrew installations always follow stable.",
-                    )
-                    .control(self.preference_toggle(
-                        "general-update-beta-toggle",
-                        beta,
-                        Preference::UpdateChannel(if beta {
-                            UpdateChannel::Stable
-                        } else {
-                            UpdateChannel::Beta
-                        }),
-                        cx,
-                    )),
+                        )
+                        .control(self.preference_toggle(
+                            "general-update-beta-toggle",
+                            beta,
+                            Preference::UpdateChannel(if beta {
+                                UpdateChannel::Stable
+                            } else {
+                                UpdateChannel::Beta
+                            }),
+                            cx,
+                        )),
+                ),
             )
     }
 
@@ -185,7 +196,7 @@ impl SettingsWindow {
             .map(|&feature| {
                 let id = feature.setting_id();
                 let on = features.enabled(feature);
-                ui::row(&self.theme, id, feature.label())
+                ui::row(&self.look(), id, feature.label())
                     .description(feature.description())
                     .control(self.preference_toggle(
                         format!("{id}-toggle"),

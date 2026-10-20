@@ -45,30 +45,36 @@ impl SettingsWindow {
         let follow_row = self.theme_follow_row(cx);
         let contrast_row = self.theme_contrast_row(cx);
         let source_row = self.theme_source_row(cx);
-        let search = self.render_theme_search(cx);
+        let search = self.render_theme_search(window, cx);
         let open_file = self.theme_open_file(cx);
         let results = self.render_theme_results(window, cx);
         let window_rows = self.render_window_rows(cx);
-        let theme = &self.theme;
+        let look = &self.look();
         div()
             .debug_selector(|| "settings-appearance".into())
             .w_full()
             .flex()
             .flex_col()
             .min_w_0()
-            .child(ui::section(theme, "Mode", None))
-            .child(mode_row)
-            .children(side_row)
-            .child(follow_row)
-            .child(contrast_row)
-            .child(ui::section(theme, "Themes", None))
-            .child(source_row)
-            .child(div().mt(px(8.)).child(search))
+            .child(
+                ui::group(look, "mode", "Mode", None)
+                    .row(mode_row)
+                    .rows(side_row)
+                    .row(follow_row)
+                    .row(contrast_row)
+                    .row(source_row),
+            )
+            // The grid's themes are cards of their own, so the section has
+            // its title alone.
+            .child(
+                ui::section(look, "Themes", None).debug_selector(|| "settings-group-themes".into()),
+            )
+            .child(search)
             .children(open_file)
             .child(
                 div()
                     .debug_selector(|| "settings-theme-grid".into())
-                    .mt(px(8.))
+                    .mt(look.at(10.))
                     .flex()
                     .flex_col()
                     .flex_1()
@@ -97,10 +103,10 @@ impl SettingsWindow {
         } else {
             Mode::Dark
         };
-        ui::row(&self.theme, "theme-mode", "Appearance")
+        ui::row(&self.look(), "theme-mode", "Appearance")
             .description("Light, dark, or follow the system. Pick a theme below to change it.")
             .control(ui::segmented(
-                &self.theme,
+                &self.look(),
                 "theme-mode-control",
                 &[
                     (Mode::Light, "Light"),
@@ -125,14 +131,14 @@ impl SettingsWindow {
     fn theme_side_row(&self, cx: &mut Context<Self>) -> Option<ui::Row> {
         let value = self.drafted_theme();
         ThemeName::follows_system(value).then(|| {
-            ui::row(&self.theme, "theme-side", "Editing")
+            ui::row(&self.look(), "theme-side", "Editing")
                 .description(format!(
                     "Which side of the pair the themes below change. Light: {} \u{b7} Dark: {}",
                     ThemeName::side(value, true),
                     ThemeName::side(value, false)
                 ))
                 .control(ui::segmented(
-                    &self.theme,
+                    &self.look(),
                     "theme-side-control",
                     &[(true, "Light"), (false, "Dark")],
                     Some(self.themes.editing_light),
@@ -148,11 +154,11 @@ impl SettingsWindow {
 
     fn theme_follow_row(&self, cx: &mut Context<Self>) -> ui::Row {
         let following = self.config.theme == FOLLOW;
-        ui::row(&self.theme, "theme-follow", "Follow Herdr's theme")
+        ui::row(&self.look(), "theme-follow", "Follow Herdr's theme")
             .tag(ui::Source::Shared)
             .description("Use the theme set in Herdr's own config instead of a GUI choice.")
             .control(
-                ui::toggle(&self.theme, "theme-follow-toggle", following, true).on_click(
+                ui::toggle(&self.look(), "theme-follow-toggle", following, true).on_click(
                     cx.listener(move |this, _, _, cx| {
                         let name = if following {
                             this.themes
@@ -176,19 +182,19 @@ impl SettingsWindow {
 
     fn theme_contrast_row(&self, cx: &mut Context<Self>) -> ui::Row {
         let high = self.config.contrast == Contrast::High;
-        ui::row(&self.theme, "theme-contrast", "High contrast")
+        ui::row(&self.look(), "theme-contrast", "High contrast")
             .description("Raise text and marker contrast on every theme.")
             .control(
-                ui::toggle(&self.theme, "theme-contrast-toggle", high, true).on_click(cx.listener(
-                    move |this, _, _, cx| {
+                ui::toggle(&self.look(), "theme-contrast-toggle", high, true).on_click(
+                    cx.listener(move |this, _, _, cx| {
                         let contrast = if high {
                             Contrast::Standard
                         } else {
                             Contrast::High
                         };
                         this.save_native(move || Config::save_contrast(contrast), cx);
-                    },
-                )),
+                    }),
+                ),
             )
     }
 
@@ -203,10 +209,10 @@ impl SettingsWindow {
         } else {
             "Shared Herdr themes are read-only on this platform."
         };
-        ui::row(&self.theme, "theme-source", "Source")
+        ui::row(&self.look(), "theme-source", "Source")
             .description(note)
             .control(ui::segmented(
-                &self.theme,
+                &self.look(),
                 "theme-source-control",
                 &[
                     (Library::All, "All"),
@@ -233,7 +239,7 @@ impl SettingsWindow {
     fn theme_open_file(&self, cx: &mut Context<Self>) -> Option<Div> {
         let path = theme_file(self.edited_theme())?;
         Some(div().mt(px(8.)).flex().child(
-            ui::button(&self.theme, "theme-open-file", "Open theme file", true).on_click(
+            ui::button(&self.look(), "theme-open-file", "Open theme file", true).on_click(
                 cx.listener(move |_, _, _, cx| super::open_path(false, path.clone(), cx)),
             ),
         ))

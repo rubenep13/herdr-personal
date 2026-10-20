@@ -17,7 +17,7 @@ fn the_section_list_resizes_by_its_edge(cx: &mut TestAppContext) {
     };
     draw(cx);
     let edge = cx.debug_bounds("settings-navigation-resize").unwrap();
-    assert!((edge.right() - px(184.)).abs() <= px(1.), "{edge:?}");
+    assert!((edge.right() - px(224.)).abs() <= px(1.), "{edge:?}");
     let start = edge.center();
     cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::default());
     cx.simulate_mouse_move(

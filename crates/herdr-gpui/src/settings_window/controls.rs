@@ -34,6 +34,9 @@ pub(super) struct Controls {
     picker: Option<FontTarget>,
     active_face: FontFace,
     selected: usize,
+    /// The keys' row while the pointer rests on another, given back when it
+    /// leaves.
+    hover_origin: Option<usize>,
     #[cfg(test)]
     family_io: Option<fonts::FamilyIo>,
     names: Vec<String>,
@@ -53,7 +56,9 @@ impl Controls {
     pub(super) fn new(cx: &mut Context<SettingsWindow>) -> Self {
         let search = cx.new(SearchInput::new);
         search.update(cx, |input, cx| {
-            input.set_placeholder("Search installed fonts...", cx)
+            input.set_placeholder("Search installed fonts...", cx);
+            // The picker's query row draws the field.
+            input.set_frameless(cx);
         });
         let subscription = cx.subscribe(&search, |this, search, _: &Changed, cx| {
             this.controls.filtered = filter_fonts(&this.controls.names, search.read(cx).text());
@@ -63,7 +68,8 @@ impl Controls {
         });
         let integration_search = cx.new(SearchInput::new);
         integration_search.update(cx, |input, cx| {
-            input.set_placeholder("Search integrations by name or ID...", cx)
+            input.set_placeholder("Search integrations by name or ID...", cx);
+            input.set_frameless(cx);
         });
         let integration_changed = cx.subscribe(&integration_search, |this, _, _: &Changed, cx| {
             this.body_scroll.set_offset(Point::default());
@@ -78,6 +84,7 @@ impl Controls {
             picker: None,
             active_face: FontFace::Terminal,
             selected: 0,
+            hover_origin: None,
             #[cfg(test)]
             family_io: None,
             names: Vec::new(),
@@ -228,9 +235,12 @@ impl SettingsWindow {
     }
 
     pub(in crate::settings_window) fn control_note(&self, text: impl Into<SharedString>) -> Div {
+        let look = self.look();
         div()
             .min_w_0()
-            .text_color(rgb(self.theme.muted))
+            .text_size(px(look.scale().secondary))
+            .line_height(relative(1.5))
+            .text_color(look.muted())
             .child(text.into())
     }
 

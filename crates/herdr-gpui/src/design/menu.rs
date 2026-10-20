@@ -4,7 +4,7 @@
 //! drift apart again. Behaviour (selection, hover, clicks, keys) stays with
 //! each menu; these pieces only paint.
 
-use super::{SELECTION_RADIUS, TypeScale};
+use super::{ICON_BUTTON, ICON_BUTTON_RADIUS, SELECTION_RADIUS, TypeScale};
 use crate::config::{FontConfig, Theme, corners};
 use gpui::{
     BoxShadow, Div, ElementId, FontFeatures, FontWeight, IntoElement, Pixels, Rgba, SharedString,
@@ -21,6 +21,8 @@ const ROW_PADDING: f32 = 10.;
 const ROW_GAP: f32 = 10.;
 const ICON: f32 = 16.;
 const SUBMENU_ICON: f32 = 14.;
+/// The cross a picker closes with.
+const CLOSE_ICON: f32 = 14.;
 const SEPARATOR_INSET: f32 = 10.;
 const SEPARATOR_GAP: f32 = 5.;
 const HEADER_ICON: f32 = 16.;
@@ -31,6 +33,10 @@ const HEADER_SUB_INSET: f32 = 24.;
 const QUERY_HEIGHT: f32 = 56.;
 const SEARCH_ICON: f32 = 18.;
 const TABS_HEIGHT: f32 = 40.;
+/// A theme's strip: eight bars this wide and tall, this far apart.
+const SWATCH_WIDTH: f32 = 7.;
+const SWATCH_HEIGHT: f32 = 12.;
+const SWATCH_GAP: f32 = 2.;
 /// How far a separator leans from the hairline toward the quiet text colour.
 const RULE_PERCENT: u32 = 40;
 /// How far a key chip's fill leans from the selection toward the text.
@@ -44,12 +50,14 @@ const SHADOW_DARK: f32 = 0.45;
 const SHADOW_LIGHT: f32 = 0.18;
 
 /// What leads a row: nothing (the slot stays, so labels line up), an icon
-/// and the selector naming it, or a check mark in the accent.
+/// and the selector naming it, a check mark in the accent, or a theme's
+/// eight colours, whose slot keeps its width before they load.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Leading {
     Empty,
     Icon(&'static str, String),
     Check,
+    Swatches(Option<[u32; 8]>, String),
 }
 
 /// How a row reads: selected by the pointer or the keys, unavailable, or a
@@ -82,6 +90,8 @@ pub(crate) struct MenuLook {
     /// shows on a selected row.
     key: Rgba,
     selection: Rgba,
+    /// A picker's footer, as the palette's.
+    well: Rgba,
     text: Rgba,
     selected_text: Rgba,
     muted: Rgba,
@@ -105,6 +115,7 @@ impl MenuLook {
                 KEY_PERCENT,
             )),
             selection: rgb(theme.active),
+            well: rgb(theme.surface),
             text: rgb(theme.subtext()),
             selected_text: rgb(theme.foreground),
             muted: rgb(theme.muted),
@@ -146,8 +157,18 @@ impl MenuLook {
         self.muted
     }
 
+    /// The red of destructive rows, for an error's text.
+    pub(crate) fn danger(&self) -> Rgba {
+        self.danger
+    }
+
     pub(crate) fn line(&self) -> Rgba {
         self.line
+    }
+
+    /// A picker footer's fill.
+    pub(crate) fn well(&self) -> Rgba {
+        self.well
     }
 
     #[cfg(test)]
@@ -290,6 +311,21 @@ impl MenuLook {
                     .flex_none()
                     .text_color(self.accent),
             ),
+            Leading::Swatches(strip, selector) => div()
+                .debug_selector(move || selector)
+                .flex_none()
+                .w(self.at(8. * SWATCH_WIDTH + 7. * SWATCH_GAP))
+                .flex()
+                .items_center()
+                .gap(self.at(SWATCH_GAP))
+                .children(strip.into_iter().flatten().map(|color| {
+                    div()
+                        .w(self.at(SWATCH_WIDTH))
+                        .h(self.at(SWATCH_HEIGHT))
+                        .flex_none()
+                        .rounded(self.at(2.))
+                        .bg(rgb(color))
+                })),
         }
     }
 
@@ -455,6 +491,30 @@ impl MenuLook {
                 tab.text_color(self.muted)
                     .hover(move |tab| tab.text_color(hover))
             })
+    }
+
+    /// A picker's close button: a square holding the cross, filled while
+    /// hovered. The caller places it and adds its click.
+    pub(crate) fn close_button(&self, id: &'static str) -> Stateful<Div> {
+        let hover = self.selection;
+        div()
+            .id(id)
+            .debug_selector(move || id.into())
+            .flex_none()
+            .size(self.at(ICON_BUTTON))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(self.at(ICON_BUTTON_RADIUS))
+            .cursor_pointer()
+            .hover(move |button| button.bg(hover))
+            .child(
+                svg()
+                    .path("icons/close.svg")
+                    .size(self.at(CLOSE_ICON))
+                    .flex_none()
+                    .text_color(self.muted),
+            )
     }
 
     pub(crate) fn header(&self, header: Header<'_>) -> Div {

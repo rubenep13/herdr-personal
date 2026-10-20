@@ -1,6 +1,7 @@
 //! Editing GUI overrides from the shortcut reference. The field uses GPUI's
 //! key notation, so aliases are editable without capturing desktop shortcuts.
 use super::Page;
+use crate::design::{ButtonKind, ButtonSize};
 use crate::{
     HerdrWindow,
     config::Config,
@@ -8,7 +9,7 @@ use crate::{
     keymap::{Binding, DaemonKeys, Keymap},
     search_input::SearchInput,
 };
-use gpui::{Context, Div, Entity, FontWeight, KeyDownEvent, Window, div, prelude::*, px, rgb};
+use gpui::{Context, Div, Entity, FontWeight, KeyDownEvent, Window, div, prelude::*, px};
 
 pub(super) struct Editor {
     info: &'static CommandInfo,
@@ -47,6 +48,8 @@ impl HerdrWindow {
             .collect::<Vec<_>>()
             .join(" ");
         let input = cx.new(SearchInput::new);
+        // The editor draws the field's frame.
+        input.update(cx, |input, cx| input.set_frameless(cx));
         input.update(cx, |input, cx| {
             input.set_placeholder("e.g. ctrl-shift-t", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
@@ -191,48 +194,95 @@ impl HerdrWindow {
 
     pub(super) fn render_shortcut_editor(&self, cx: &mut Context<Self>) -> Option<Div> {
         let editor = self.menu.shortcut_editor.as_ref()?;
-        let theme = &self.theme;
+        let look = crate::design::SettingsLook::of(&self.theme, &self.config.ui);
+        let enabled = !editor.saving;
         let buttons = [
-            ("shortcut-save", "Save", Edit::Save),
-            ("shortcut-unbind", "Unbind", Edit::Unbind),
-            ("shortcut-reset", "Reset", Edit::Reset),
+            ("shortcut-save", "Save", Edit::Save, ButtonKind::Primary),
+            (
+                "shortcut-unbind",
+                "Unbind",
+                Edit::Unbind,
+                ButtonKind::Normal,
+            ),
+            ("shortcut-reset", "Reset", Edit::Reset, ButtonKind::Normal),
         ]
         .into_iter()
-        .map(|(id, label, edit)| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px(px(8.))
-                .py(px(4.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .bg(rgb(theme.active))
-                .when(!editor.saving, |button| {
-                    button
-                        .cursor_pointer()
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.save_shortcut_edit(edit, window, cx);
-                        }))
+        .map(|(id, label, edit, kind)| {
+            look.button(id, id.into(), label, kind, ButtonSize::Small, enabled)
+                .when(enabled, |button| {
+                    button.on_click(cx.listener(move |this, _, window, cx| {
+                        this.save_shortcut_edit(edit, window, cx);
+                    }))
                 })
-                .child(label)
         });
+        let note = |text: &'static str| {
+            div()
+                .text_size(px(look.scale().secondary))
+                .text_color(look.muted())
+                .child(text)
+        };
         let panel = div()
             .debug_selector(|| "shortcut-editor".into())
-            .flex_none().py(px(8.))
-            .border_b_1().border_color(rgb(theme.active))
-            .child(div().font_weight(FontWeight::SEMIBOLD)
-                .child(format!("Edit {}", editor.info.label)))
-            .child(editor.input.clone())
-            .child(div().text_color(rgb(theme.muted)).child("Type key names with modifiers, e.g. ctrl-shift-t. Separate alternatives with spaces."))
-            .child(div().text_color(rgb(theme.muted)).child("Save replaces this command's shortcuts, including daemon chords. Reset restores inherited defaults."))
+            .flex_none()
+            .flex()
+            .flex_col()
+            .gap(look.at(6.))
+            .mx(look.at(10.))
+            .mb(look.at(6.))
+            .p(look.at(12.))
+            .rounded(look.at(10.))
+            .bg(look.card_fill())
+            .border_1()
+            .border_color(look.line())
+            .child(
+                div()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(look.title())
+                    .child(format!("Edit {}", editor.info.label)),
+            )
+            .child(
+                look.field("shortcut-editor-field".into(), false)
+                    .child(div().flex_1().min_w_0().child(editor.input.clone())),
+            )
+            .child(note(
+                "Type key names with modifiers, e.g. ctrl-shift-t. Separate alternatives with spaces.",
+            ))
+            .child(note(
+                "Save replaces this command's shortcuts, including daemon chords. Reset restores inherited defaults.",
+            ))
             .when_some(editor.error.clone(), |panel, error| {
-                panel.child(div().debug_selector(|| "shortcut-error".into())
-                    .text_color(super::danger(theme)).child(error))
+                panel.child(
+                    div()
+                        .debug_selector(|| "shortcut-error".into())
+                        .text_color(look.danger())
+                        .child(error),
+                )
             })
-            .child(div().flex().flex_wrap().gap(px(8.)).mt(px(6.))
-                .children(buttons)
-                .child(div().id("shortcut-cancel").px(px(8.)).py(px(4.)).cursor_pointer().child("Cancel")
-                    .on_click(cx.listener(|this, _, window, cx| this.cancel_shortcut_edit(window, cx))))
-                .when(editor.saving, |row| row.child("Saving…")));
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap(look.at(8.))
+                    .mt(look.at(4.))
+                    .children(buttons)
+                    .child(
+                        look.button(
+                            "shortcut-cancel",
+                            "shortcut-cancel".into(),
+                            "Cancel",
+                            ButtonKind::Normal,
+                            ButtonSize::Small,
+                            true,
+                        )
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.cancel_shortcut_edit(window, cx)),
+                        ),
+                    )
+                    .when(editor.saving, |row| {
+                        row.child(div().text_color(look.muted()).child("Saving…"))
+                    }),
+            );
         Some(panel)
     }
 }

@@ -22,7 +22,9 @@
 >   space, pane, tab and host menus, the device and session lists, the Git
 >   popup), the command palette and Go to Symbol/File share that look: rows
 >   led by icons, a rounded selection inside the panel, underlined tabs, and
->   the theme's colours.
+>   the theme's colours. Settings and its theme, font and shortcut pickers
+>   share that look, and the six options above can also be set in
+>   Settings > Sidebar > Tree and Settings > Tabs & panes.
 > - A Git graph tab shows the workspace's repository as a read-only graph,
 >   locally or on an SSH host, with the look of
 >   [herdr-git-graph](https://github.com/rubenep13/herdr-git-graph): lanes,

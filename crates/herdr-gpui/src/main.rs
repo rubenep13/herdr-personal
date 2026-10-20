@@ -131,6 +131,7 @@ mod terminal;
 mod terminal_notes;
 mod terminal_painter;
 mod theme_picker;
+mod theme_swatches;
 mod titlebar;
 mod toggles;
 mod update_panel;

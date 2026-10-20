@@ -99,6 +99,8 @@ pub(crate) struct MenuState {
     pub(super) shortcut_editor: Option<super::shortcut_editor::Editor>,
     pub(super) _keybinds_subscription: Option<Subscription>,
     pub(crate) themes: Option<crate::theme_picker::ThemePicker>,
+    /// The colour strips the theme and host theme pickers draw.
+    pub(crate) theme_swatches: crate::theme_swatches::ThemeSwatches,
     pub(crate) palette: Option<crate::palette::Palette>,
     /// Whether Go To shows its preview; Alt-P toggles it for the session.
     pub(crate) palette_preview: bool,
@@ -335,6 +337,7 @@ impl MenuState {
             shortcut_editor: None,
             _keybinds_subscription: None,
             themes: None,
+            theme_swatches: Default::default(),
             palette: None,
             palette_resume: None,
             palette_preview: false,

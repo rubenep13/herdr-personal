@@ -30,20 +30,25 @@ pub(in crate::settings_window) fn padding_ids(
 
 impl SettingsWindow {
     pub(in crate::settings_window) fn render_window_rows(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         div()
             .flex()
             .flex_col()
             .child(
-                ui::section(theme, "Window", Some(ui::Source::Local))
-                    .debug_selector(|| "settings-window-section".into()),
+                ui::group(look, "window", "Window", Some(ui::Source::Local))
+                    .title_selector("settings-window-section")
+                    .row(self.render_backdrop_controls(cx)),
             )
-            .child(self.render_backdrop_controls(cx))
             .child(
-                ui::section(theme, "Terminal padding", Some(ui::Source::Local))
-                    .debug_selector(|| "settings-terminal-padding".into()),
+                ui::group(
+                    look,
+                    "terminal-padding",
+                    "Terminal padding",
+                    Some(ui::Source::Local),
+                )
+                .title_selector("settings-terminal-padding")
+                .rows(PADDING_SIDES.map(|(axis, side)| self.padding_row(axis, side, cx))),
             )
-            .children(PADDING_SIDES.map(|(axis, side)| self.padding_row(axis, side, cx)))
     }
 
     fn padding_row(&self, axis: Axis, side: Side, cx: &mut Context<Self>) -> ui::Row {
@@ -51,14 +56,14 @@ impl SettingsWindow {
         let (row, _, title) = padding_ids(axis, side);
         let value = self.number_value(field, self.config.terminal_padding.axis(axis).side(side));
         let view = cx.entity().downgrade();
-        ui::row(&self.theme, row, title)
+        ui::row(&self.look(), row, title)
             .when(axis == Axis::X && side == Side::Start, |row| {
                 row.description(
                     "Beside the sidebar. A deprecated sidebar_gap stands in while unset.",
                 )
             })
             .control(ui::number(
-                &self.theme,
+                &self.look(),
                 ui::Number {
                     id: field.selector(),
                     value,

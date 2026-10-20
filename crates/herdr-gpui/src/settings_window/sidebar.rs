@@ -17,17 +17,26 @@ pub(super) enum SidebarKey {
     HostGap,
     Select,
     DeviceFooter,
+    Hierarchy,
+    TreeTabs,
+    StateText,
+    AgentDetails,
     Host(String),
 }
 
 impl SidebarKey {
-    const FIXED: [Self; 6] = [
+    /// Every key but the hosts', whose names only the configs know.
+    const FIXED: &[Self] = &[
         Self::Indent,
         Self::RowPadding,
         Self::Gap,
         Self::HostGap,
         Self::Select,
         Self::DeviceFooter,
+        Self::Hierarchy,
+        Self::TreeTabs,
+        Self::StateText,
+        Self::AgentDetails,
     ];
 
     /// Copies this key's value from `from` into `to`.
@@ -40,6 +49,10 @@ impl SidebarKey {
             Self::HostGap => new.host_gap = old.host_gap,
             Self::Select => to.select = from.select,
             Self::DeviceFooter => to.device_footer = from.device_footer,
+            Self::Hierarchy => to.hierarchy = from.hierarchy,
+            Self::TreeTabs => to.tree_tabs = from.tree_tabs,
+            Self::StateText => to.state_text = from.state_text,
+            Self::AgentDetails => to.agent_details = from.agent_details,
             Self::Host(host) => match from.hosts.get(host) {
                 Some(color) => {
                     to.hosts.insert(host.clone(), *color);
@@ -61,6 +74,10 @@ impl SidebarKey {
             Self::HostGap => Preference::SidebarHostGap(overrides.host_gap),
             Self::Select => Preference::SidebarSelect(style.select),
             Self::DeviceFooter => Preference::SidebarDeviceFooter(style.device_footer),
+            Self::Hierarchy => Preference::SidebarHierarchy(style.hierarchy),
+            Self::TreeTabs => Preference::SidebarTreeTabs(style.tree_tabs),
+            Self::StateText => Preference::SidebarStateText(style.state_text),
+            Self::AgentDetails => Preference::SidebarAgentDetails(style.agent_details),
             Self::Host(host) => Preference::HostColor {
                 host: host.clone(),
                 color: style.hosts.get(host).copied(),
@@ -77,6 +94,10 @@ impl SidebarKey {
             Self::HostGap => old.host_gap != new.host_gap,
             Self::Select => before.select != after.select,
             Self::DeviceFooter => before.device_footer != after.device_footer,
+            Self::Hierarchy => before.hierarchy != after.hierarchy,
+            Self::TreeTabs => before.tree_tabs != after.tree_tabs,
+            Self::StateText => before.state_text != after.state_text,
+            Self::AgentDetails => before.agent_details != after.agent_details,
             Self::Host(host) => before.hosts.get(host) != after.hosts.get(host),
         }
     }
@@ -97,7 +118,8 @@ impl SidebarTouched {
             .map(|host| SidebarKey::Host(host.clone()));
         Self(
             SidebarKey::FIXED
-                .into_iter()
+                .iter()
+                .cloned()
                 .chain(hosts)
                 .filter(|key| key.differs(before, after))
                 .collect(),

@@ -45,6 +45,18 @@ pub(crate) enum Preference {
     SidebarSelect(SelectMode),
     /// `[sidebar] device_footer`: when the sidebar draws its device footer.
     SidebarDeviceFooter(DeviceFooter),
+    /// `[sidebar] hierarchy`: how the tree layout nests spaces under a host.
+    SidebarHierarchy(TreeHierarchy),
+    /// `[sidebar] tree_tabs`: which of a space's tabs the tree layout lists.
+    SidebarTreeTabs(TreeTabs),
+    /// `[sidebar] state_text`: whether agent rows name their state in words.
+    SidebarStateText(bool),
+    /// `[sidebar] agent_details`: whether agent rows add Herdr's extra lines.
+    SidebarAgentDetails(AgentDetails),
+    /// `[tabs] position`: where the tab strips sit.
+    TabsPosition(TabPlacement),
+    /// `[tabs] content`: what each tab shows besides its name.
+    TabsContent(TabContent),
     /// `None` removes the host's colour.
     HostColor {
         host: String,
@@ -190,6 +202,34 @@ impl Config {
                     Some("sidebar"),
                     "device_footer",
                     Some(toml_edit::Value::from(footer.as_str())),
+                ),
+                Preference::SidebarHierarchy(hierarchy) => (
+                    Some("sidebar"),
+                    "hierarchy",
+                    Some(toml_edit::Value::from(hierarchy.as_str())),
+                ),
+                Preference::SidebarTreeTabs(tabs) => (
+                    Some("sidebar"),
+                    "tree_tabs",
+                    Some(toml_edit::Value::from(tabs.as_str())),
+                ),
+                Preference::SidebarStateText(value) => {
+                    (Some("sidebar"), "state_text", Some(value.into()))
+                }
+                Preference::SidebarAgentDetails(details) => (
+                    Some("sidebar"),
+                    "agent_details",
+                    Some(toml_edit::Value::from(details.as_str())),
+                ),
+                Preference::TabsPosition(placement) => (
+                    Some("tabs"),
+                    "position",
+                    Some(toml_edit::Value::from(placement.as_str())),
+                ),
+                Preference::TabsContent(content) => (
+                    Some("tabs"),
+                    "content",
+                    Some(toml_edit::Value::from(content.as_str())),
                 ),
                 Preference::HostColor { host, color } => {
                     if let Some(color) = color.filter(|color| *color > 0xFF_FFFF) {

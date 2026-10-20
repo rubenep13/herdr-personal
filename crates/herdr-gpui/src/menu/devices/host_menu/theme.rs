@@ -5,6 +5,7 @@ use super::HostMenu;
 use crate::{
     HerdrWindow,
     config::{Theme, ThemeName},
+    design::{Header, Leading},
     menu::Page,
     search_input::SearchInput,
 };
@@ -81,8 +82,11 @@ impl HerdrWindow {
         search.update(cx, |input, cx| {
             input.set_placeholder("Search themes...", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            // The query row draws the field.
+            input.set_frameless(cx);
             window.focus(&input.focus, cx);
         });
+        self.menu.theme_swatches.invalidate();
         let subscription = cx.subscribe(
             &search,
             |this, search, _: &crate::search_input::Changed, cx| {
@@ -374,47 +378,17 @@ impl HerdrWindow {
         let Some(picker) = &host.theme else {
             return div();
         };
-        let theme = &self.theme;
-        let font = &self.config.ui;
+        let look = self.menu_look();
         let shown = self
             .endpoints
             .get(self.selected_endpoint)
             .is_some_and(|endpoint| endpoint.id == host.id);
-        let header = div()
-            .flex_none()
-            .p(px(16.))
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(12.))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .text_size(px(font.size * 1.35))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(format!("Terminal theme · {}", host.label)),
-                    )
-                    .child(
-                        div()
-                            .id("device-theme-close")
-                            .debug_selector(|| "device-theme-close".into())
-                            .px_2()
-                            .py_1()
-                            .cursor_pointer()
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .hover(|s| s.bg(rgb(theme.active)))
-                            .child("Close")
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)),
-                            ),
-                    ),
-            )
-            .child(div().pt(px(12.)).child(picker.search.clone()));
+        let title = format!("Terminal theme \u{b7} {}", host.label);
+        let count = format!(
+            "{} of {} themes",
+            picker.filtered.len(),
+            picker.names.len() + 1
+        );
         let current = current_row(
             self.device_theme_value(&host.id),
             crate::app::light_appearance(cx),
@@ -427,54 +401,73 @@ impl HerdrWindow {
                 else {
                     return Vec::new();
                 };
-                range
+                let look = this.menu_look();
+                let names = picker.filtered[range.clone()]
+                    .iter()
+                    .filter_map(|row| match row {
+                        Row::App => None,
+                        Row::Named(name) => Some(name.clone()),
+                    })
+                    .collect();
+                let rows = range
                     .map(|index| {
                         let row = picker.filtered[index].clone();
-                        let label = match &row {
-                            Row::App => SAME_AS_APP.to_owned(),
-                            Row::Named(name) => name.clone(),
+                        let (label, leading) = match &row {
+                            Row::App => (
+                                SAME_AS_APP.to_owned(),
+                                Leading::Icon(
+                                    "icons/link.svg",
+                                    format!("device-theme-row-{index}-icon"),
+                                ),
+                            ),
+                            Row::Named(name) => (
+                                name.clone(),
+                                Leading::Swatches(
+                                    this.menu.theme_swatches.get(name).flatten(),
+                                    format!("device-theme-row-{index}-swatches"),
+                                ),
+                            ),
                         };
-                        div()
-                            .id(index)
-                            .debug_selector(move || format!("device-theme-row-{index}"))
-                            .w_full()
-                            .h(px(this.config.ui.line_height() + 20.))
-                            .px(px(16.))
-                            .flex()
-                            .items_center()
-                            .gap(px(8.))
-                            .cursor_pointer()
-                            .when(index == picker.selected, |row| {
-                                row.bg(rgb(this.theme.active))
-                            })
-                            .hover(|s| s.bg(rgb(this.theme.active)))
-                            .child(div().flex_1().min_w_0().truncate().child(label))
-                            .when(row == current, |row| {
-                                row.child(div().text_color(rgb(this.theme.muted)).child("Current"))
-                            })
-                            .on_hover(cx.listener(move |this, hovered, _, cx| {
-                                if *hovered && let Some(picker) = this.device_theme_picker_mut() {
-                                    picker.selected = index;
-                                    this.preview_device_theme(cx);
-                                }
-                            }))
-                            .on_click(cx.listener(move |this, _, window, cx| {
+                        crate::menu::theme_row(
+                            &look,
+                            index,
+                            format!("device-theme-row-{index}"),
+                            label.into(),
+                            format!("device-theme-row-{index}-label"),
+                            leading,
+                            index == picker.selected,
+                            row == current,
+                        )
+                        .on_hover(cx.listener(move |this, hovered, _, cx| {
+                            if *hovered && let Some(picker) = this.device_theme_picker_mut() {
+                                picker.selected = index;
+                                this.preview_device_theme(cx);
+                            }
+                        }))
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
                                 this.choose_device_theme(row.clone(), window, cx)
-                            }))
+                            },
+                        ))
                     })
-                    .collect()
+                    .collect();
+                this.schedule_theme_swatches(names, cx);
+                rows
             }),
         )
         .track_scroll(&picker.scroll)
+        .mt(look.at(6.))
         .flex_1()
         .min_h_0();
-        let status = if let Some(error) = &picker.error {
-            error.clone()
+        // Keys and the note while the device is shown; otherwise the reason
+        // its terminal cannot preview here, or an error.
+        let error = picker.error.clone().map(SharedString::from);
+        let message: Option<SharedString> = if error.is_some() {
+            Some("Could not use the theme.".into())
         } else if shown {
-            "Only this device's terminal changes. Hover to preview; Enter or click to save."
-                .to_owned()
+            None
         } else {
-            "Only this device's terminal changes; select the device to preview it.".to_owned()
+            Some("Only this device's terminal changes; select the device to preview it.".into())
         };
         div()
             .debug_selector(|| "device-theme".into())
@@ -482,18 +475,40 @@ impl HerdrWindow {
             .flex_col()
             .size_full()
             .min_h_0()
-            .child(header)
-            .child(list)
+            .relative()
+            .child(look.header(Header {
+                selector: "device-theme-header",
+                icon: "icons/computer.svg",
+                title: ("device-theme-title", &title),
+                sub: None,
+            }))
             .child(
-                div()
-                    .debug_selector(|| "device-theme-status".into())
-                    .flex_none()
-                    .px(px(16.))
-                    .py(px(10.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .text_color(rgb(theme.muted))
-                    .child(status),
+                look.close_button("device-theme-close")
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
             )
+            .child(
+                look.query(
+                    "device-theme-search-icon",
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(look.at(10.))
+                        .child(div().flex_1().min_w_0().child(picker.search.clone()))
+                        .child(look.detail("device-theme-count".into(), count)),
+                ),
+            )
+            .child(list)
+            .children(
+                error.map(|error| crate::menu::picker_error(&look, "device-theme-error", error)),
+            )
+            .child(crate::menu::picker_footer(
+                &look,
+                "device-theme-status",
+                message,
+                Some("Only this device's terminal changes."),
+            ))
     }
 }

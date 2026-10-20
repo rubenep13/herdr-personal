@@ -1,6 +1,7 @@
 use crate::{
     HerdrWindow,
     config::{Theme, ThemeName},
+    design::{Header, Leading},
     menu::Page,
     search_input::SearchInput,
 };
@@ -55,11 +56,15 @@ impl HerdrWindow {
         // A pending reload must not replace this newer interactive appearance.
         self.config_load = None;
         self.menu.page = Some(Page::Themes);
+        // Strips load again, for the appearance the picker opens in.
+        self.menu.theme_swatches.invalidate();
         let mut picker = if let Some(picker) = self.menu.themes.take() {
             picker.search.update(cx, |input, cx| input.clear(cx));
             picker
         } else {
             let search = cx.new(SearchInput::new);
+            // The query row draws the field.
+            search.update(cx, |input, cx| input.set_frameless(cx));
             let subscription = cx.subscribe(
                 &search,
                 |this, search, _: &crate::search_input::Changed, cx| {
@@ -419,60 +424,61 @@ impl HerdrWindow {
         let Some(picker) = &self.menu.themes else {
             return div();
         };
-        let theme = &self.theme;
-        let font = &self.config.ui;
+        let look = self.menu_look();
+        let count = format!("{} of {} themes", picker.filtered.len(), picker.names.len());
+        // An error shows in full above the footer, which names it briefly.
+        let error = picker
+            .error
+            .clone()
+            .filter(|_| !picker.saving)
+            .map(SharedString::from);
+        let message = if picker.saving {
+            Some("Saving theme... Please wait.".into())
+        } else if error.is_some() {
+            Some("Could not load the theme.".into())
+        } else if picker.accepting {
+            Some("Loading theme... Esc to cancel.".into())
+        } else {
+            None
+        };
         div()
             .flex()
             .flex_col()
             .size_full()
             .min_h_0()
+            .relative()
+            .child(look.header(Header {
+                selector: "theme-header",
+                icon: "icons/palette.svg",
+                title: ("theme-title", "Color Scheme"),
+                sub: None,
+            }))
             .child(
-                div()
-                    .flex_none()
-                    .p(px(16.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(12.))
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Color Scheme"),
-                            )
-                            .child(
-                                div()
-                                    .id("theme-close")
-                                    .debug_selector(|| "theme-close".into())
-                                    .px_2()
-                                    .py_1()
-                                    .cursor_pointer()
-                                    .rounded(px(crate::config::corners::CONTROL))
-                                    .hover(|s| s.bg(rgb(theme.active)))
-                                    .child("Close")
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.dismiss_menu(window, cx)
-                                    })),
-                            ),
-                    )
-                    .child(div().pt(px(12.)).child(picker.search.clone()))
-                    .child(div().pt(px(8.)).text_color(rgb(theme.muted)).child(format!(
-                        "{} of {} themes",
-                        picker.filtered.len(),
-                        picker.names.len()
-                    ))),
+                look.close_button("theme-close")
+                    .absolute()
+                    .top_0()
+                    .right_0()
+                    .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
+            )
+            .child(
+                look.query(
+                    "theme-search-icon",
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(look.at(10.))
+                        .child(div().flex_1().min_w_0().child(picker.search.clone()))
+                        .child(look.detail("theme-count".into(), count)),
+                ),
             )
             .when(picker.filtered.is_empty(), |panel| {
                 panel.child(
                     div()
                         .debug_selector(|| "theme-empty".into())
                         .flex_1()
-                        .p(px(16.))
-                        .text_color(rgb(theme.muted))
+                        .px(look.at(10.))
+                        .py(look.at(12.))
+                        .text_color(look.muted())
                         .child("No matching themes. Try a shorter search."),
                 )
             })
@@ -485,88 +491,63 @@ impl HerdrWindow {
                             let Some(picker) = &this.menu.themes else {
                                 return Vec::new();
                             };
-                            range
+                            let look = this.menu_look();
+                            let names = picker.filtered[range.clone()].to_vec();
+                            let current = ThemeName::side(
+                                &this.config.theme,
+                                crate::app::light_appearance(cx),
+                            )
+                            .to_owned();
+                            let rows = range
                                 .map(|index| {
                                     let name = picker.filtered[index].clone();
-                                    let selected = index == picker.selected;
-                                    let current = name
-                                        == ThemeName::side(
-                                            &this.config.theme,
-                                            crate::app::light_appearance(cx),
-                                        );
-                                    div()
-                                        .id(index)
-                                        .debug_selector(move || format!("theme-row-{index}"))
-                                        // As in the palette, the fill is the row.
-                                        .w_full()
-                                        .h(px(this.config.ui.line_height() + 20.))
-                                        .px(px(16.))
-                                        .flex()
-                                        .items_center()
-                                        .gap(px(8.))
-                                        .cursor_pointer()
-                                        .when(selected, |row| row.bg(rgb(this.theme.active)))
-                                        .hover(|s| s.bg(rgb(this.theme.active)))
-                                        .child(
-                                            div()
-                                                .debug_selector(|| format!("theme-name-{name}"))
-                                                .flex_1()
-                                                .min_w_0()
-                                                .truncate()
-                                                .child(name.clone()),
-                                        )
-                                        .when(current, |row| {
-                                            row.child(
-                                                div()
-                                                    .text_color(rgb(this.theme.muted))
-                                                    .child("Current"),
-                                            )
-                                        })
-                                        .on_hover(cx.listener(move |this, hovered, _, cx| {
-                                            if *hovered {
-                                                if let Some(picker) = &mut this.menu.themes {
-                                                    if picker.accepting {
-                                                        return;
-                                                    }
-                                                    picker.selected = index;
+                                    let strip = this.menu.theme_swatches.get(&name).flatten();
+                                    crate::menu::theme_row(
+                                        &look,
+                                        index,
+                                        format!("theme-row-{index}"),
+                                        name.clone().into(),
+                                        format!("theme-name-{name}"),
+                                        Leading::Swatches(
+                                            strip,
+                                            format!("theme-row-{index}-swatches"),
+                                        ),
+                                        index == picker.selected,
+                                        name == current,
+                                    )
+                                    .on_hover(cx.listener(move |this, hovered, _, cx| {
+                                        if *hovered {
+                                            if let Some(picker) = &mut this.menu.themes {
+                                                if picker.accepting {
+                                                    return;
                                                 }
-                                                this.preview_picker_selection(cx);
+                                                picker.selected = index;
                                             }
-                                        }))
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.apply_picker_theme(&name, cx)
-                                        }))
+                                            this.preview_picker_selection(cx);
+                                        }
+                                    }))
+                                    .on_click(cx.listener(
+                                        move |this, _, _, cx| this.apply_picker_theme(&name, cx),
+                                    ))
                                 })
-                                .collect()
+                                .collect();
+                            this.schedule_theme_swatches(names, cx);
+                            rows
                         }),
                     )
                     .track_scroll(&picker.scroll)
+                    .mt(look.at(6.))
                     .flex_1()
                     .min_h_0(),
                 )
             })
-            .child(
-                div()
-                    .id("theme-status")
-                    .debug_selector(|| "theme-status".into())
-                    .flex_none()
-                    .h(px(font.line_height() * 3. + 20.))
-                    .overflow_y_scroll()
-                    .px(px(16.))
-                    .py(px(10.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .text_color(rgb(theme.muted))
-                    .child(if picker.saving {
-                        "Saving theme... Please wait.".to_owned()
-                    } else if let Some(error) = &picker.error {
-                        error.clone()
-                    } else if picker.accepting {
-                        "Loading theme... Esc to cancel.".to_owned()
-                    } else {
-                        "Hover or Up / Down to preview. Enter or click a theme to save.".to_owned()
-                    }),
-            )
+            .children(error.map(|error| crate::menu::picker_error(&look, "theme-error", error)))
+            .child(crate::menu::picker_footer(
+                &look,
+                "theme-status",
+                message,
+                None,
+            ))
     }
 }
 

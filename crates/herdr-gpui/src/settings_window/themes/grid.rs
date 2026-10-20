@@ -47,8 +47,9 @@ impl Grid {
     }
 }
 
+/// How many cards fit `width`: each at least 168 wide, 10 apart.
 pub(super) fn columns(width: f32) -> usize {
-    ((width + 6.) / 174.).floor().clamp(2., 6.) as usize
+    ((width + 10.) / 178.).floor().clamp(2., 6.) as usize
 }
 
 pub(super) fn navigate(index: usize, count: usize, columns: usize, up: bool) -> usize {
@@ -162,6 +163,7 @@ impl SettingsWindow {
     }
 
     pub(super) fn grid_thumbnail(&self, choice: &Choice, index: usize) -> Div {
+        let look = self.look();
         let palette = self
             .themes
             .grid
@@ -170,29 +172,41 @@ impl SettingsWindow {
             .find(|(cached, _)| cached == choice);
         let thumbnail = div()
             .debug_selector(move || format!("settings-theme-thumbnail-{index}"))
-            .h(px(26.))
+            .h(look.at(40.))
             .flex_none()
             .w_full()
-            .rounded(px(3.))
+            .rounded(look.at(6.))
             .overflow_hidden();
         match palette {
             Some((_, Some(theme))) => thumbnail
                 .bg(rgb(theme.background))
                 .text_color(rgb(theme.foreground))
-                .px(px(4.))
+                .px(look.at(8.))
                 .flex()
                 .items_center()
-                .gap(px(3.))
-                .child(div().text_size(px(10.)).child("Aa"))
-                .children(
-                    theme.palette[..8]
-                        .iter()
-                        .map(|color| div().flex_1().min_w_0().h(px(9.)).bg(rgb(*color))),
-                ),
+                .gap(look.at(3.))
+                .child(
+                    div()
+                        .mr(look.at(3.))
+                        .text_size(px(look.scale().secondary))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("Aa"),
+                )
+                .children(theme.palette[..8].iter().map(|color| {
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h(look.at(10.))
+                        .rounded(look.at(3.))
+                        .bg(rgb(*color))
+                })),
             _ => thumbnail
-                .bg(rgb(self.theme.surface))
-                .text_color(rgb(self.theme.subtext()))
-                .text_size(px(10.))
+                .bg(look.well())
+                .text_color(look.muted())
+                .text_size(px(look.scale().detail))
+                .flex()
+                .items_center()
+                .justify_center()
                 .child(if palette.is_some() {
                     "Unavailable"
                 } else {

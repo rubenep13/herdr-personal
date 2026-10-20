@@ -17,6 +17,17 @@ pub enum TabContent {
     Status,
 }
 
+impl TabContent {
+    /// The value written to the config file; matches the serde name.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Name => "name",
+            Self::Agent => "agent",
+            Self::Status => "status",
+        }
+    }
+}
+
 /// Where the tab strips sit.
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -28,6 +39,17 @@ pub enum TabPlacement {
     Bottom,
     /// Where Herdr's `tab_bar_position` puts them.
     Herdr,
+}
+
+impl TabPlacement {
+    /// The value written to the config file; matches the serde name.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Subheader => "subheader",
+            Self::Bottom => "bottom",
+            Self::Herdr => "herdr",
+        }
+    }
 }
 
 /// Tab styling the config file sets.

@@ -6,9 +6,12 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
+mod cards;
 mod config_watch;
+mod frame_look;
 mod layout_drafts;
 mod load_save;
+mod narrow_rows;
 mod navigation_groups;
 mod navigation_resize;
 mod navigation_scroll;
@@ -20,6 +23,7 @@ mod scrollbars;
 mod search;
 mod section_order;
 mod sidebar_drafts;
+mod tab_options;
 mod theme_drafts;
 // Saving a shared Herdr theme is Unix-only.
 mod theme_hover;
@@ -27,6 +31,7 @@ mod theme_mode;
 #[cfg(unix)]
 mod theme_recovery;
 mod theme_sources;
+mod tree_options;
 mod window_commands;
 mod window_lifecycle;
 

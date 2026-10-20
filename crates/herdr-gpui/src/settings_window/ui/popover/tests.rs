@@ -21,7 +21,7 @@ fn options() -> Vec<SharedString> {
 
 impl Render for Harness {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = Theme::default();
+        let look = SettingsLook::of(&Theme::default(), &crate::config::Config::default().ui);
         let picked = self.picked.clone();
         let opens = self.opens.clone();
         let keys = self.keys.clone();
@@ -43,7 +43,12 @@ impl Render for Harness {
                 });
             })
             .child(dropdown(
-                &theme,
+                &look,
+                &MenuLook::of(
+                    &Theme::default(),
+                    &crate::config::Config::default().ui,
+                    false,
+                ),
                 "notif-position-control",
                 "Top right",
                 false,
@@ -71,6 +76,7 @@ impl Render for Harness {
                         cx.notify();
                     });
                 },
+                |_, _, _, _| {},
                 move |_, cx| {
                     let _ = dismisser.update(cx, |this, cx| {
                         this.open = None;
@@ -203,3 +209,5 @@ fn dropdown_opens_picks_and_dismisses(cx: &mut TestAppContext) {
     draw(cx);
     assert!(cx.debug_bounds("notif-position-control-option-0").is_none());
 }
+
+mod look;

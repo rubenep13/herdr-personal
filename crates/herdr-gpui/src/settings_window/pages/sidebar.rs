@@ -3,8 +3,10 @@
 use super::{SettingsWindow, on_value, ui};
 use crate::{
     config::{
-        Config, DeviceFooter, LayoutMode, SelectMode, SidebarOverrides, preferences::Preference,
+        AgentDetails, Config, DeviceFooter, LayoutMode, SelectMode, SidebarOverrides,
+        TreeHierarchy, TreeTabs, preferences::Preference,
     },
+    design::SettingsLook,
     settings_window::{
         inputs::{DropdownField, NumberField},
         sidebar::SidebarIntent,
@@ -145,24 +147,22 @@ impl SettingsWindow {
     }
 
     pub(in crate::settings_window) fn render_sidebar(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = &self.look();
         let ready = !self.quitting && self.closing.is_none();
         let mut page = div()
             .relative()
             .flex()
             .flex_col()
-            .child(ui::section(theme, "Layout", None))
             .child(
-                ui::row(theme, "sidebar-layout", "Layout preset")
+                ui::group(look, "layout", "Layout", None)
+                    .row(ui::row(look, "sidebar-layout", "Layout preset")
                     .tag(ui::Source::Local)
                     .description("Row shape and density; spacing below starts from the preset.")
-                    .control(self.layout_dropdown(ready, cx)),
-            )
-            .child(
-                ui::row(theme, "sidebar-select", "Selection marks")
+                    .control(self.layout_dropdown(ready, cx)),)
+                    .row(ui::row(look, "sidebar-select", "Selection marks")
                     .description("What selecting a workspace highlights beyond its own row.")
                     .control(ui::segmented(
-                        theme,
+                        look,
                         "sidebar-select-control",
                         &[
                             (SelectMode::Row, "Row"),
@@ -176,16 +176,14 @@ impl SettingsWindow {
                             intent.style.select = select;
                             this.commit_sidebar(intent, cx);
                         }),
-                    )),
-            )
-            .child(
-                ui::row(theme, "sidebar-device-footer", "Device footer")
+                    )),)
+                    .row(ui::row(look, "sidebar-device-footer", "Device footer")
                     .description(
                         "The device picker and its buttons. Auto shows it with two or more \
                          devices.",
                     )
                     .control(ui::segmented(
-                        theme,
+                        look,
                         "sidebar-device-footer-control",
                         &[
                             (DeviceFooter::Always, "Always"),
@@ -199,14 +197,16 @@ impl SettingsWindow {
                             intent.style.device_footer = footer;
                             this.commit_sidebar(intent, cx);
                         }),
-                    )),
+                    )),)
             )
+            .child(self.tree_group(look, ready, cx))
             .child(
-                ui::row(theme, "sidebar-show-agents", "Show agents")
+                ui::group(look, "show", "Show", None)
+                    .row(ui::row(look, "sidebar-show-agents", "Show agents")
                     .description("List running agents under their workspace.")
                     .control(
                         ui::toggle(
-                            theme,
+                            look,
                             "sidebar-show-agents-toggle",
                             self.config.show_agents,
                             true,
@@ -215,20 +215,16 @@ impl SettingsWindow {
                             let show = !this.config.show_agents;
                             this.save_native(move || Config::save_show_agents(show), cx);
                         })),
-                    ),
-            )
-            .child(
-                ui::row(theme, "sidebar-show-search", "Show search")
+                    ),)
+                    .row(ui::row(look, "sidebar-show-search", "Show search")
                     .description("The search field above the workspaces.")
                     .control(self.preference_toggle(
                         "sidebar-show-search-toggle",
                         self.config.show_sidebar_search,
                         Preference::ShowSidebarSearch(!self.config.show_sidebar_search),
                         cx,
-                    )),
-            )
-            .child(
-                ui::row(theme, "sidebar-repository-icons", "Show repository icons")
+                    )),)
+                    .row(ui::row(look, "sidebar-repository-icons", "Show repository icons")
                     .description(
                         "The repository owner's avatar at the start of each workspace row.",
                     )
@@ -237,10 +233,8 @@ impl SettingsWindow {
                         self.config.show_repository_icons,
                         Preference::ShowRepositoryIcons(!self.config.show_repository_icons),
                         cx,
-                    )),
-            )
-            .child(
-                ui::row(theme, "sidebar-device-icons", "Show device icons")
+                    )),)
+                    .row(ui::row(look, "sidebar-device-icons", "Show device icons")
                     .description(
                         "A mark before each device's name: this machine, a cloud provider or SSH.",
                     )
@@ -249,47 +243,37 @@ impl SettingsWindow {
                         self.config.show_device_icons,
                         Preference::ShowDeviceIcons(!self.config.show_device_icons),
                         cx,
-                    )),
+                    )),),
             )
-            .child(ui::section(theme, "Spacing", None));
-        for spacing in Spacing::ALL {
-            page = page.child(self.spacing_row(spacing, ready, cx));
-        }
-        page = page.child(
-            ui::section(theme, "Host colours", None)
-                .relative()
-                .debug_selector(|| "sidebar-host-colours".into())
-                .child(super::super::search::track_bounds(
-                    "sidebar-host-colours".into(),
-                )),
-        );
+            .child(
+                ui::group(look, "spacing", "Spacing", None)
+                    .rows(Spacing::ALL.map(|spacing| self.spacing_row(spacing, ready, cx))),
+            );
+        // The section's title also stands for the page's host colours in
+        // search, so it keeps its selector and its tracked bounds.
+        let mut colours = ui::group(look, "host-colours", "Host colours", None)
+            .title_selector("sidebar-host-colours")
+            .track("sidebar-host-colours")
+            .lead(TINT_HINT);
         let rows = self.host_rows(cx);
         if rows.is_empty() {
-            page = page.child(
+            colours = colours.body(
                 div()
                     .debug_selector(|| "sidebar-host-colours-empty".into())
-                    .py(px(6.))
-                    .text_size(px(12.))
-                    .text_color(rgb(theme.muted))
+                    .text_size(px(look.scale().secondary))
+                    .text_color(look.muted())
                     .child("Connect to a host to give it a colour."),
             );
         }
-        let mut tinted = false;
         for (index, (host, color, hint)) in rows.into_iter().enumerate() {
-            let hint = if hint.is_empty() && !tinted {
-                tinted = true;
-                TINT_HINT
-            } else {
-                hint
-            };
             let hex = self
                 .hex_edit
                 .as_ref()
                 .filter(|edit| edit.host == host)
                 .map(|edit| (edit.input.clone(), edit.invalid));
             let (changed, editing) = (host.clone(), host.clone());
-            page = page.child(ui::swatch_row(
-                theme,
+            colours = colours.row(ui::swatch_row(
+                look,
                 &host,
                 index,
                 color,
@@ -312,11 +296,101 @@ impl SettingsWindow {
                 },
             ));
         }
+        page = page.child(colours);
         #[cfg(all(feature = "integration-test", target_os = "macos"))]
         let page = page.child(super::super::native::probe(
             super::super::native::SIDEBAR_PAGE,
         ));
         page
+    }
+
+    /// The tree layout's own options. Another layout leaves them in place,
+    /// disabled, so search still finds them.
+    fn tree_group(&self, look: &SettingsLook, ready: bool, cx: &mut Context<Self>) -> ui::Group {
+        const ONLY_TREE: &str = "Only the tree layout uses this.";
+        let tree = self.config.layout.mode == LayoutMode::Tree;
+        let enabled = ready && tree;
+        let style = &self.config.sidebar_style;
+        let gate = |row: ui::Row| if tree { row } else { row.disabled(ONLY_TREE) };
+        let state_text = style.state_text;
+        ui::group(look, "tree", "Tree", None)
+            .row(
+                gate(ui::row(look, "sidebar-hierarchy", "Hierarchy"))
+                    .description("How spaces and agents show they belong to their host.")
+                    .control(ui::segmented(
+                        look,
+                        "sidebar-hierarchy-control",
+                        &[
+                            (TreeHierarchy::Guide, "Guide"),
+                            (TreeHierarchy::Indent, "Indent"),
+                            (TreeHierarchy::Block, "Block"),
+                        ],
+                        Some(style.hierarchy),
+                        enabled,
+                        on_value(cx, |this, hierarchy, _, cx| {
+                            let mut intent = SidebarIntent::of(&this.config);
+                            intent.style.hierarchy = hierarchy;
+                            this.preview_sidebar(intent, cx);
+                        }),
+                    )),
+            )
+            .row(
+                gate(ui::row(look, "sidebar-tree-tabs", "Tabs"))
+                    .description("Every tab of a space, or only the tabs an agent runs in.")
+                    .control(ui::segmented(
+                        look,
+                        "sidebar-tree-tabs-control",
+                        &[
+                            (TreeTabs::All, "All tabs"),
+                            (TreeTabs::Agents, "Agents only"),
+                        ],
+                        Some(style.tree_tabs),
+                        enabled,
+                        on_value(cx, |this, tabs, _, cx| {
+                            let mut intent = SidebarIntent::of(&this.config);
+                            intent.style.tree_tabs = tabs;
+                            this.preview_sidebar(intent, cx);
+                        }),
+                    )),
+            )
+            .row(
+                gate(ui::row(look, "sidebar-agent-details", "Agent details"))
+                    .description(
+                        "The extra rows Herdr's sidebar config defines, such as the model and \
+                         summary.",
+                    )
+                    .control(ui::segmented(
+                        look,
+                        "sidebar-agent-details-control",
+                        &[
+                            (AgentDetails::Herdr, "From Herdr"),
+                            (AgentDetails::Off, "Off"),
+                        ],
+                        Some(style.agent_details),
+                        enabled,
+                        on_value(cx, |this, details, _, cx| {
+                            let mut intent = SidebarIntent::of(&this.config);
+                            intent.style.agent_details = details;
+                            this.preview_sidebar(intent, cx);
+                        }),
+                    )),
+            )
+            .row(
+                gate(ui::row(look, "sidebar-state-text", "State as text"))
+                    .description("Name each agent's state beside its badge.")
+                    .control(
+                        ui::toggle(look, "sidebar-state-text-toggle", state_text, enabled).when(
+                            enabled,
+                            |toggle| {
+                                toggle.on_click(cx.listener(move |this, _, _, cx| {
+                                    let mut intent = SidebarIntent::of(&this.config);
+                                    intent.style.state_text = !state_text;
+                                    this.preview_sidebar(intent, cx);
+                                }))
+                            },
+                        ),
+                    ),
+            )
     }
 
     fn layout_dropdown(&self, ready: bool, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -331,9 +405,10 @@ impl SettingsWindow {
             .position(|candidate| *candidate == mode)
             .unwrap_or(0);
         let view = cx.entity().downgrade();
-        let (opener, picker, dismisser) = (view.clone(), view.clone(), view);
+        let (opener, picker, hoverer, dismisser) = (view.clone(), view.clone(), view.clone(), view);
         ui::dropdown(
-            &self.theme,
+            &self.look(),
+            &self.menu_look(cx),
             FIELD.selector(),
             mode.label(),
             false,
@@ -351,6 +426,9 @@ impl SettingsWindow {
                     window.focus(&this.focus, cx);
                 });
             },
+            move |index, hovered, _, cx| {
+                let _ = hoverer.update(cx, |this, cx| this.hover_dropdown(index, hovered, cx));
+            },
             move |window, cx| {
                 let _ = dismisser.update(cx, |this, cx| this.close_dropdown(window, cx));
             },
@@ -361,10 +439,10 @@ impl SettingsWindow {
         let field = NumberField::Spacing(spacing);
         let value = spacing.value(&self.config);
         let view = cx.entity().downgrade();
-        ui::row(&self.theme, spacing.row(), spacing.title())
+        ui::row(&self.look(), spacing.row(), spacing.title())
             .description(spacing.description())
             .control(ui::number(
-                &self.theme,
+                &self.look(),
                 ui::Number {
                     id: field.selector(),
                     value,

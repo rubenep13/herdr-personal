@@ -1101,6 +1101,10 @@ state_text = false       # name each agent's state beside its badge
 agent_details = "herdr"  # "off" leaves out Herdr's extra agent rows
 ```
 
+The same four options are in Settings > Sidebar > Tree, where they apply to
+every window at once and are saved when Settings closes (or with Save now).
+They are disabled there while another layout is chosen.
+
 `guide` runs a line down from the host's icon beside its rows, `indent` steps
 each level further in, and `block` sets each host and its rows in one rounded
 block. They decorate only hosts with a header. With a single host the tree
@@ -1371,6 +1375,10 @@ shows and where the strips go:
 content = "name"        # "agent" adds the agent's logo, "status" also its state
 position = "subheader"  # "bottom", or "herdr" to follow ui.tab_bar_position
 ```
+
+Both are also in Settings > Tabs & panes, as Content and Position. Herdr's own
+tab bar position shows there under Position, as "Herdr's position", and is
+used only when Position follows Herdr.
 
 A tab with no agent shows a terminal icon and never a state. Tabs use the
 `[ui]` family at 13px unless `[tabs]` sets its own family or size.

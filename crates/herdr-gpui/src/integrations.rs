@@ -1,5 +1,10 @@
 //! Daemon-host integration management. No native credentials or local file writes.
-use crate::{HerdrWindow, connection::IntegrationInbox};
+use crate::{
+    HerdrWindow,
+    connection::IntegrationInbox,
+    design::{ButtonKind, ButtonSize, SettingsLook, Tone},
+    icons::AgentIcon,
+};
 use gpui::{prelude::*, *};
 use herdr_client::Method;
 use serde_json::Value;
@@ -26,6 +31,16 @@ enum State {
     Outdated,
 }
 
+/// The colour a state's chip takes: well when current, a warning when an
+/// update waits, quiet otherwise.
+fn tone(state: State) -> Tone {
+    match state {
+        State::Current => Tone::Good,
+        State::Outdated => Tone::Warn,
+        State::NotInstalled => Tone::Neutral,
+    }
+}
+
 #[derive(Debug)]
 struct Integration {
     target: String,
@@ -38,6 +53,20 @@ struct Integration {
 impl Integration {
     fn matches(&self, query: &str) -> bool {
         self.label.to_lowercase().contains(query) || self.target.to_lowercase().contains(query)
+    }
+
+    /// The agent's mark, found by its target, its command or the target's
+    /// first word (`gemini_cli` is Gemini); unknown agents get the generic one.
+    fn icon(&self) -> AgentIcon {
+        [
+            self.target.as_str(),
+            self.command.as_str(),
+            self.target.split('_').next().unwrap_or_default(),
+        ]
+        .into_iter()
+        .map(|identity| AgentIcon::from_identity(Some(identity)))
+        .find(|icon| *icon != AgentIcon::Generic)
+        .unwrap_or(AgentIcon::Generic)
     }
 }
 
@@ -330,6 +359,8 @@ impl HerdrWindow {
         let query = query.trim().to_lowercase();
         let state = &self.integrations;
         let theme = &self.theme;
+        let look = SettingsLook::of(theme, &self.config.ui);
+        let scale = look.scale();
         let current = state
             .scope
             .as_ref()
@@ -345,41 +376,68 @@ impl HerdrWindow {
         let can_install = !state.busy
             && current.is_some_and(|scope| scope.inbox.try_lock().is_ok_and(|inbox| inbox.install));
         let epoch = self.selection_epoch;
-        let mut body = div().id("integrations-body").min_h_0().overflow_y_scroll()
-            .track_scroll(&state.scroll).p(px(16.))
-            .child(div().font_weight(FontWeight::SEMIBOLD).child(crate::sidebar::label_text(&format!("Daemon host: {host}"))))
-            .child(div().mt(px(8.)).text_color(rgb(theme.subtext())).child("Install updates agent configuration on this daemon's host, not necessarily this computer. No integrations are installed automatically."));
-        if let Some(error) = &state.error {
-            body = body.child(
+        let note = |text: SharedString| {
+            div()
+                .mt(look.at(8.))
+                .text_size(px(scale.secondary))
+                .text_color(look.muted())
+                .child(text)
+        };
+        // The daemon's host is the section's title, and what Install does
+        // there its lead.
+        let mut body = div()
+            .id("integrations-body")
+            .min_h_0()
+            .overflow_y_scroll()
+            .track_scroll(&state.scroll)
+            .child(
                 div()
-                    .mt(px(12.))
-                    .text_color(rgb(theme.palette[1]))
-                    .child(error.clone()),
+                    .mt(look.at(24.))
+                    .mx(look.at(2.))
+                    .text_size(px(scale.secondary))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(look.text())
+                    .child(crate::sidebar::label_text(&format!("Daemon host: {host}"))),
+            )
+            .child(
+                div()
+                    .mt(look.at(4.))
+                    .mx(look.at(2.))
+                    .text_size(px(scale.secondary))
+                    .line_height(relative(1.5))
+                    .text_color(look.muted())
+                    .child(
+                        "Install updates agent configuration on this daemon's host, not \
+                         necessarily this computer. No integrations are installed automatically.",
+                    ),
             );
+        if let Some(error) = &state.error {
+            body = body.child(note(error.clone().into()).text_color(look.danger()));
         }
         if state.busy {
-            body = body.child(div().mt(px(12.)).child("Working on the selected daemon..."));
+            body = body.child(note("Working on the selected daemon...".into()));
         } else {
             body = body.child(
-                div()
-                    .id("integrations-refresh")
-                    .mt(px(12.))
-                    .cursor_pointer()
-                    .child("Refresh integrations")
+                div().mt(look.at(8.)).flex().child(
+                    look.button(
+                        "integrations-refresh",
+                        "integrations-refresh".into(),
+                        "Refresh integrations",
+                        ButtonKind::Normal,
+                        ButtonSize::Small,
+                        true,
+                    )
                     .on_click(cx.listener(move |this, _, _, cx| {
                         if this.selection_epoch == epoch {
                             this.load_integrations(cx);
                         }
                     })),
+                ),
             );
         }
         if let Some(scope) = current {
             if !state.busy && state.rows.is_empty() && state.error.is_none() {
-                body = body.child(
-                    div()
-                        .mt(px(12.))
-                        .child("No integrations reported by this daemon."),
-                );
+                body = body.child(note("No integrations reported by this daemon.".into()));
             }
             let rows: Vec<_> = state
                 .rows
@@ -387,67 +445,124 @@ impl HerdrWindow {
                 .filter(|row| row.matches(&query))
                 .collect();
             if rows.is_empty() && !state.rows.is_empty() {
-                body = body.child(div().mt(px(12.)).child("No matching integrations."));
+                body = body.child(note("No matching integrations.".into()));
             }
-            for row in rows {
-                let status = match row.state {
-                    State::NotInstalled => "Not installed",
-                    State::Current => "Current",
-                    State::Outdated => "Outdated",
-                };
-                let mut item = div()
-                    .py(px(12.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
+            if !rows.is_empty() {
+                let mut card = look.card("integrations-card".into()).mt(look.at(10.));
+                for (index, row) in rows.into_iter().enumerate() {
+                    if index > 0 {
+                        card = card.child(look.rule());
+                    }
+                    card = card.child(self.integration_row(row, &look, can_install, scope, cx));
+                }
+                body = body.child(card);
+            }
+            for message in &state.messages {
+                body = body.child(note(message.clone().into()));
+            }
+        }
+        div().flex().flex_col().min_h_0().child(body)
+    }
+
+    /// One integration: its agent's tile, its name over its command, its
+    /// state in a chip and its action.
+    fn integration_row(
+        &self,
+        row: &Integration,
+        look: &SettingsLook,
+        can_install: bool,
+        scope: &Scope,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let theme = &self.theme;
+        let scale = look.scale();
+        let target = row.target.clone();
+        let status = match row.state {
+            State::NotInstalled => "Not installed",
+            State::Current => "Current",
+            State::Outdated => "Outdated",
+        };
+        let icon = row.icon();
+        let line = |text: &'static str| {
+            div()
+                .text_size(px(scale.secondary))
+                .text_color(look.muted())
+                .child(text)
+        };
+        let reason = if !row.available {
+            Some("Agent not available on this host")
+        } else if !can_install && !self.integrations.busy {
+            Some("Installation not supported by this daemon")
+        } else {
+            None
+        };
+        div()
+            .debug_selector({
+                let target = target.clone();
+                move || format!("integration-{target}")
+            })
+            .flex()
+            .items_center()
+            .gap(look.at(12.))
+            .min_h(px(look.row_min_height()))
+            .px(look.at(14.))
+            .py(look.at(9.))
+            .child(crate::sidebar::tile(
+                format!("integration-{target}-tile"),
+                icon.path(),
+                crate::sidebar::logo_color(icon, theme),
+                false,
+                theme,
+            ))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
                     .child(
                         div()
-                            .font_weight(FontWeight::SEMIBOLD)
+                            .truncate()
+                            .text_size(px(scale.name))
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(look.title())
                             .child(row.label.clone()),
                     )
                     .child(
                         div()
-                            .text_color(rgb(theme.muted))
-                            .child(format!("{status} | {}", row.command)),
-                    );
-                if !row.available {
-                    item = item.child(
-                        div()
-                            .text_color(rgb(theme.muted))
-                            .child("Agent not available on this host"),
-                    );
-                } else if can_install {
-                    let target = row.target.clone();
-                    let scope = scope.clone();
-                    item = item.child(
-                        div()
-                            .id(SharedString::from(format!("install-{target}")))
-                            .mt(px(6.))
-                            .cursor_pointer()
-                            .child(if row.state == State::NotInstalled {
-                                "Install"
-                            } else {
-                                "Reinstall"
-                            })
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                if this.integration_scope_current(&scope) {
-                                    this.install_integration(target.clone(), cx);
-                                }
-                            })),
-                    );
-                } else if !state.busy {
-                    item = item.child(
-                        div()
-                            .text_color(rgb(theme.muted))
-                            .child("Installation not supported by this daemon"),
-                    );
-                }
-                body = body.child(item);
-            }
-            for message in &state.messages {
-                body = body.child(div().mt(px(8.)).child(message.clone()));
-            }
-        }
-        div().flex().flex_col().min_h_0().child(body)
+                            .truncate()
+                            .text_size(px(scale.secondary))
+                            .text_color(look.muted())
+                            .child(row.command.clone()),
+                    )
+                    .children(reason.map(line)),
+            )
+            .child(look.chip(
+                format!("integration-{target}-state"),
+                status,
+                tone(row.state),
+            ))
+            .when(row.available && can_install, |item| {
+                let scope = scope.clone();
+                let action = target.clone();
+                item.child(
+                    look.button(
+                        SharedString::from(format!("install-{target}")),
+                        format!("install-{target}"),
+                        if row.state == State::NotInstalled {
+                            "Install"
+                        } else {
+                            "Reinstall"
+                        },
+                        ButtonKind::Normal,
+                        ButtonSize::Small,
+                        true,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if this.integration_scope_current(&scope) {
+                            this.install_integration(action.clone(), cx);
+                        }
+                    })),
+                )
+            })
     }
 }
 
@@ -556,4 +671,6 @@ mod tests {
         let response = json!({"error":{"code":"failure","message":"x".repeat(MAX_TEXT + 1)}});
         assert!(matches!(parse_list(&response), Err(ResponseError::Limit)));
     }
+
+    mod look;
 }

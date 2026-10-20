@@ -61,11 +61,16 @@ fn compact_rows_and_unclipped_picker_at_both_window_sizes(cx: &mut TestAppContex
         let mut previous: Option<Bounds<Pixels>> = None;
         for index in 0..4 {
             let row = cx.debug_bounds(ROWS[index]).unwrap();
-            inside(row, body);
+            // A narrow window puts a row's controls under its title, so the
+            // page may scroll; across, every row stays inside the body.
+            assert!(
+                row.left() >= body.left() && row.right() <= body.right(),
+                "{row:?} in {body:?}"
+            );
             assert!(row.size.height >= px(crate::settings_window::ui::ROW_HEIGHT));
             if let Some(previous) = previous {
-                // Rows are divider-separated and sit flush.
-                assert_eq!(row.top(), previous.bottom());
+                // Rows share one card, a 1 px rule between each two.
+                assert_eq!(row.top(), previous.bottom() + px(1.));
             }
             previous = Some(row);
             let family = cx.debug_bounds(FAMILIES[index]).unwrap();
@@ -80,15 +85,17 @@ fn compact_rows_and_unclipped_picker_at_both_window_sizes(cx: &mut TestAppContex
         let button = cx.debug_bounds("fonts-terminal-family").unwrap();
         cx.simulate_click(button.center(), Modifiers::default());
         cx.update(|window, cx| window.draw(cx).clear(cx));
+        // The picker is centred over the whole window, past the page.
         let picker = cx.debug_bounds("settings-font-picker").unwrap();
-        inside(picker, body);
+        let window = Bounds::new(point(px(0.), px(0.)), size(px(width), px(height)));
+        inside(picker, window);
         inside(cx.debug_bounds("settings-font-results").unwrap(), picker);
         assert_eq!(
             cx.debug_bounds("settings-font-result-0")
                 .unwrap()
                 .size
                 .height,
-            px(28.)
+            px(32.)
         );
         assert!(cx.debug_bounds("settings-font-result-471").is_none());
         view.read_with(cx, |view, cx| {
@@ -203,7 +210,7 @@ fn picker_search_keyboard_refresh_and_dismissal_are_local(cx: &mut TestAppContex
     });
     cx.update(|window, cx| window.draw(cx).clear(cx));
     // Outside the panel but inside its body-level backdrop.
-    cx.simulate_click(point(px(190.), px(50.)), Modifiers::default());
+    cx.simulate_click(point(px(240.), px(50.)), Modifiers::default());
     view.read_with(cx, |view, _| assert!(view.controls.picker.is_none()));
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {

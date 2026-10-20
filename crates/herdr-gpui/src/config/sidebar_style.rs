@@ -110,6 +110,17 @@ pub enum TreeHierarchy {
     Guide,
 }
 
+impl TreeHierarchy {
+    /// The value written to the config file; matches the serde name.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Indent => "indent",
+            Self::Block => "block",
+            Self::Guide => "guide",
+        }
+    }
+}
+
 /// Which of a space's tabs the tree layout lists.
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -119,6 +130,16 @@ pub enum TreeTabs {
     All,
     /// Only the agents.
     Agents,
+}
+
+impl TreeTabs {
+    /// The value written to the config file; matches the serde name.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::Agents => "agents",
+        }
+    }
 }
 
 /// What the tree layout shows under an agent's name and kind.
@@ -131,6 +152,16 @@ pub enum AgentDetails {
     Herdr,
     /// Nothing more.
     Off,
+}
+
+impl AgentDetails {
+    /// The value written to the config file; matches the serde name.
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Herdr => "herdr",
+            Self::Off => "off",
+        }
+    }
 }
 
 /// Sidebar styling the config file adds to a layout preset.

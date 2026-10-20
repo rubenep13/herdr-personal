@@ -7,6 +7,7 @@ mod backdrop;
 mod device_icons;
 mod features;
 mod focus_follows_mouse;
+mod font_picker_look;
 mod repository_icons;
 mod session_restore;
 mod sidebar_search;

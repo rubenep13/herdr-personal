@@ -13,27 +13,27 @@ struct Harness {
 
 impl Render for Harness {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let theme = Theme::default();
+        let look = SettingsLook::of(&Theme::default(), &crate::config::Config::default().ui);
         let picked = self.picked.clone();
         let element_picked = self.element_picked.clone();
         let off_picked = self.off_picked.clone();
         div()
             .size_full()
-            .child(section(&theme, "Layout", Some(Source::Shared)))
+            .child(section(&look, "Layout", Some(Source::Shared)))
             .child(
-                row(&theme, "row-a", "Indent")
+                row(&look, "row-a", "Indent")
                     .description("Pixels per level")
                     .tag(Source::Local)
-                    .control(toggle(&theme, "toggle-a", self.checked, true)),
+                    .control(toggle(&look, "toggle-a", self.checked, true)),
             )
             .child(
-                row(&theme, "row-b", "Off")
+                row(&look, "row-b", "Off")
                     .description("Original")
                     .disabled("Read-only here")
-                    .control(toggle(&theme, "toggle-b", false, false)),
+                    .control(toggle(&look, "toggle-b", false, false)),
             )
             .child(segmented(
-                &theme,
+                &look,
                 "seg",
                 &[(1u8, "One"), (2u8, "Two"), (3u8, "Three")],
                 Some(2),
@@ -41,7 +41,7 @@ impl Render for Harness {
                 move |value, _, _| picked.set(Some(value)),
             ))
             .child(segmented(
-                &theme,
+                &look,
                 "seg-off",
                 &[(1u8, "One"), (2u8, "Two")],
                 Some(1),
@@ -49,7 +49,7 @@ impl Render for Harness {
                 move |value, _, _| off_picked.set(Some(value)),
             ))
             .child(segmented_elements(
-                &theme,
+                &look,
                 "seg-el",
                 vec![
                     (1u8, div().child("A").into_any_element()),
@@ -144,3 +144,5 @@ fn switch_colors_follow_primary_and_contrast_in_every_theme() {
         }
     }
 }
+
+mod look;

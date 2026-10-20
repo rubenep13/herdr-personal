@@ -2,6 +2,7 @@
 use super::*;
 use core::prelude::v1::test;
 
+mod cards;
 mod scrolling;
 
 #[test]
@@ -286,14 +287,16 @@ fn row_click_and_keyboard_accept_intent_while_validation_is_held(cx: &mut TestAp
             assert_eq!(view.themes.selected, Some(1));
         })
     });
+    // Down moves a row of cards: as many as the column fits.
+    let below = view.read_with(cx, |view, _| 1 + view.themes.grid.columns);
     cx.simulate_keystrokes("down enter");
     view.read_with(cx, |view, _| {
-        assert_eq!(view.themes.selected, Some(5));
+        assert_eq!(view.themes.selected, Some(below));
         assert!(!view.saving);
         assert_eq!(view.config.theme, Config::default().theme);
         assert_eq!(
             view.theme_intent.as_ref().unwrap().choice.name,
-            "Catalog 005"
+            format!("Catalog {below:03}")
         );
     });
     cx.simulate_keystrokes("escape");
@@ -342,13 +345,14 @@ fn normal_window_stacks_rows_search_and_grid_without_a_mock_preview(cx: &mut Tes
     let search = cx.debug_bounds("settings-theme-search").unwrap();
     let count = cx.debug_bounds("settings-theme-count").unwrap();
     let list = cx.debug_bounds("settings-theme-list").unwrap();
-    assert_eq!(search.size.height, px(32.));
+    assert_eq!(search.size.height, px(30.));
     assert!(mode.bottom() <= follow.top());
     assert!(follow.bottom() <= contrast.top());
     assert!(contrast.bottom() <= source.top());
     assert!(source.bottom() <= search.top());
-    assert!(search.bottom() <= count.top());
-    assert!(count.bottom() <= list.top());
+    // The count sits inside the search field, at its right.
+    assert!(count.top() >= search.top() && count.bottom() <= search.bottom());
+    assert!(search.bottom() <= list.top());
     assert!(list.size.height >= px(240.), "list: {list:?}");
     for id in ["theme-follow-toggle", "theme-contrast-toggle"] {
         assert!(cx.debug_bounds(id).is_some(), "{id}");
@@ -378,6 +382,7 @@ fn list_materializes_only_visible_rows_and_scrolls_to_last(cx: &mut TestAppConte
     assert!(cx.debug_bounds("settings-theme-row-399").is_some());
     assert!(cx.debug_bounds("settings-theme-row-0").is_none());
     let list_height = f32::from(cx.debug_bounds("settings-theme-list").unwrap().size.height);
+    let row = view.read_with(cx, |view, _| row_height(&view.look()));
     let visible = (0..400)
         .filter(|index| {
             cx.debug_bounds(Box::leak(
@@ -387,7 +392,7 @@ fn list_materializes_only_visible_rows_and_scrolls_to_last(cx: &mut TestAppConte
         })
         .count();
     assert!(
-        visible <= ((list_height / ROW_HEIGHT).ceil() as usize + 2) * 4,
+        visible <= ((list_height / row).ceil() as usize + 2) * 4,
         "{visible} materialized rows"
     );
     cx.simulate_resize(size(px(680.), px(1000.)));

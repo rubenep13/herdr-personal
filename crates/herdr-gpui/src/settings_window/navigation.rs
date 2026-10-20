@@ -1,13 +1,15 @@
 //! The section list and the footer: grouped sections under a search box, and
 //! the save status line.
 use super::*;
+use crate::design::{ButtonKind, ButtonSize};
 
 impl SettingsWindow {
-    pub(super) fn navigation(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+    pub(super) fn navigation(&self, search_focused: bool, cx: &mut Context<Self>) -> Stateful<Div> {
         use crate::panel_resize::{PanelDrag, Side, handle};
-        let theme = &self.theme;
+        let look = self.look();
         div()
             .id("settings-navigation")
+            .debug_selector(|| "settings-navigation".into())
             .relative()
             .w(px(self.navigation_width.width(self.viewport_width)))
             .on_drag_move(
@@ -36,16 +38,23 @@ impl SettingsWindow {
             .flex_none()
             .flex()
             .flex_col()
-            .p(px(12.))
-            .gap(px(2.))
-            .bg(rgb(mix(theme.surface, theme.background, 25)))
+            .py(look.at(10.))
+            .px(look.at(8.))
+            .bg(look.nav())
             .border_r_1()
-            .border_color(rgb(theme.active))
+            .border_color(look.line())
             .child(
-                div()
-                    .debug_selector(|| "settings-nav-search".into())
-                    .mb(px(8.))
-                    .child(self.nav_search.clone()),
+                look.field("settings-nav-search".into(), search_focused)
+                    .mb(look.at(6.))
+                    .text_color(look.muted())
+                    .child(
+                        svg()
+                            .path("icons/search.svg")
+                            .size(look.at(15.))
+                            .flex_none()
+                            .text_color(look.muted()),
+                    )
+                    .child(div().flex_1().min_w_0().child(self.nav_search.clone())),
             )
             .child(
                 self.scroll_area(
@@ -57,7 +66,6 @@ impl SettingsWindow {
                         .min_h_0()
                         .flex()
                         .flex_col()
-                        .gap(px(2.))
                         .overflow_y_scroll()
                         .track_scroll(&self.navigation_scroll)
                         // Flat, so `Section::nav_item` can scroll to a page.
@@ -80,14 +88,17 @@ impl SettingsWindow {
     }
 
     fn group_label(&self, group: Group) -> Div {
+        let look = self.look();
         div()
             .debug_selector(move || format!("settings-group-{}", group.label().to_lowercase()))
-            .px(px(10.))
-            .pt(px(10.))
-            .pb(px(4.))
-            .text_size(px(10.))
-            .text_color(rgb(self.theme.subtext()))
-            .child(group.label().to_uppercase())
+            .flex_none()
+            .px(look.at(10.))
+            .pt(look.at(12.))
+            .pb(look.at(4.))
+            .text_size(px(look.scale().detail))
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(look.muted())
+            .child(group.label())
     }
 
     fn navigation_row(
@@ -96,8 +107,9 @@ impl SettingsWindow {
         section: Section,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
+        let look = self.look();
         let selected = self.section == section;
+        let hover = look.nav_hover();
         div()
             .id(("settings-section", index))
             .relative()
@@ -107,27 +119,27 @@ impl SettingsWindow {
                 row
             })
             .debug_selector(move || section.selector())
+            .flex_none()
+            .h(px(look.nav_row_height()))
             .flex()
             .items_center()
-            .gap(px(10.))
-            .px(px(10.))
-            .py(px(6.))
-            .rounded(px(corners::CONTROL))
+            .gap(look.at(10.))
+            .px(look.at(10.))
+            .rounded(look.at(8.))
             .cursor_pointer()
-            .when(selected, |el| el.bg(rgb(theme.primary_wash())))
-            .hover(|el| el.bg(rgb(theme.active)))
+            .text_size(px(look.scale().name))
+            .text_color(if selected { look.title() } else { look.text() })
+            .when(selected, |row| row.bg(look.selection()))
+            .when(!selected, |row| row.hover(move |row| row.bg(hover)))
             .child(
                 svg()
                     .path(section.icon())
-                    .size(px(17.))
+                    .size(look.at(16.))
                     .flex_none()
-                    .text_color(rgb(if selected {
-                        theme.primary()
-                    } else {
-                        theme.subtext()
-                    })),
+                    .text_color(if selected { look.title() } else { look.muted() })
+                    .debug_selector(move || format!("{}-icon", section.selector())),
             )
-            .child(section.label())
+            .child(div().min_w_0().truncate().child(section.label()))
             .on_click(
                 cx.listener(move |this, _, window, cx| this.select_section(section, window, cx)),
             )
@@ -170,25 +182,24 @@ impl SettingsWindow {
     }
 
     pub(super) fn footer(&self, cx: &mut Context<Self>) -> Div {
+        let look = self.look();
         let pending = self.pending_drafts();
         let text = self.footer_text();
         div()
+            .debug_selector(|| "settings-footer".into())
             .flex_none()
-            .min_h(px(36.))
-            .px(px(16.))
+            .min_h(look.at(36.))
+            .px(look.at(16.))
             .flex()
             .items_center()
-            .gap(px(12.))
+            .gap(look.at(12.))
+            .bg(look.well())
             .border_t_1()
-            .border_color(rgb(self.theme.active))
-            .text_size(px(11.))
+            .border_color(look.line())
+            .text_size(px(look.scale().secondary))
+            .text_color(look.muted())
             .when(!pending.is_empty() && self.error.is_none(), |footer| {
-                footer.child(
-                    div()
-                        .size(px(7.))
-                        .rounded_full()
-                        .bg(rgb(self.theme.ink(0xe3b341))),
-                )
+                footer.child(div().size(look.at(7.)).rounded_full().bg(look.warn()))
             })
             .child(
                 div()
@@ -199,21 +210,27 @@ impl SettingsWindow {
             )
             .when(!pending.is_empty(), |footer| {
                 footer.child(
-                    self.control_choice("settings-footer-save", "Save now", false, !self.busy())
-                        .debug_selector(|| "settings-footer-save".into())
-                        .flex_none()
-                        .px(px(10.))
-                        .py(px(3.))
-                        .on_click(cx.listener(|this, _, _, cx| this.save_pending_drafts(cx))),
+                    look.button(
+                        "settings-footer-save",
+                        "settings-footer-save".into(),
+                        "Save now",
+                        ButtonKind::Primary,
+                        ButtonSize::Small,
+                        !self.busy(),
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.save_pending_drafts(cx))),
                 )
             })
             .child(
-                self.control_choice("settings-footer-reload", "Reload", false, true)
-                    .debug_selector(|| "settings-footer-reload".into())
-                    .flex_none()
-                    .px(px(10.))
-                    .py(px(3.))
-                    .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
+                look.button(
+                    "settings-footer-reload",
+                    "settings-footer-reload".into(),
+                    "Reload",
+                    ButtonKind::Normal,
+                    ButtonSize::Small,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
             )
     }
 }

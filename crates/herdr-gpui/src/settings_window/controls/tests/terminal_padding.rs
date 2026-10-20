@@ -117,8 +117,12 @@ fn the_appearance_cards_are_evenly_spaced(cx: &mut TestAppContext) {
     let grid = cx.debug_bounds("settings-theme-grid").unwrap();
     let window = cx.debug_bounds("settings-window-section").unwrap();
     let padding = cx.debug_bounds("settings-terminal-padding").unwrap();
+    // The backdrop sits in the Window card; the next title keeps the same
+    // distance from that card.
     let backdrop = cx.debug_bounds("settings-backdrop").unwrap();
+    let card = cx.debug_bounds("settings-card-window").unwrap();
+    assert!(card.contains(&backdrop.origin));
     let gap = window.top() - grid.bottom();
     assert!(gap > px(0.));
-    assert_eq!(padding.top() - backdrop.bottom(), gap);
+    assert_eq!(padding.top() - card.bottom(), gap);
 }

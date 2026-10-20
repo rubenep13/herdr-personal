@@ -338,11 +338,12 @@ pub(super) fn check_keybinds_panel(view: &Entity<HerdrWindow>, cx: &mut gpui::Vi
         ("keys-Split Right", "description-Split Right"),
         ("keys-Split Down", "description-Split Down"),
     ] {
+        // The action leads; its keys sit at the row's right, inside the panel.
         let keys = cx.debug_bounds(keys).unwrap();
         let label = cx.debug_bounds(label).unwrap();
-        assert!(keys.right() < label.left());
+        assert!(label.right() <= keys.left());
         assert_eq!(label.left(), first_description.left());
-        assert!(label.right() < panel.right());
+        assert!(keys.right() < panel.right());
     }
     cx.simulate_resize(size(px(360.), px(240.)));
     cx.update(|window, cx| {

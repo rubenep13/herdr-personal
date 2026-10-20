@@ -43,7 +43,7 @@ pub(crate) const NOTES: PanelWidth = PanelWidth::new(300., 220.);
 /// The review's list of changed files.
 pub(crate) const REVIEW_FILES: PanelWidth = PanelWidth::new(240., 160.);
 /// The settings window's section list.
-pub(crate) const SETTINGS_NAVIGATION: PanelWidth = PanelWidth::new(184., 150.);
+pub(crate) const SETTINGS_NAVIGATION: PanelWidth = PanelWidth::new(224., 150.);
 
 /// A panel's width: its default until the user drags it.
 #[derive(Clone, Copy, Debug, PartialEq)]

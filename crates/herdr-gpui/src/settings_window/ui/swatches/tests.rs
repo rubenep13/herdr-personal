@@ -27,7 +27,7 @@ impl Render for Harness {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let seen = self.seen.clone();
         let row = swatch_row(
-            &Theme::default(),
+            &SettingsLook::of(&Theme::default(), &Config::default().ui),
             self.host,
             0,
             self.current,

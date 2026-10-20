@@ -93,6 +93,17 @@ impl SettingsWindow {
         cx.notify();
     }
 
+    /// The pointer entered or left option `index` of the open list.
+    pub(super) fn hover_dropdown(&mut self, index: usize, hovered: bool, cx: &mut Context<Self>) {
+        if self
+            .dropdown
+            .as_mut()
+            .is_some_and(|open| open.hover(index, hovered))
+        {
+            cx.notify();
+        }
+    }
+
     /// Closes the list and hands focus back to the window unless the user
     /// already clicked into something else.
     pub(super) fn close_dropdown(&mut self, window: &mut Window, cx: &mut Context<Self>) {
