@@ -426,10 +426,16 @@ impl HerdrWindow {
         };
         let look = self.menu_look();
         let count = format!("{} of {} themes", picker.filtered.len(), picker.names.len());
+        // An error shows in full above the footer, which names it briefly.
+        let error = picker
+            .error
+            .clone()
+            .filter(|_| !picker.saving)
+            .map(SharedString::from);
         let message = if picker.saving {
             Some("Saving theme... Please wait.".into())
-        } else if let Some(error) = &picker.error {
-            Some(error.clone().into())
+        } else if error.is_some() {
+            Some("Could not load the theme.".into())
         } else if picker.accepting {
             Some("Loading theme... Esc to cancel.".into())
         } else {
@@ -535,6 +541,7 @@ impl HerdrWindow {
                     .min_h_0(),
                 )
             })
+            .children(error.map(|error| crate::menu::picker_error(&look, "theme-error", error)))
             .child(crate::menu::picker_footer(
                 &look,
                 "theme-status",

@@ -57,3 +57,25 @@ fn theme_rows_keep_their_width_before_the_palette_loads(cx: &mut TestAppContext)
     let after = cx.debug_bounds("theme-name-Default").unwrap();
     assert_eq!(before.left(), after.left());
 }
+
+#[gpui::test]
+fn a_long_error_shows_in_full_above_the_footer(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        let picker = view.menu.themes.as_mut().unwrap();
+        picker.error = Some(format!(
+            "Could not read the theme file {}: permission denied",
+            "/home/someone/.config/ghostty/themes/".repeat(4)
+        ));
+        cx.notify();
+    });
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let footer = cx.debug_bounds("theme-status").unwrap();
+    let error = cx.debug_bounds("theme-error").unwrap();
+    assert_eq!(footer.size.height, px(36.), "the footer keeps its height");
+    assert!(
+        error.size.height > px(36.),
+        "the whole error wraps: {error:?}"
+    );
+    assert!(error.bottom() <= footer.top() && error.right() <= footer.right());
+}

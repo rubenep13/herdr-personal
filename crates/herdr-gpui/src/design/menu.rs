@@ -157,6 +157,11 @@ impl MenuLook {
         self.muted
     }
 
+    /// The red of destructive rows, for an error's text.
+    pub(crate) fn danger(&self) -> Rgba {
+        self.danger
+    }
+
     pub(crate) fn line(&self) -> Rgba {
         self.line
     }

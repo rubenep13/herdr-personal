@@ -461,8 +461,9 @@ impl HerdrWindow {
         .min_h_0();
         // Keys and the note while the device is shown; otherwise the reason
         // its terminal cannot preview here, or an error.
-        let message: Option<SharedString> = if let Some(error) = &picker.error {
-            Some(error.clone().into())
+        let error = picker.error.clone().map(SharedString::from);
+        let message: Option<SharedString> = if error.is_some() {
+            Some("Could not use the theme.".into())
         } else if shown {
             None
         } else {
@@ -500,6 +501,9 @@ impl HerdrWindow {
                 ),
             )
             .child(list)
+            .children(
+                error.map(|error| crate::menu::picker_error(&look, "device-theme-error", error)),
+            )
             .child(crate::menu::picker_footer(
                 &look,
                 "device-theme-status",

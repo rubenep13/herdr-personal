@@ -2,7 +2,7 @@
 //! theme's row, with its colour strip, and the footer with the keys they
 //! answer to.
 use crate::design::{ItemState, Leading, MenuLook};
-use gpui::{Div, SharedString, Stateful, div, prelude::*, px, svg};
+use gpui::{Div, SharedString, Stateful, div, prelude::*, px, relative, svg};
 
 /// One theme: its strip (or another leading mark), its name, and "Current"
 /// with a check on the one in use.
@@ -111,5 +111,31 @@ pub(crate) fn picker_footer(
     })
 }
 
-/// The footer's height, as the palette's, at the default `[ui]` size.
+/// An error in full above a picker's footer, as the palette shows one: it
+/// wraps, and past a few lines it scrolls. The list above gives it room, so
+/// no row moves.
+pub(crate) fn picker_error(
+    look: &MenuLook,
+    selector: &'static str,
+    error: SharedString,
+) -> Stateful<Div> {
+    div()
+        .id(selector)
+        .debug_selector(move || selector.into())
+        .flex_none()
+        .max_h(look.at(ERROR_HEIGHT))
+        .overflow_y_scroll()
+        .px(look.at(16.))
+        .py(look.at(8.))
+        .border_t_1()
+        .border_color(look.line())
+        .text_size(px(look.scale().secondary))
+        .line_height(relative(1.5))
+        .text_color(look.danger())
+        .child(error)
+}
+
+/// The footer's height, as the palette's, and how tall an error may grow
+/// before it scrolls, at the default `[ui]` size.
 const FOOTER_HEIGHT: f32 = 36.;
+const ERROR_HEIGHT: f32 = 96.;

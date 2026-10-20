@@ -69,10 +69,16 @@ fn herdrs_position_only_applies_when_following_herdr(cx: &mut TestAppContext) {
     let shared = Arc::new(Mutex::new(Vec::new()));
     view.update(cx, |view, _| view.shared_edits = Some(shared.clone()));
     assert!(cx.debug_bounds("tabs-position-reason").is_some());
-    assert!(cx.debug_bounds("tabs-position-sub").is_some(), "it depends on Position");
+    assert!(
+        cx.debug_bounds("tabs-position-sub").is_some(),
+        "it depends on Position"
+    );
     click(cx, "tabs-position-control-0");
     cx.run_until_parked();
-    assert!(shared.lock().unwrap().is_empty(), "Herdr's file is not touched");
+    assert!(
+        shared.lock().unwrap().is_empty(),
+        "Herdr's file is not touched"
+    );
 
     view.update(cx, |view, cx| {
         view.config.tabs_style.placement = TabPlacement::Herdr;
