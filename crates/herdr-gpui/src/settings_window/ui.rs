@@ -20,6 +20,10 @@ pub(in crate::settings_window) use swatches::{HostColorChange, parse_hex_input, 
 pub(in crate::settings_window) const ROW_HEIGHT: f32 = 48.;
 /// How far a dependent row steps in, and where its mark sits.
 const SUB_INDENT: f32 = 34.;
+/// The least a row's text keeps beside its controls before they wrap. It
+/// does not grow with the face: at a large one the title wraps instead of
+/// pushing past a narrow window.
+const TEXT_MIN: f32 = 140.;
 const SUB_MARK: f32 = 18.;
 
 /// Where a setting is stored: shared with every machine or local to this one.
@@ -330,6 +334,9 @@ impl IntoElement for Row {
             .debug_selector(move || id.to_string())
             .relative()
             .flex()
+            // Controls too wide to leave the text its least width move under
+            // it, rather than squeezing the title to nothing.
+            .flex_wrap()
             .items_center()
             .gap(look.at(16.))
             .min_h(px(look.row_min_height()))
@@ -343,7 +350,7 @@ impl IntoElement for Row {
                 // opacity, so dimming the whole row would show it at 25 %.
                 div()
                     .flex_1()
-                    .min_w_0()
+                    .min_w(px(TEXT_MIN))
                     .when(dimmed, |text| text.opacity(0.5))
                     .child(
                         div()
@@ -385,9 +392,11 @@ impl IntoElement for Row {
                 div()
                     .debug_selector(move || control_id.clone())
                     .flex()
+                    .flex_wrap()
                     .items_center()
                     .gap(look.at(8.))
-                    .flex_none()
+                    .min_w_0()
+                    .max_w_full()
                     .children(self.controls),
             )
     }

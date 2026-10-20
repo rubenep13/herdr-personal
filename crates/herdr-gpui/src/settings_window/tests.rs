@@ -11,6 +11,7 @@ mod config_watch;
 mod frame_look;
 mod layout_drafts;
 mod load_save;
+mod narrow_rows;
 mod navigation_groups;
 mod navigation_resize;
 mod navigation_scroll;

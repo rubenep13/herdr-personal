@@ -104,9 +104,10 @@ pub(in crate::settings_window) fn number(
     let mut root = div()
         .debug_selector(move || id.into())
         .flex()
+        .flex_wrap()
         .items_center()
         .gap(look.at(10.))
-        .flex_none()
+        .min_w_0()
         .when(!enabled, |root| root.opacity(0.5));
     if spec.slider {
         let fraction =

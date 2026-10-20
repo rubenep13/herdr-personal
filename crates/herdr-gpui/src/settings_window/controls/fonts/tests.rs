@@ -61,7 +61,12 @@ fn compact_rows_and_unclipped_picker_at_both_window_sizes(cx: &mut TestAppContex
         let mut previous: Option<Bounds<Pixels>> = None;
         for index in 0..4 {
             let row = cx.debug_bounds(ROWS[index]).unwrap();
-            inside(row, body);
+            // A narrow window puts a row's controls under its title, so the
+            // page may scroll; across, every row stays inside the body.
+            assert!(
+                row.left() >= body.left() && row.right() <= body.right(),
+                "{row:?} in {body:?}"
+            );
             assert!(row.size.height >= px(crate::settings_window::ui::ROW_HEIGHT));
             if let Some(previous) = previous {
                 // Rows share one card, a 1 px rule between each two.
