@@ -8,11 +8,16 @@ fn open(cx: &mut TestAppContext) -> (Entity<HerdrWindow>, &mut VisualTestContext
         view.update(cx, |view, cx| {
             view.config.theme = "Nord".into();
             view.open_theme_picker(window, cx);
-            let picker = view.menu.themes.as_mut().unwrap();
-            picker.names = vec!["Default".into(), "Nord".into(), "Dracula".into()];
-            picker.filter("");
-            cx.notify();
         })
+    });
+    // Let discovery finish first, so the machine's own themes never replace
+    // the names below.
+    cx.run_until_parked();
+    view.update(cx, |view, cx| {
+        let picker = view.menu.themes.as_mut().unwrap();
+        picker.names = vec!["Default".into(), "Nord".into(), "Dracula".into()];
+        picker.filter("");
+        cx.notify();
     });
     cx.update(|window, cx| window.draw(cx).clear(cx));
     (view, cx)
@@ -39,6 +44,12 @@ fn the_theme_picker_wears_the_menu_panel(cx: &mut TestAppContext) {
 #[gpui::test]
 fn theme_rows_keep_their_width_before_the_palette_loads(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
+    // Start from an empty cache, whatever the first frames loaded.
+    view.update(cx, |view, cx| {
+        view.menu.theme_swatches.invalidate();
+        cx.notify();
+    });
+    cx.update(|window, cx| window.draw(cx).clear(cx));
     let before = cx.debug_bounds("theme-name-Default").unwrap();
     view.read_with(cx, |view, _| {
         assert_eq!(
