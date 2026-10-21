@@ -2,6 +2,7 @@
 //! its toolbar where the terminal would be.
 
 use super::{store, tab_label};
+use crate::fonts::StyledFont;
 use crate::{
     HerdrWindow,
     browser::{
@@ -15,6 +16,12 @@ use gpui::{prelude::*, *};
 
 /// What a page's tab shows until the page reports an icon of its own.
 const GLOBE: &str = "icons/globe.svg";
+/// The toolbar's left padding, its brief message's widest, a notice's
+/// padding and a port's process name's widest, at `[ui] size = 12`.
+const TOOLBAR_PADDING_LEFT: f32 = 8.;
+const FLASH_WIDTH: f32 = 240.;
+const NOTICE_PADDING: f32 = 14.;
+const PROCESS_WIDTH: f32 = 160.;
 
 impl HerdrWindow {
     /// A page, filling the space it is given. It also records where the
@@ -148,27 +155,11 @@ impl HerdrWindow {
         cx: &mut Context<Self>,
         action: impl Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static,
     ) -> Stateful<Div> {
-        let color = if enabled {
-            self.theme.foreground
-        } else {
-            self.theme.muted
-        };
-        div()
-            .id(id)
-            .debug_selector(move || slot.selector(id))
-            .size(px(24.))
-            .flex_none()
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(crate::config::corners::CONTROL))
+        self.view_look()
+            .icon_button(id, slot.selector(id), icon, false, enabled)
             .when(enabled, |button| {
-                button
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(self.theme.active)))
-                    .on_click(cx.listener(move |this, _, window, cx| action(this, window, cx)))
+                button.on_click(cx.listener(move |this, _, window, cx| action(this, window, cx)))
             })
-            .child(svg().path(icon).size(px(14.)).text_color(rgb(color)))
     }
 
     /// The page with its toolbar, drawn in a group where the terminal would
@@ -179,8 +170,10 @@ impl HerdrWindow {
         slot: Slot,
         tab: &Tab,
         keyboard: bool,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        let look = self.view_look();
         let id = tab.id;
         let code = tab.place.is_code();
         let loaded = tab.location.is_some();
@@ -210,42 +203,23 @@ impl HerdrWindow {
                 // Annotating needs the page itself, so a blank tab or a
                 // build without pages has nothing to annotate.
                 let enabled = loaded && crate::browser::EMBEDDED;
-                let color = if annotating {
-                    self.theme.text_on(self.theme.primary_wash())
-                } else if enabled {
-                    self.theme.foreground
-                } else {
-                    self.theme.muted
-                };
-                div()
-                    .id("browser-annotate")
-                    .debug_selector(move || slot.selector("browser-annotate"))
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .gap(px(4.))
-                    .h(px(24.))
-                    .px(px(6.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .when(annotating, |button| {
-                        button.bg(rgb(self.theme.primary_wash()))
-                    })
-                    .text_color(rgb(color))
-                    .child(
-                        svg()
-                            .path("icons/pencil.svg")
-                            .size(px(13.))
-                            .text_color(rgb(color)),
-                    )
-                    .child("Annotate")
-                    .when(enabled, |button| {
-                        button
-                            .cursor_pointer()
-                            .hover(|s| s.bg(rgb(self.theme.active)))
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.toggle_annotating(id, window, cx);
-                            }))
-                    })
+                look.button(
+                    "browser-annotate",
+                    slot.selector("browser-annotate"),
+                    Some("icons/pencil.svg"),
+                    "Annotate",
+                    if annotating {
+                        crate::design::ButtonKind::Lit
+                    } else {
+                        crate::design::ButtonKind::Normal
+                    },
+                    enabled,
+                )
+                .when(enabled, |button| {
+                    button.on_click(cx.listener(move |this, _, window, cx| {
+                        this.toggle_annotating(id, window, cx);
+                    }))
+                })
             };
             (Some(button), panel)
         };
@@ -265,17 +239,15 @@ impl HerdrWindow {
             }
             (None, true) => "Loading\u{2026}".into(),
         };
-        let toolbar = div()
-            .debug_selector(move || slot.selector("browser-toolbar"))
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap(px(4.))
-            .px(px(6.))
-            .py(px(4.))
-            .bg(rgb(self.theme.surface))
-            .border_b_1()
-            .border_color(rgb(self.theme.active))
+        let address = self.group_address(slot.id, cx);
+        let typing = address.read(cx).focus.is_focused(window);
+        let secure = matches!(
+            &tab.location,
+            Some(Location::Web { url }) if url.as_str().starts_with("https://")
+        );
+        let toolbar = look
+            .bar(slot.selector("browser-toolbar"))
+            .pl(look.at(TOOLBAR_PADDING_LEFT))
             .child(self.toolbar_button(
                 slot,
                 "browser-back",
@@ -316,24 +288,34 @@ impl HerdrWindow {
                 },
             ))
             .child(
-                div()
-                    .id("browser-address")
-                    .debug_selector(move || slot.selector("browser-address"))
-                    .flex_1()
-                    .min_w_0()
-                    .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
-                        match event.keystroke.key.as_str() {
-                            "enter" => this.submit_address(slot.id, id, window, cx),
-                            "escape" => {
-                                let tab = store(cx).and_then(|store| store.get(id)).cloned();
-                                this.sync_address(slot.id, tab.as_ref(), true, window, cx);
-                                window.focus(&this.focus, cx);
+                look.field(
+                    slot.selector("browser-address-field"),
+                    typing,
+                    Some(if secure { "icons/lock.svg" } else { GLOBE }),
+                )
+                .flex_1()
+                .flex_shrink(1.)
+                .mx(look.at(4.))
+                .child(
+                    div()
+                        .id("browser-address")
+                        .debug_selector(move || slot.selector("browser-address"))
+                        .flex_1()
+                        .min_w_0()
+                        .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
+                            match event.keystroke.key.as_str() {
+                                "enter" => this.submit_address(slot.id, id, window, cx),
+                                "escape" => {
+                                    let tab = store(cx).and_then(|store| store.get(id)).cloned();
+                                    this.sync_address(slot.id, tab.as_ref(), true, window, cx);
+                                    window.focus(&this.focus, cx);
+                                }
+                                _ => return,
                             }
-                            _ => return,
-                        }
-                        cx.stop_propagation();
-                    }))
-                    .child(self.group_address(slot.id, cx)),
+                            cx.stop_propagation();
+                        }))
+                        .child(address),
+                ),
             )
             // A split shows the window's flash once, in the group in use.
             .children(
@@ -342,9 +324,11 @@ impl HerdrWindow {
                     .filter(|_| Some(slot.id) == self.active_group())
                     .map(|(flash, _)| {
                         div()
-                            .flex_none()
-                            .max_w(px(240.))
+                            .flex_shrink(1.)
+                            .min_w_0()
+                            .max_w(look.at(FLASH_WIDTH))
                             .truncate()
+                            .text_size(px(look.scale().secondary))
                             .text_color(rgb(flash.accent(&self.theme)))
                             .child(flash.text.clone())
                     }),
@@ -362,27 +346,32 @@ impl HerdrWindow {
                     }
                 },
             ));
+        let placeholder_selector = slot.selector("browser-placeholder");
         let content = match (page, &failure) {
             (Some(page), None) => self.page_area(id, page).into_any_element(),
             // The VS Code tab says why its page is not there yet.
             _ if tab.place.is_code() => self.render_code_status(failure.clone(), cx),
-            _ => div()
-                .flex_1()
-                .min_h_0()
-                .flex()
-                .items_center()
-                .justify_center()
-                .flex_col()
-                .gap(px(10.))
-                .px_4()
-                .text_color(rgb(self.theme.muted))
-                .child(
-                    div()
-                        .debug_selector(move || slot.selector("browser-placeholder"))
-                        .child(placeholder),
+            (None, Some(_)) => div()
+                .p(look.at(NOTICE_PADDING))
+                .child(look.dialog().error(placeholder_selector, placeholder))
+                .into_any_element(),
+            _ if loaded && !crate::browser::EMBEDDED => div()
+                .p(look.at(NOTICE_PADDING))
+                .child(look.dialog().note(
+                    placeholder_selector,
+                    crate::design::NoteTone::Info,
+                    placeholder,
+                ))
+                .into_any_element(),
+            _ => look
+                .empty(
+                    placeholder_selector,
+                    (!loaded).then_some(GLOBE),
+                    placeholder,
                 )
+                .flex_1()
                 .children(
-                    (failure.is_none() && !loaded)
+                    (!loaded)
                         .then(|| self.render_blank_ports(slot, id, cx))
                         .flatten(),
                 )
@@ -396,7 +385,7 @@ impl HerdrWindow {
             .flex_1()
             .min_h_0()
             .min_w_0()
-            .bg(rgb(self.theme.background))
+            .bg(look.background())
             // Keeps window shortcuts reachable while the page does not hold
             // the keyboard; nothing here types into a terminal. A focus
             // handle belongs to one element, so a drawn terminal keeps it.
@@ -419,33 +408,42 @@ impl HerdrWindow {
     /// opening its page in this tab; None while it listens on none.
     fn render_blank_ports(&self, slot: Slot, id: TabId, cx: &mut Context<Self>) -> Option<Div> {
         let (_, _, listed) = self.focused_listening_ports()?;
-        let theme = &self.theme;
+        let look = self.view_look();
         let chips = listed.ports.iter().filter_map(|port| {
             let link = port.link(listed.origin)?;
             let selector = slot.selector(&format!("blank-port-{}", port.number));
-            Some(
-                div()
-                    .id(SharedString::from(selector.clone()))
-                    .debug_selector(move || selector.clone())
-                    .flex()
-                    .gap(px(6.))
-                    .px(px(10.))
-                    .py(px(2.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .border_1()
-                    .border_color(rgb(theme.active))
-                    .cursor_pointer()
-                    .hover(|chip| chip.bg(rgb(theme.active)))
-                    .child(
+            let label = div()
+                .flex()
+                .items_center()
+                .gap(look.at(6.))
+                .child(
+                    div()
+                        .flex_none()
+                        .text_font(&self.config.terminal)
+                        .text_size(look.at(12.))
+                        .text_color(look.title())
+                        .child(link.label()),
+                )
+                // A long process name gives way; the address stays whole.
+                .when(!port.process.is_empty(), |label| {
+                    label.child(
                         div()
-                            .flex_none()
-                            .text_color(rgb(theme.foreground))
-                            .child(link.label()),
+                            .max_w(look.at(PROCESS_WIDTH))
+                            .truncate()
+                            .text_color(look.muted())
+                            .child(port.process.clone()),
                     )
-                    // A long process name gives way; the address stays whole.
-                    .when(!port.process.is_empty(), |chip| {
-                        chip.child(div().max_w(px(160.)).truncate().child(port.process.clone()))
-                    })
+                });
+            Some(
+                look.settings()
+                    .button(
+                        SharedString::from(selector.clone()),
+                        selector,
+                        label,
+                        crate::design::ButtonKind::Normal,
+                        crate::design::ButtonSize::Small,
+                        true,
+                    )
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_blank_port(slot.id, id, &link, window, cx);
                     })),
@@ -456,7 +454,7 @@ impl HerdrWindow {
                 .flex()
                 .flex_wrap()
                 .justify_center()
-                .gap(px(6.))
+                .gap(look.at(6.))
                 .children(chips),
         )
     }

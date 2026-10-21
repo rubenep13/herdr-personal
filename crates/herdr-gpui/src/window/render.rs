@@ -696,7 +696,9 @@ impl Render for HerdrWindow {
                         _ => self.render_review_tab(slot, &tab, window, cx),
                     }
                 }
-                (Shown::Page(_), Some(tab)) => self.render_browser(slot, &tab, owns_keyboard, cx),
+                (Shown::Page(_), Some(tab)) => {
+                    self.render_browser(slot, &tab, owns_keyboard, window, cx)
+                }
                 (Shown::Elsewhere(tab), _) => match self.live_frame_of(tab, window_frame.clone()) {
                     Some(frame) => self.render_terminal_mirror(
                         slot,

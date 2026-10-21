@@ -206,9 +206,10 @@ impl ViewLook {
 
     /// The bar along a view's top. The caller adds its title and controls;
     /// what does not fit is clipped rather than growing the bar.
-    pub(crate) fn bar(&self, selector: &'static str) -> Div {
+    pub(crate) fn bar(&self, selector: impl Into<String>) -> Div {
+        let selector = selector.into();
         div()
-            .debug_selector(move || selector.into())
+            .debug_selector(move || selector)
             .flex_none()
             .w_full()
             .min_w_0()
@@ -709,15 +710,18 @@ impl ViewLook {
 
     /// What a view shows with nothing in it, centred in its room: the
     /// view's icon on a tile of the accent, when there is room for one, and
-    /// the text. The caller adds its actions below.
+    /// the text, which `selector` names; the room is `{selector}-area` and
+    /// the tile `{selector}-tile`. The caller adds its actions below.
     pub(crate) fn empty(
         &self,
-        selector: &'static str,
+        selector: impl Into<String>,
         icon: Option<&'static str>,
         text: impl Into<SharedString>,
     ) -> Div {
+        let selector = selector.into();
+        let (area, tile) = (format!("{selector}-area"), format!("{selector}-tile"));
         div()
-            .debug_selector(move || selector.into())
+            .debug_selector(move || area)
             .size_full()
             .min_h_0()
             .p(self.at(EMPTY_PADDING))
@@ -729,6 +733,7 @@ impl ViewLook {
             .when_some(icon, |empty, icon| {
                 empty.child(
                     div()
+                        .debug_selector(move || tile)
                         .flex_none()
                         .size(self.at(EMPTY_TILE))
                         .rounded(self.at(EMPTY_RADIUS))
@@ -746,6 +751,7 @@ impl ViewLook {
             })
             .child(
                 div()
+                    .debug_selector(move || selector)
                     .text_center()
                     .text_size(px(self.scale.name))
                     .text_color(self.text)
