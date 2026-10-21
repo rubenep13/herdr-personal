@@ -233,9 +233,10 @@ impl HerdrWindow {
         label: impl Into<SharedString>,
         armed: bool,
     ) -> Stateful<Div> {
+        let label: SharedString = label.into();
         self.dialog_look().small_button(
             id,
-            SharedString::from(label.into()),
+            label,
             if armed {
                 ButtonKind::Primary
             } else {
