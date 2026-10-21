@@ -4,7 +4,7 @@
 //! so switching back and forth does not lose what was typed.
 
 use super::super::Page;
-use crate::HerdrWindow;
+use crate::{HerdrWindow, design::Tone};
 use gpui::{prelude::*, *};
 
 /// Below this panel width the rail shows only icons.
@@ -243,35 +243,19 @@ impl HerdrWindow {
         pane: impl IntoElement,
         cx: &mut Context<Self>,
     ) -> Div {
-        let theme = &self.theme;
-        let header = div()
-            .debug_selector(|| "device-setup-header".into())
-            .flex_none()
-            .p(px(16.))
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .items_center()
-            .gap(px(12.))
-            .child(
-                div()
-                    .flex_1()
-                    .text_size(px(self.config.ui.size * 1.35))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Add Device"),
-            )
-            .child(
-                div()
-                    .id(close)
-                    .debug_selector(move || close.into())
-                    .px_2()
-                    .py_1()
-                    .cursor_pointer()
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .hover(|s| s.bg(rgb(theme.active)))
-                    .child("Close")
-                    .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
-            );
+        let look = self.dialog_look();
+        let header = look.header(
+            crate::design::Header {
+                selector: "device-setup-header",
+                icon: "icons/plus.svg",
+                title: ("device-setup-title", "Add Device"),
+                sub: None,
+                danger: false,
+            },
+            look.menu()
+                .close_button(close)
+                .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
+        );
         let sources = self.rail_sources();
         let body = div().flex_1().min_h_0().flex();
         // A lone source needs no rail.
@@ -306,8 +290,11 @@ impl HerdrWindow {
         compact: bool,
         cx: &mut Context<Self>,
     ) -> Div {
-        let theme = &self.theme;
+        let look = self.dialog_look();
+        let settings = look.settings();
+        let menu = look.menu();
         let current = self.menu.page.and_then(Source::of);
+        // Settings' section list: its fill, its rows, its hairline.
         let mut rail = div()
             .debug_selector(|| "add-device-rail".into())
             .flex_none()
@@ -316,49 +303,25 @@ impl HerdrWindow {
             .flex()
             .flex_col()
             .gap(px(2.))
+            .bg(settings.nav())
             .border_r_1()
-            .border_color(rgb(theme.active));
+            .border_color(settings.line());
         for (index, &source) in sources.iter().enumerate() {
             if index == 1 {
                 rail = if compact {
-                    rail.child(div().my(px(6.)).h(px(1.)).bg(rgb(theme.active)))
+                    rail.child(div().my(px(6.)).h(px(1.)).bg(settings.line()))
                 } else {
-                    rail.child(
-                        div()
-                            .px(px(8.))
-                            .pt(px(10.))
-                            .pb(px(4.))
-                            .text_color(rgb(theme.muted))
-                            .child("CLOUD"),
-                    )
+                    rail.child(menu.section("add-device-cloud".into(), "CLOUD"))
                 };
             }
             let on = current == Some(source);
             let id = source.id();
-            let icon = div()
-                .flex_none()
-                .size(px(24.))
-                .rounded(px(crate::config::corners::SMALL))
-                .bg(rgb(theme.active))
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(
-                    svg()
-                        .path(source.icon())
-                        .size(px(14.))
-                        .text_color(rgb(theme.foreground)),
-                );
             let trailing = match self.source_state(source, cx) {
                 State::None => None,
                 State::Nearby(count) => Some(
-                    div()
-                        .px(px(6.))
-                        .rounded_full()
-                        .bg(rgb(theme.active))
-                        .text_size(px(self.config.ui.size * 0.85))
-                        .text_color(rgb(theme.subtext()))
-                        .child(count.to_string()),
+                    settings
+                        .chip(format!("{id}-count"), count.to_string(), Tone::Neutral)
+                        .into_any_element(),
                 ),
                 #[cfg(feature = "cloud")]
                 State::Ready => Some(
@@ -366,29 +329,47 @@ impl HerdrWindow {
                         .debug_selector(move || format!("{id}-ready"))
                         .size(px(7.))
                         .rounded_full()
-                        .bg(rgb(super::super::colors::online(theme))),
+                        .bg(rgb(super::super::colors::online(&self.theme)))
+                        .into_any_element(),
                 ),
                 #[cfg(feature = "cloud")]
                 State::SetUp => Some(
-                    div()
-                        .text_size(px(self.config.ui.size * 0.85))
-                        .text_color(rgb(theme.muted))
-                        .child("Set up"),
+                    settings
+                        .chip(format!("{id}-set-up"), "Set up", Tone::Neutral)
+                        .into_any_element(),
                 ),
             };
+            let hover = settings.nav_hover();
             rail = rail.child(
                 div()
                     .id(id)
                     .debug_selector(move || id.into())
-                    .p(px(6.))
+                    .h(px(settings.nav_row_height()))
+                    .px(px(if compact { 8. } else { 10. }))
                     .flex()
                     .items_center()
-                    .gap(px(8.))
-                    .rounded(px(crate::config::corners::CONTROL))
+                    .gap(px(10.))
+                    .rounded(px(8.))
                     .cursor_pointer()
-                    .when(on, |row| row.bg(rgb(theme.primary_wash())))
-                    .when(!on, |row| row.hover(|s| s.bg(rgb(theme.active))))
-                    .child(icon)
+                    .text_size(px(settings.scale().name))
+                    .text_color(if on {
+                        settings.title()
+                    } else {
+                        settings.text()
+                    })
+                    .when(on, |row| row.bg(settings.selection()))
+                    .when(!on, |row| row.hover(move |row| row.bg(hover)))
+                    .child(
+                        svg()
+                            .path(source.icon())
+                            .size(px(16.))
+                            .flex_none()
+                            .text_color(if on {
+                                settings.title()
+                            } else {
+                                settings.muted()
+                            }),
+                    )
                     .when(!compact, |row| {
                         row.child(div().flex_1().min_w_0().truncate().child(source.name()))
                             .children(trailing.map(|trailing| div().flex_none().child(trailing)))

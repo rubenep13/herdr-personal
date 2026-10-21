@@ -694,36 +694,26 @@ impl HerdrWindow {
             .flex()
             .flex_col()
             .child(body)
-            .child(
-                div()
-                    .flex_none()
-                    .p(px(16.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .flex()
-                    .justify_end()
-                    .child(
-                        div()
-                            .id("coder-setup-submit")
-                            .debug_selector(|| "coder-setup-submit".into())
-                            .p(px(8.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .bg(rgb(theme.active))
-                            .when(ready, |button| {
-                                button.cursor_pointer().hover(|s| {
-                                    s.bg(rgb(theme.active)
-                                        .blend(rgba((theme.foreground << 8) | 0x20)))
-                                })
-                            })
-                            .when(!ready, |button| button.text_color(rgb(theme.muted)))
-                            .child(label)
-                            .on_click(cx.listener(move |this, _, window, cx| {
+            .child({
+                let look = self.dialog_look();
+                look.footer("coder-setup-footer")
+                    .hint("Esc", "cancel")
+                    .button(
+                        look.button(
+                            "coder-setup-submit",
+                            label,
+                            crate::design::ButtonKind::Primary,
+                            ready,
+                        )
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
                                 if ready {
                                     this.submit_coder(window, cx);
                                 }
-                            })),
-                    ),
-            );
+                            },
+                        )),
+                    )
+            });
         self.add_device_frame("coder-setup-dialog", "coder-setup-close", compact, pane, cx)
     }
 

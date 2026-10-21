@@ -26,18 +26,14 @@ impl HerdrWindow {
         if !cfg!(target_os = "macos") {
             return None;
         }
-        let theme = &self.theme;
         Some(
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .flex_none()
-                .px_2()
-                .py_1()
-                .cursor_pointer()
-                .rounded(px(crate::config::corners::CONTROL))
-                .hover(|s| s.bg(rgb(theme.active)))
-                .child("Open Local Network Settings")
+            self.dialog_look()
+                .button(
+                    id,
+                    "Open Local Network Settings",
+                    crate::design::ButtonKind::Normal,
+                    true,
+                )
                 .on_click(cx.listener(|_, _, _, cx| cx.open_url(SETTINGS_URL))),
         )
     }

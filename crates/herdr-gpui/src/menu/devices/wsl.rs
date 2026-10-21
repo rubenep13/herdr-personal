@@ -294,48 +294,38 @@ impl HerdrWindow {
             );
         if let Some(error) = &setup.error {
             body = body.child(
-                div()
-                    .debug_selector(|| "wsl-setup-error".into())
-                    .flex_none()
-                    .text_color(crate::menu::danger(theme))
-                    .child(error.clone()),
+                self.dialog_look()
+                    .error("wsl-setup-error".into(), error.clone())
+                    .flex_none(),
             );
         }
         if let Step::Checking(distro) = &setup.step {
             body = body.child(
-                div()
-                    .debug_selector(|| "wsl-setup-status".into())
-                    .flex_none()
-                    .text_color(rgb(theme.muted))
-                    .child(format!("Checking Herdr in {distro}…")),
+                self.dialog_look()
+                    .note(
+                        "wsl-setup-status".into(),
+                        crate::design::NoteTone::Info,
+                        format!("Checking Herdr in {distro}…"),
+                    )
+                    .flex_none(),
             );
         }
         let ready = setup.step == Step::Form && setup.selected.is_some();
-        let footer = div()
-            .flex_none()
-            .p(px(16.))
-            .border_t_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .justify_end()
-            .child(
-                div()
-                    .id("wsl-setup-submit")
-                    .debug_selector(|| "wsl-setup-submit".into())
-                    .p(px(8.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.active))
-                    .when(ready, |button| {
-                        button.cursor_pointer().hover(|s| {
-                            s.bg(rgb(theme.active).blend(rgba((theme.foreground << 8) | 0x20)))
-                        })
-                    })
-                    .when(!ready, |button| button.text_color(rgb(theme.muted)))
-                    .child(match setup.step {
+        let look = self.dialog_look();
+        let footer = look
+            .footer("wsl-setup-footer")
+            .hint("Esc", "cancel")
+            .button(
+                look.button(
+                    "wsl-setup-submit",
+                    match setup.step {
                         Step::Form => "Add distribution",
                         Step::Checking(_) => "Checking…",
-                    })
-                    .on_click(cx.listener(|this, _, window, cx| this.submit_add_wsl(window, cx))),
+                    },
+                    crate::design::ButtonKind::Primary,
+                    ready,
+                )
+                .on_click(cx.listener(|this, _, window, cx| this.submit_add_wsl(window, cx))),
             );
         frame(
             div()

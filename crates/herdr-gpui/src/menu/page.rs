@@ -165,7 +165,13 @@ impl Page {
             | Self::Tab
             | Self::Themes
             | Self::Workspace => Look::Menu,
+            #[cfg(feature = "cloud")]
+            Self::AddCloud(_) => Look::Dialog,
+            #[cfg(feature = "coder")]
+            Self::AddCoder => Look::Dialog,
             Self::About
+            | Self::AddDevice
+            | Self::AddWsl
             | Self::AgentSkill
             | Self::AppUpdate
             | Self::ConfirmClose

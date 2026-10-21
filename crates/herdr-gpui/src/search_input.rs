@@ -480,21 +480,27 @@ impl EntityInputHandler for SearchInput {
 }
 
 impl Render for SearchInput {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let input = cx.entity();
         let painter = input.clone();
         let height = px(self.font.line_height());
+        let focused = self.focus.is_focused(window);
         div()
             .debug_selector(|| "theme-search".into())
             .w_full()
             .when(self.framed, |field| {
+                // The frame Settings' fields wear: its ring takes the accent
+                // while the field has the keyboard.
+                let look = crate::design::SettingsLook::of(&self.theme, &self.font);
                 field
-                    .px_2()
-                    .py_1()
-                    .rounded(px(crate::config::corners::CONTROL))
+                    .h(px(look.control_height()))
+                    .px(look.at(10.))
+                    .flex()
+                    .items_center()
+                    .rounded(look.at(8.))
                     .border_1()
-                    .border_color(rgb(self.theme.active))
-                    .bg(rgb(self.theme.background))
+                    .border_color(if focused { look.accent() } else { look.line() })
+                    .bg(look.well())
             })
             .text_color(rgb(self.theme.foreground))
             .text_font(&self.font)
