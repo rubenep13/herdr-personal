@@ -171,6 +171,7 @@ impl Page {
             | Self::ConfirmClose
             | Self::Dialog(_)
             | Self::ForwardPort
+            | Self::GitHub
             | Self::Install
             | Self::OpenLink
             | Self::RenameDevice
@@ -179,8 +180,12 @@ impl Page {
             | Self::VersionMismatch
             | Self::WorktreeScript => Look::Dialog,
             Self::CarryPane
+            | Self::GitCommit
             | Self::KillProcesses
             | Self::PaneProcesses
+            | Self::PrComment
+            | Self::PrMerge
+            | Self::PrReview
             | Self::RemoveDevice
             | Self::RemoveWsl
             | Self::RenamePane

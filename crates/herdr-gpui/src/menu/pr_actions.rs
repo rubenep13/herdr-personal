@@ -4,6 +4,7 @@
 use super::{Page, accent, danger, git::Row};
 use crate::{
     HerdrWindow,
+    design::{ButtonKind, Header, ItemState, Leading},
     dialog_input::DialogInput,
     pr_actions::{Action, Target},
     pull_request::{MergeMethod, Outcome as CheckOutcome},
@@ -202,99 +203,50 @@ impl HerdrWindow {
     }
 
     /// A dialog's titled header: the row's icon, a title, and the PR.
+    /// A pull request form's heading: the menu's, naming the pull request.
     fn pr_dialog_header(&self, row: Row, title: &'static str) -> Div {
-        let theme = &self.theme;
-        let font = &self.config.ui;
         let subtitle = self
             .git_open_pull_request()
             .map(|pr| format!("#{} {}", pr.number, pr.title));
-        div()
-            .flex()
-            .items_center()
-            .gap(px(10.))
-            .px(px(16.))
-            .py(px(12.))
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .child(
-                svg()
-                    .path(row.icon())
-                    .size(px(16.))
-                    .flex_none()
-                    .text_color(rgb(theme.muted)),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .flex_1()
-                    .min_w_0()
-                    .child(
-                        div()
-                            .text_size(px(font.size * 1.35))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(title),
-                    )
-                    .when_some(subtitle, |header, subtitle| {
-                        header.child(
-                            div()
-                                .truncate()
-                                .text_color(rgb(theme.muted))
-                                .child(crate::sidebar::label_text(&subtitle)),
-                        )
-                    }),
-            )
-    }
-
-    fn pr_dialog_error(&self) -> Option<Div> {
-        let theme = &self.theme;
-        self.menu.error.as_ref().map(|error| {
-            div()
-                .debug_selector(|| "pr-dialog-error".into())
-                .rounded(px(crate::config::corners::CONTROL))
-                .bg(rgb(theme.active))
-                .px(px(10.))
-                .py(px(6.))
-                .text_color(danger(theme))
-                .child(error.clone())
+        self.menu_look().header(Header {
+            selector: "pr-dialog-header",
+            icon: row.icon(),
+            title: ("pr-dialog-title", title),
+            sub: subtitle
+                .as_deref()
+                .map(|subtitle| ("icons/git-branch.svg", "pr-dialog-pull-request", subtitle)),
+            danger: false,
         })
     }
 
+    fn pr_dialog_error(&self) -> Option<Div> {
+        self.menu.error.as_ref().map(|error| {
+            self.dialog_look()
+                .error("pr-dialog-error".into(), error.clone())
+        })
+    }
+
+    /// A form's small button: the one it leads with when `armed`.
     fn pr_button(
         &self,
         id: &'static str,
         label: impl Into<SharedString>,
         armed: bool,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
-        div()
-            .id(id)
-            .debug_selector(move || id.into())
-            .px(px(12.))
-            .py(px(6.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .border_1()
-            .cursor_pointer()
-            .border_color(rgb(if armed {
-                theme.foreground
+        self.dialog_look().small_button(
+            id,
+            SharedString::from(label.into()),
+            if armed {
+                ButtonKind::Primary
             } else {
-                theme.active
-            }))
-            .when(armed, |button| button.bg(rgb(theme.active)))
-            .text_color(rgb(if armed { theme.foreground } else { theme.muted }))
-            .hover(|button| button.bg(rgb(theme.active)))
-            .child(label.into())
+                ButtonKind::Normal
+            },
+            true,
+        )
     }
 
-    fn pr_footer(&self) -> Div {
-        div()
-            .flex()
-            .justify_end()
-            .gap(px(8.))
-            .px(px(16.))
-            .py(px(12.))
-            .border_t_1()
-            .border_color(rgb(self.theme.active))
+    fn pr_footer(&self) -> crate::design::Footer {
+        self.dialog_look().form_footer("pr-dialog-footer")
     }
 
     fn pr_back_button(&self, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -311,21 +263,20 @@ impl HerdrWindow {
 
     pub(super) fn render_pr_review(&self, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
+        let look = self.menu_look();
         let mut body = div()
             .id("pr-review-body")
             .debug_selector(|| "pr-review-body".into())
             .flex()
             .flex_col()
             .gap(px(4.))
-            .px(px(16.))
-            .py(px(12.))
+            .px(look.at(10.))
+            .pt(look.at(6.))
+            .pb(look.at(4.))
             .max_h(px(380.))
             .overflow_y_scroll();
         let heading = |label: &'static str| {
-            div()
-                .pt(px(4.))
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(label)
+            look.section(format!("pr-review-{}", label.to_lowercase()), label)
         };
         body = body.child(heading("Checks"));
         let pr = self.git_open_pull_request();
@@ -419,7 +370,7 @@ impl HerdrWindow {
             .child(self.pr_dialog_header(Row::Review, "Checks and comments"))
             .child(body)
             .child(
-                self.pr_footer().child(self.pr_back_button(cx)).child(
+                self.pr_footer().button(self.pr_back_button(cx)).button(
                     self.pr_button("pr-review-comment-button", "Comment...", false)
                         .on_click(cx.listener(|this, _, _, cx| {
                             cx.stop_propagation();
@@ -431,23 +382,18 @@ impl HerdrWindow {
     }
 
     pub(super) fn render_pr_comment(&self, window: &Window, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
         let armed = self
             .menu
             .input
             .as_ref()
             .is_some_and(|input| !input.text.trim().is_empty());
-        let mut body = div()
-            .flex()
-            .flex_col()
-            .gap(px(10.))
-            .px(px(16.))
-            .py(px(12.))
-            .child(
-                div()
-                    .text_color(rgb(theme.muted))
-                    .child("Posts to the pull request's conversation as your GitHub account."),
-            );
+        let mut body =
+            self.dialog_look()
+                .form_body("pr-comment-body")
+                .child(self.dialog_look().lead(
+                    "pr-comment-text",
+                    "Posts to the pull request's conversation as your GitHub account.",
+                ));
         if self.menu.input.is_some() {
             body = body.child(self.render_dialog_input(window, cx));
         }
@@ -460,7 +406,7 @@ impl HerdrWindow {
             .child(self.pr_dialog_header(Row::Comment, "Comment"))
             .child(body)
             .child(
-                self.pr_footer().child(self.pr_back_button(cx)).child(
+                self.pr_footer().button(self.pr_back_button(cx)).button(
                     self.pr_button("pr-comment-submit", "Comment", armed)
                         .on_click(cx.listener(|this, _, _, cx| {
                             cx.stop_propagation();
@@ -472,19 +418,16 @@ impl HerdrWindow {
 
     pub(super) fn render_pr_merge(&self, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
-        let font = &self.config.ui;
         let pr = self.git_open_pull_request();
-        let mut body = div().flex().flex_col().gap(px(8.)).px(px(16.)).py(px(12.));
+        let look = self.dialog_look();
+        let mut body = look.form_body("pr-merge-body");
         if let Some(pr) = pr {
-            body = body.child(
-                div()
-                    .debug_selector(|| "pr-merge-branches".into())
-                    .text_color(rgb(theme.muted))
-                    .child(crate::sidebar::label_text(&format!(
-                        "Merge {} into {}",
-                        pr.head_ref_name, pr.base_ref_name
-                    ))),
-            );
+            body = body.child(look.well("pr-merge-branches".into(), None).child(
+                crate::sidebar::label_text(&format!(
+                    "Merge {} into {}",
+                    pr.head_ref_name, pr.base_ref_name
+                )),
+            ));
             // GitHub has the final word; this is what it last reported.
             for (heading, label) in [
                 ("Review", pr.review().to_owned()),
@@ -505,42 +448,35 @@ impl HerdrWindow {
                         .child(div().flex_1().min_w_0().child(label)),
                 );
             }
-            body = body.child(
-                div()
-                    .pt(px(4.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Method"),
-            );
+            body = body.child(look.menu().section("pr-merge-method".into(), "Method"));
+            let menu = look.menu();
             for method in pr.merge_methods.iter().copied() {
                 let selected = self.menu.merge_method == Some(method);
+                let hover = menu.line();
                 body = body.child(
-                    div()
-                        .id(SharedString::from(method.graphql()))
-                        .debug_selector(move || format!("pr-merge-method-{}", method.graphql()))
-                        .min_h(px(font.line_height() + 10.))
-                        .px(px(8.))
-                        .flex()
-                        .items_center()
-                        .gap(px(8.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .cursor_pointer()
-                        .when(selected, |row| row.bg(rgb(theme.active)))
-                        .hover(|row| row.bg(rgb(theme.active)))
-                        .child(
-                            div()
-                                .size(px(8.))
-                                .flex_none()
-                                .rounded_full()
-                                .border_1()
-                                .border_color(rgb(theme.foreground))
-                                .when(selected, |dot| dot.bg(rgb(theme.foreground))),
-                        )
-                        .child(method.action())
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.menu.merge_method = Some(method);
-                            cx.notify();
-                        })),
+                    menu.row(
+                        SharedString::from(method.graphql()),
+                        format!("pr-merge-method-{}", method.graphql()),
+                        if selected {
+                            Leading::Check
+                        } else {
+                            Leading::Empty
+                        },
+                        ItemState {
+                            selected,
+                            ..ItemState::default()
+                        },
+                    )
+                    .hover(move |row| row.bg(hover))
+                    .child(menu.label(
+                        format!("pr-merge-method-{}-label", method.graphql()),
+                        method.action(),
+                    ))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        cx.stop_propagation();
+                        this.menu.merge_method = Some(method);
+                        cx.notify();
+                    })),
                 );
             }
         }
@@ -555,7 +491,7 @@ impl HerdrWindow {
             .child(self.pr_dialog_header(Row::Merge, "Merge pull request"))
             .child(body)
             .child(
-                self.pr_footer().child(self.pr_back_button(cx)).child(
+                self.pr_footer().button(self.pr_back_button(cx)).button(
                     self.pr_button("pr-merge-confirm", label, armed)
                         .on_click(cx.listener(|this, _, _, cx| {
                             cx.stop_propagation();

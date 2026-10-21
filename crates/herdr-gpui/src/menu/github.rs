@@ -1,5 +1,6 @@
 use crate::{
     HerdrWindow,
+    design::{ButtonKind, Header},
     fonts::StyledFont,
     github::{Account, Auth, Profile},
 };
@@ -332,13 +333,9 @@ impl HerdrWindow {
         cx.notify();
     }
 
-    fn github_button(
-        &self,
-        action: Action,
-        label: &'static str,
-        cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
-        let theme = &self.theme;
+    /// A footer button's kind: the one-click choice leads, signing out is
+    /// red, the rest are plain.
+    fn github_kind(&self, action: Action) -> ButtonKind {
         // The GitHub CLI's sign-in, when offered, is the one-click choice.
         let primary = match action {
             Action::Open | Action::GitHubCli | Action::SubmitToken => true,
@@ -350,50 +347,28 @@ impl HerdrWindow {
             | Action::SignOut
             | Action::Close => false,
         };
-        let danger = action == Action::SignOut;
-        let accent = if danger {
-            super::danger(theme)
+        if action == Action::SignOut {
+            ButtonKind::Danger
+        } else if primary {
+            ButtonKind::Primary
         } else {
-            super::accent(theme)
-        };
-        let selected = self.menu.github_selected == Some(action);
-        div()
-            .id(action.id())
-            .debug_selector(move || action.id().into())
-            .flex_none()
-            .px(px(12.))
-            .py(px(7.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .border_1()
-            .border_color(if selected {
-                if danger {
-                    accent
-                } else {
-                    rgb(theme.foreground)
-                }
-            } else {
-                rgb(theme.active)
+            ButtonKind::Normal
+        }
+    }
+
+    fn github_button(
+        &self,
+        action: Action,
+        label: &'static str,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let kind = self.github_kind(action);
+        let look = self.dialog_look();
+        look.button(action.id(), crate::sidebar::label_text(label), kind, true)
+            // The keys move through the buttons; the ring shows which.
+            .when(self.menu.github_selected == Some(action), |button| {
+                look.ring(button)
             })
-            .bg(if primary {
-                accent
-            } else {
-                rgb(theme.background)
-            })
-            .text_color(if primary {
-                rgb(theme.background)
-            } else if danger {
-                accent
-            } else {
-                rgb(theme.foreground)
-            })
-            .font_weight(if primary {
-                FontWeight::SEMIBOLD
-            } else {
-                FontWeight::NORMAL
-            })
-            .cursor_pointer()
-            .hover(|style| style.border_color(accent))
-            .child(crate::sidebar::label_text(label))
             .on_click(cx.listener(move |this, _, window, cx| {
                 cx.stop_propagation();
                 this.github_action(action, window, cx);
@@ -403,7 +378,6 @@ impl HerdrWindow {
     pub(super) fn render_github_auth(&self, cx: &mut Context<Self>) -> Div {
         let auth = self.github_auth();
         let theme = &self.theme;
-        let font = &self.config.ui;
         let mut body = div()
             .id("github-body")
             .debug_selector(|| "github-body".into())
@@ -579,16 +553,8 @@ impl HerdrWindow {
             };
             body = body.child(div().mt(px(12.)).text_color(rgb(color)).child(text));
         }
-        let mut footer = div()
-            .debug_selector(|| "github-footer".into())
-            .flex_none()
-            .p(px(12.))
-            .border_t_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .flex_wrap()
-            .justify_end()
-            .gap(px(8.));
+        let look = self.dialog_look();
+        let mut footer = look.footer("github-footer").wrap();
         let mut has_footer = false;
         for action in self
             .github_actions()
@@ -621,53 +587,31 @@ impl HerdrWindow {
                 Action::SignOut => "Sign out (D)",
                 Action::Copy | Action::Close => continue,
             };
-            footer = footer.child(self.github_button(action, label, cx));
+            footer = footer.button(self.github_button(action, label, cx));
         }
+        let close = look
+            .menu()
+            .close_button("github-header-close")
+            // The keys move through the footer's buttons and then the cross.
+            .when(self.menu.github_selected == Some(Action::Close), |close| {
+                look.ring(close)
+            })
+            .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)));
         div()
             .flex()
             .flex_col()
             .w_full()
             .min_h_0()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .flex_none()
-                    .gap(px(12.))
-                    .p(px(16.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        crate::sidebar::github_mark(theme.foreground)
-                            .debug_selector(|| "github-mark".into())
-                            .size(px(28.)),
-                    )
-                    .child(
-                        div().flex_1().min_w_0().child(
-                            div()
-                                .text_size(px(font.size * 1.35))
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child("GitHub"),
-                        ),
-                    )
-                    .child(
-                        div()
-                            .id("github-header-close")
-                            .debug_selector(|| "github-header-close".into())
-                            .cursor_pointer()
-                            .px(px(8.))
-                            .py(px(4.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .when(self.menu.github_selected == Some(Action::Close), |style| {
-                                style.bg(rgb(theme.active))
-                            })
-                            .hover(|style| style.bg(rgb(theme.active)))
-                            .child(crate::sidebar::label_text("Close"))
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)),
-                            ),
-                    ),
-            )
+            .child(look.header(
+                Header {
+                    selector: "github-header",
+                    icon: "icons/github.svg",
+                    title: ("github-title", "GitHub"),
+                    sub: None,
+                    danger: false,
+                },
+                close,
+            ))
             .child(body)
             .when(has_footer, |panel| panel.child(footer))
     }

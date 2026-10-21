@@ -303,7 +303,7 @@ impl SettingsLook {
         &self,
         id: impl Into<ElementId>,
         selector: String,
-        label: impl Into<SharedString>,
+        label: impl IntoElement,
         kind: ButtonKind,
         size: ButtonSize,
         enabled: bool,
@@ -335,7 +335,7 @@ impl SettingsLook {
             .when(kind != ButtonKind::Normal, |button| {
                 button.font_weight(FontWeight::MEDIUM)
             })
-            .child(label.into())
+            .child(label)
             .when(enabled, |button| {
                 button
                     .cursor_pointer()

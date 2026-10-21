@@ -449,7 +449,7 @@ impl DialogLook {
     pub(crate) fn button(
         &self,
         id: &'static str,
-        label: impl Into<SharedString>,
+        label: impl IntoElement,
         kind: ButtonKind,
         enabled: bool,
     ) -> Stateful<Div> {
@@ -461,7 +461,7 @@ impl DialogLook {
     pub(crate) fn small_button(
         &self,
         id: &'static str,
-        label: impl Into<SharedString>,
+        label: impl IntoElement,
         kind: ButtonKind,
         enabled: bool,
     ) -> Stateful<Div> {

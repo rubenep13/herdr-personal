@@ -309,6 +309,10 @@ impl HerdrWindow {
         // modal decision, not a continuation of the row it came from, so it
         // centres over a dimmed window the way the Herdr TUI's dialogs do.
         let pointer_anchored = page.pointer_anchored();
+        let git_popup = matches!(
+            page,
+            Page::Git | Page::GitCommit | Page::PrReview | Page::PrComment | Page::PrMerge
+        );
         let mut panel = div()
             .id("menu-panel")
             .debug_selector(|| "menu-panel".into())
@@ -379,7 +383,8 @@ impl HerdrWindow {
                             .max(px(0.))
                             .min(px(if page == Page::Git { 340. } else { 420. })))
                         .max_h((viewport.height - px(24.)).max(px(0.)))
-                        .when(page == Page::Git, |panel| {
+                        // The Git popup's forms keep the popup's top and room.
+                        .when(git_popup, |panel| {
                             let top = crate::titlebar::HEIGHT
                                 + crate::worktree_banner::reserved(
                                     env!("HERDR_BUILD_WORKTREE") == "1",
@@ -777,7 +782,9 @@ impl HerdrWindow {
             )
             .on_key_down(cx.listener(Self::menu_key_down))
             .child(if pointer_anchored {
-                let position = if page == Page::Git {
+                // The Git popup and the forms it turns into hang under the
+                // titlebar's Git button, so a form never jumps from its menu.
+                let position = if git_popup {
                     point(
                         self.menu.anchor.x,
                         px(crate::titlebar::HEIGHT

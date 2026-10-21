@@ -8,7 +8,7 @@ use crate::config::FontConfig;
 mod dialog;
 mod menu;
 mod settings;
-pub(crate) use dialog::{DialogLook, NoteTone};
+pub(crate) use dialog::{DialogLook, Footer, NoteTone};
 pub(crate) use menu::{Header, ItemState, Leading, MenuLook, keycaps, menu_hover};
 pub(crate) use settings::{ButtonKind, ButtonSize, SettingsLook, Tone};
 

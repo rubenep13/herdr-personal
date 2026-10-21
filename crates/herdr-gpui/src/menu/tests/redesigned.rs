@@ -26,5 +26,5 @@ fn every_page_has_a_look() {
     }
     assert_eq!(Page::Install.look(), Look::Dialog);
     assert_eq!(Page::RenameTab.look(), Look::Form);
-    assert_eq!(Page::GitCommit.look(), Look::Legacy);
+    assert_eq!(Page::AddDevice.look(), Look::Legacy);
 }
