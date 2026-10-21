@@ -5,7 +5,7 @@
 
 use super::rows::Status;
 use crate::{
-    config::{FontConfig, Theme, mix},
+    config::{FontConfig, Theme},
     design::{ButtonKind, Tone},
     fonts::StyledFont,
     sidebar::Indicators,
@@ -50,10 +50,6 @@ impl Look {
 
     pub(crate) fn hue(&self, index: usize) -> u32 {
         self.theme.ink(self.theme.palette[index])
-    }
-
-    pub(crate) fn wash(&self, index: usize) -> u32 {
-        mix(self.theme.background, self.hue(index), 16)
     }
 
     pub(crate) fn size(&self) -> Pixels {
