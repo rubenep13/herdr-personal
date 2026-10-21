@@ -176,6 +176,11 @@ impl Page {
             | Self::Update
             | Self::VersionMismatch
             | Self::WorktreeScript => Look::Dialog,
+            Self::CarryPane
+            | Self::KillProcesses
+            | Self::PaneProcesses
+            | Self::RenamePane
+            | Self::RenameTab => Look::Form,
             _ => Look::Legacy,
         }
     }

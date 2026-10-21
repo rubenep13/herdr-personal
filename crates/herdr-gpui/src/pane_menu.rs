@@ -1,7 +1,7 @@
 use crate::{
     HerdrWindow,
     close_modal::CloseConfirmation,
-    design::{ItemState, Leading},
+    design::{ButtonKind, Header, ItemState, Leading},
     menu::Page,
     pane_move::Destination,
     search_input::SearchInput,
@@ -432,6 +432,8 @@ impl HerdrWindow {
                 input.update(cx, |input, cx| {
                     input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
                     input.set_placeholder("Pane name (blank clears)", cx);
+                    // The form's field frame draws the frame.
+                    input.set_frameless(cx);
                     input.set_text_selected(&target.label, cx);
                     window.focus(&input.focus, cx);
                 });
@@ -681,7 +683,7 @@ impl HerdrWindow {
         }
     }
 
-    pub(super) fn render_pane_menu(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn render_pane_menu(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let Some(pane) = &self.menu.pane else {
             return div();
         };
@@ -726,54 +728,78 @@ impl HerdrWindow {
                 );
             }
         } else {
-            body =
-                body.p(px(8.))
-                    .gap(px(12.))
-                    .child(div().font_weight(FontWeight::SEMIBOLD).child("Rename pane"))
-                    .child(
-                        div()
-                            .text_color(rgb(self.theme.subtext()))
-                            .child("Leave blank to clear the custom label."),
-                    )
-                    .when_some(pane.input.clone(), |body, input| {
-                        if pane.pending.is_some() {
-                            body.child(div().child(input.read(cx).text().to_owned()))
-                        } else {
-                            body.child(input)
-                        }
-                    })
-                    .child(
-                        div()
-                            .flex()
-                            .justify_end()
-                            .gap(px(8.))
-                            .child(
-                                div()
-                                    .id("pane-rename-cancel")
-                                    .p(px(6.))
-                                    .cursor_pointer()
-                                    .child("Cancel")
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.dismiss_menu(window, cx)
-                                    })),
+            let look = self.dialog_look();
+            let pending = pane.pending.is_some();
+            let field = look
+                .settings()
+                .field(
+                    "pane-rename-field".into(),
+                    pane.input
+                        .as_ref()
+                        .is_some_and(|input| input.read(cx).focus.is_focused(window)),
+                )
+                .w_full()
+                .when_some(pane.input.clone(), |field, input| {
+                    // While the rename is in flight the name reads as text.
+                    if pending {
+                        field.child(div().truncate().child(input.read(cx).text().to_owned()))
+                    } else {
+                        field.child(
+                            div()
+                                .debug_selector(|| "pane-rename-input".into())
+                                .flex_1()
+                                .min_w_0()
+                                .child(input),
+                        )
+                    }
+                });
+            return body
+                .child(look.menu().header(Header {
+                    selector: "pane-rename-header",
+                    icon: "icons/pencil.svg",
+                    title: ("pane-rename-title", "Rename pane"),
+                    sub: (!pane.target.label.is_empty()).then_some((
+                        "icons/terminal.svg",
+                        "pane-rename-target",
+                        pane.target.label.as_str(),
+                    )),
+                    danger: false,
+                }))
+                .child(
+                    look.form_body("pane-rename-body")
+                        .child(
+                            look.lead("pane-rename-text", "Leave blank to clear the custom label."),
+                        )
+                        .child(field)
+                        .when_some(pane.error.clone(), |body, error| {
+                            body.child(look.error("pane-rename-error".into(), error))
+                        }),
+                )
+                .child(
+                    look.form_footer("pane-rename-footer")
+                        .button(
+                            look.small_button(
+                                "pane-rename-cancel",
+                                "Cancel",
+                                ButtonKind::Normal,
+                                true,
                             )
-                            .child(
-                                div()
-                                    .id("pane-rename-submit")
-                                    .p(px(6.))
-                                    .rounded(px(crate::config::corners::CONTROL))
-                                    .bg(rgb(self.theme.active))
-                                    .cursor_pointer()
-                                    .child(if pane.pending.is_some() {
-                                        "Renaming..."
-                                    } else {
-                                        "Rename"
-                                    })
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.submit_pane_rename(window, cx)
-                                    })),
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)),
                             ),
-                    );
+                        )
+                        .button(
+                            look.small_button(
+                                "pane-rename-submit",
+                                if pending { "Renaming..." } else { "Rename" },
+                                ButtonKind::Primary,
+                                !pending,
+                            )
+                            .on_click(cx.listener(
+                                |this, _, window, cx| this.submit_pane_rename(window, cx),
+                            )),
+                        ),
+                );
         }
         body.when_some(pane.error.clone(), |body, error| {
             // No width of its own, so the labels set the panel's width and

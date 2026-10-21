@@ -6,6 +6,8 @@ use core::prelude::v1::test;
 use herdr_client::protocol::ClientShellSnapshot;
 use std::sync::Arc;
 
+mod look;
+
 fn row(pid: u32, depth: usize) -> Row {
     Row {
         entry: crate::processes::Entry {

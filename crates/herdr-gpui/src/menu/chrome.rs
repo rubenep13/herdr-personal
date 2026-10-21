@@ -662,7 +662,7 @@ impl HerdrWindow {
         ) {
             panel = panel.child(self.render_host_menu(cx));
         } else if matches!(page, Page::Tab | Page::RenameTab) {
-            panel = panel.child(self.render_tab_menu(cx));
+            panel = panel.child(self.render_tab_menu(window, cx));
         } else if page == Page::Group {
             panel = self.render_group_menu(panel, cx);
         } else if page == Page::MovePane {
@@ -671,7 +671,7 @@ impl HerdrWindow {
             page,
             Page::Pane | Page::RenamePane | Page::PaneProcesses | Page::KillProcesses
         ) {
-            panel = panel.child(self.render_pane_menu(cx));
+            panel = panel.child(self.render_pane_menu(window, cx));
         } else if page == Page::Keybinds {
             panel = panel.child(self.render_keybinds(cx));
         } else if page == Page::Themes {
