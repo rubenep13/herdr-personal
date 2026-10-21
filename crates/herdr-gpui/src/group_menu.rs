@@ -335,6 +335,7 @@ impl HerdrWindow {
                     key,
                     ICON_SIZE,
                     theme,
+                    self.menu_look(),
                     cx,
                 )),
                 _ => None,

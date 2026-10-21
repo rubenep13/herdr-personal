@@ -21,9 +21,16 @@ pub(crate) struct Look {
     pub(crate) theme: Theme,
     pub(crate) ui: FontConfig,
     pub(crate) mono: FontConfig,
+    /// Whether the theme is light, which softens the panels' shadows.
+    pub(crate) light: bool,
 }
 
 impl Look {
+    /// The redesigned views' pieces, at the orchestrator's face.
+    pub(crate) fn view(&self) -> crate::design::ViewLook {
+        crate::design::ViewLook::of(&self.theme, &self.ui, self.light)
+    }
+
     pub(crate) fn hue(&self, index: usize) -> u32 {
         self.theme.ink(self.theme.palette[index])
     }

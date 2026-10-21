@@ -31,6 +31,7 @@ impl HerdrWindow {
                     (endpoint, workspace),
                     &self.tunnels,
                     &self.theme,
+                    self.menu_look(),
                     size,
                     cx,
                 )),

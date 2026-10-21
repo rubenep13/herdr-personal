@@ -399,7 +399,6 @@ impl OrchestratorView {
             .and_then(|workspace| workspace.host.clone())
             .unwrap_or_else(|| "local".into())
             .into();
-        let (foreground, surface) = (theme.foreground, theme.surface);
         let run_index = row.run;
         self.row_shell(
             ("orchestrator-run", index),
@@ -441,14 +440,7 @@ impl OrchestratorView {
                         .max_w_full()
                         .min_w_0()
                         .truncate()
-                        .tooltip(move |_, cx| {
-                            cx.new(|_| crate::usage::Hint {
-                                text: host.clone(),
-                                foreground,
-                                surface,
-                            })
-                            .into()
-                        }),
+                        .tooltip(look.view().menu().tooltip(host)),
                 ),
         )
         .child(

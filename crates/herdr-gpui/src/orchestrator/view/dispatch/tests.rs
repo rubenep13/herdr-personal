@@ -22,6 +22,7 @@ fn destination_inventory_reconciles_selection_and_ignores_other_hosts(cx: &mut T
         theme: crate::config::Theme::default(),
         ui: config.ui,
         mono: config.terminal,
+        light: false,
     };
     let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
     cx.update(|_, cx| {

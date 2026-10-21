@@ -100,7 +100,6 @@ impl HerdrWindow {
                 .filter(|&count| count > 0),
             _ => None,
         };
-        let (foreground, surface) = (theme.foreground, theme.surface);
         div()
             .id(name)
             .debug_selector(move || name.into())
@@ -130,14 +129,7 @@ impl HerdrWindow {
                         .child(count.to_string()),
                 )
             })
-            .tooltip(move |_, cx| {
-                cx.new(|_| crate::usage::Hint {
-                    text: hint.into(),
-                    foreground,
-                    surface,
-                })
-                .into()
-            })
+            .tooltip(self.menu_look().tooltip(hint))
             .on_click(cx.listener(move |this, _, _, cx| {
                 cx.stop_propagation();
                 this.toggle_review_panel(id, panel, cx);

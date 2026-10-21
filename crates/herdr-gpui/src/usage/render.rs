@@ -58,8 +58,6 @@ impl HerdrWindow {
             row = row.child(self.usage_segment(reading, now, cx));
         }
         if let Some(error) = host_error {
-            let (foreground, surface) = (theme.foreground, theme.surface);
-            let error = SharedString::from(error);
             row = row.child(
                 div()
                     .id("usage-host-error")
@@ -68,15 +66,7 @@ impl HerdrWindow {
                     .truncate()
                     .text_color(rgb(theme.muted))
                     .child("Usage unavailable")
-                    .tooltip(move |_, cx| {
-                        let text = error.clone();
-                        cx.new(|_| Hint {
-                            text,
-                            foreground,
-                            surface,
-                        })
-                        .into()
-                    }),
+                    .tooltip(self.menu_look().tooltip(error)),
             );
         }
         let refresh = svg()
@@ -287,26 +277,5 @@ pub(super) fn ago(elapsed: Duration) -> String {
     match elapsed.as_secs() {
         0..60 => "less than a minute".into(),
         seconds => super::model::countdown(Duration::from_secs(seconds - seconds % 60)),
-    }
-}
-
-/// A small tooltip in the status bar's colors.
-pub(crate) struct Hint {
-    pub(crate) text: SharedString,
-    pub(crate) foreground: u32,
-    pub(crate) surface: u32,
-}
-
-impl Render for Hint {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .px(px(8.))
-            .py(px(4.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .shadow_md()
-            .text_size(px(12.))
-            .text_color(rgb(self.foreground))
-            .bg(rgb(self.surface))
-            .child(self.text.clone())
     }
 }

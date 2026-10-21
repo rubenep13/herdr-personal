@@ -55,7 +55,7 @@ impl HerdrWindow {
                 .ml(px(-2.))
                 .mr(px(-4.))
                 .h_full()
-                .tooltip(tooltip(reading, theme))
+                .tooltip(tooltip(reading, self.menu_look()))
                 .child(div().flex_none().text_color(rgb(theme.muted)).child("NET"))
                 .child(latency)
                 .children(loss),
@@ -81,18 +81,9 @@ fn graded(value: f32, warn: f32, critical: f32, theme: &Theme) -> u32 {
 
 fn tooltip(
     reading: &Reading,
-    theme: &Theme,
+    look: crate::design::MenuLook,
 ) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
-    let text = SharedString::from(details(reading));
-    let (foreground, surface) = (theme.foreground, theme.surface);
-    move |_, cx| {
-        cx.new(|_| crate::usage::Hint {
-            text: text.clone(),
-            foreground,
-            surface,
-        })
-        .into()
-    }
+    look.tooltip(details(reading))
 }
 
 pub(super) fn details(reading: &Reading) -> String {

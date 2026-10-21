@@ -409,15 +409,7 @@ impl HerdrWindow {
     }
 
     fn hint(&self, text: &'static str) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
-        let (foreground, surface) = (self.theme.foreground, self.theme.surface);
-        move |_, cx| {
-            cx.new(|_| crate::usage::Hint {
-                text: text.into(),
-                foreground,
-                surface,
-            })
-            .into()
-        }
+        self.menu_look().tooltip(text)
     }
 }
 

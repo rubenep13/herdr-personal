@@ -23,6 +23,7 @@ fn the_run_arrow_asks_to_open_the_run(cx: &mut TestAppContext) {
         theme: crate::config::Theme::default(),
         ui: config.ui.clone(),
         mono: config.terminal.clone(),
+        light: false,
     };
     let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
     let events: Rc<RefCell<Vec<Event>>> = Rc::default();

@@ -207,6 +207,7 @@ fn look() -> super::view::GraphLook {
         theme: crate::config::Theme::default(),
         ui: config.ui.clone(),
         mono: config.terminal.clone(),
+        light: false,
     }
 }
 

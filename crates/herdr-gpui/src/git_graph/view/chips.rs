@@ -11,7 +11,6 @@ use crate::{
             CHIP_GAP, CHIP_H, CHIP_PAD, CHIP_TEXT, ICON, ICON_STEP, MIN_LEADER, REFS_INSET, ROW_H,
         },
     },
-    usage::Hint,
 };
 use gpui::{prelude::*, *};
 
@@ -204,7 +203,6 @@ impl GitGraphView {
                 _ => natural,
             };
             let hint: SharedString = chip_hint(chip).into();
-            let (foreground, surface) = (theme.foreground, theme.surface);
             cell = cell.child(
                 self.chip(chip, width, lane)
                     .id(SharedString::from(format!("graph-chip-{row}-{position}")))
@@ -218,14 +216,7 @@ impl GitGraphView {
                         }
                         cx.notify();
                     }))
-                    .tooltip(move |_, cx| {
-                        cx.new(|_| Hint {
-                            text: hint.clone(),
-                            foreground,
-                            surface,
-                        })
-                        .into()
-                    }),
+                    .tooltip(self.look.view().menu().tooltip(hint)),
             );
             if self.hovered_chip == Some((row, position)) && width < natural {
                 whole = Some(
@@ -250,7 +241,6 @@ impl GitGraphView {
                 .flat_map(|(_, chip)| chip.names.iter().map(String::as_str))
                 .collect();
             let hint: SharedString = hidden.join("\n").into();
-            let (foreground, surface) = (theme.foreground, theme.surface);
             cell = cell.child(
                 div()
                     .id(SharedString::from(format!("graph-chip-more-{row}")))
@@ -264,14 +254,7 @@ impl GitGraphView {
                     .text_size(px(CHIP_TEXT))
                     .line_height(px(CHIP_H))
                     .child(format!("+{}", fit.hidden))
-                    .tooltip(move |_, cx| {
-                        cx.new(|_| Hint {
-                            text: hint.clone(),
-                            foreground,
-                            surface,
-                        })
-                        .into()
-                    }),
+                    .tooltip(self.look.view().menu().tooltip(hint)),
             );
         }
         let mut leader: Hsla = rgb(lane).into();

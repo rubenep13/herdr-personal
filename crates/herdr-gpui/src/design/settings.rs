@@ -386,10 +386,7 @@ impl SettingsLook {
             Tone::Shared => (self.accent, self.shared_fill),
             Tone::Merged => (self.merged, self.merged_fill),
             Tone::Local => (self.text, self.local_fill),
-            Tone::Status(colour) => (
-                rgb(colour),
-                rgb(mix(self.background, colour, TONE_PERCENT)),
-            ),
+            Tone::Status(colour) => (rgb(colour), rgb(mix(self.background, colour, TONE_PERCENT))),
         }
     }
 

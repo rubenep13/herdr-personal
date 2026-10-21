@@ -31,6 +31,7 @@ fn run_host_badges_stay_inside_their_column(cx: &mut TestAppContext) {
                 theme: crate::config::Theme::default(),
                 ui,
                 mono: config.terminal.clone(),
+                light: false,
             };
             let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
             let issue = item(

@@ -42,7 +42,7 @@ impl HerdrWindow {
             .items_center()
             .px(px(6.))
             .h_full()
-            .tooltip(tooltip(reading, &host, theme));
+            .tooltip(tooltip(reading, &host, self.menu_look()));
         if reading.latest().is_none() {
             // A host that never answered says so; one still starting shows nothing.
             reading.error()?;
@@ -67,18 +67,9 @@ impl HerdrWindow {
 pub(crate) fn tooltip(
     reading: &Reading,
     host: &Host,
-    theme: &Theme,
+    look: crate::design::MenuLook,
 ) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
-    let text = SharedString::from(details(reading, host));
-    let (foreground, surface) = (theme.foreground, theme.surface);
-    move |_, cx| {
-        cx.new(|_| crate::usage::Hint {
-            text: text.clone(),
-            foreground,
-            surface,
-        })
-        .into()
-    }
+    look.tooltip(details(reading, host))
 }
 
 /// `CPU ▁▃▂▅ 12%  MEM ━━─ 61%`, or `CPU 12%  MEM 61%` when compact. `glyph`

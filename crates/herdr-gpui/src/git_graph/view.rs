@@ -60,6 +60,15 @@ pub(crate) struct GraphLook {
     pub(crate) theme: Theme,
     pub(crate) ui: FontConfig,
     pub(crate) mono: FontConfig,
+    /// Whether the theme is light, which softens the panels' shadows.
+    pub(crate) light: bool,
+}
+
+impl GraphLook {
+    /// The redesigned views' pieces, at the graph's face.
+    pub(crate) fn view(&self) -> crate::design::ViewLook {
+        crate::design::ViewLook::of(&self.theme, &self.ui, self.light)
+    }
 }
 
 pub(crate) struct GitGraphView {

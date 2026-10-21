@@ -276,15 +276,9 @@ impl HerdrWindow {
                     .text_color(rgb(theme.text_on(theme.primary())))
                     .child("Add Device")
                     .when_some(unavailable, |button, reason| {
-                        let (foreground, surface) = (theme.foreground, theme.surface);
-                        button.opacity(0.5).tooltip(move |_, cx| {
-                            cx.new(|_| crate::usage::Hint {
-                                text: reason.into(),
-                                foreground,
-                                surface,
-                            })
-                            .into()
-                        })
+                        button
+                            .opacity(0.5)
+                            .tooltip(self.menu_look().tooltip(reason))
                     })
                     .when(unavailable.is_none(), |button| {
                         button

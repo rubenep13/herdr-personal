@@ -25,6 +25,7 @@ fn look() -> GraphLook {
         theme: Default::default(),
         ui: config.ui.clone(),
         mono: config.terminal.clone(),
+        light: false,
     }
 }
 

@@ -12,8 +12,7 @@ use super::{
 };
 use crate::config::{FontConfig, Theme, mix};
 use gpui::{
-    Div, ElementId, FontWeight, Pixels, Rgba, SharedString, Stateful, div, prelude::*, px, rgb,
-    svg,
+    Div, ElementId, FontWeight, Pixels, Rgba, SharedString, Stateful, div, prelude::*, px, rgb, svg,
 };
 
 /// The `[ui]` size the measures below are given at; they grow with the face.
@@ -348,9 +347,7 @@ impl ViewLook {
             .text_size(px(self.scale.name - 0.5))
             .text_color(if on { self.title } else { self.muted })
             .when(on, |segment| {
-                segment
-                    .bg(self.selection)
-                    .font_weight(FontWeight::MEDIUM)
+                segment.bg(self.selection).font_weight(FontWeight::MEDIUM)
             })
             .when(!on, |segment| {
                 segment
@@ -503,11 +500,7 @@ impl ViewLook {
 
     /// The column a list's rows sit in, kept off its sides.
     pub(crate) fn list(&self) -> Div {
-        div()
-            .min_w_0()
-            .flex()
-            .flex_col()
-            .px(self.at(LIST_INSET))
+        div().min_w_0().flex().flex_col().px(self.at(LIST_INSET))
     }
 
     /// A list's row, one line or two: rounded, filled while hovered as the
@@ -535,7 +528,9 @@ impl ViewLook {
             .whitespace_nowrap()
             .cursor_pointer()
             .text_size(px(self.scale.name))
-            .when(selected, |row| row.bg(self.selection).text_color(self.title))
+            .when(selected, |row| {
+                row.bg(self.selection).text_color(self.title)
+            })
             .when(!selected, |row| {
                 row.text_color(self.text).hover(move |row| row.bg(hover))
             })
@@ -662,10 +657,7 @@ impl ViewLook {
     /// An agent's state as the sidebar shows it: a dot in its colour, hollow
     /// at rest.
     pub(crate) fn status_dot(&self, colour: u32, hollow: bool) -> Div {
-        let dot = div()
-            .flex_none()
-            .size(self.at(STATUS_DOT))
-            .rounded_full();
+        let dot = div().flex_none().size(self.at(STATUS_DOT)).rounded_full();
         if hollow {
             dot.border(self.at(STATUS_RING)).border_color(rgb(colour))
         } else {

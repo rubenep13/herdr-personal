@@ -29,7 +29,6 @@ pub(crate) use probe::Shell;
 /// Every provider, for tests outside this module.
 #[cfg(test)]
 pub(crate) use registry::all as all_providers;
-pub(crate) use render::Hint;
 pub use settings::UsageConfig;
 
 use cookies::CookieJar;

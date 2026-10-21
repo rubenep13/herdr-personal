@@ -44,8 +44,8 @@ fn view_measures_grow_with_the_ui_size() {
 fn tones_read_on_their_wash() {
     for (theme, light) in themes() {
         let look = ViewLook::of(&theme, &font(12.), light);
-        let working = crate::sidebar::Indicators::new(None, None, light, &theme)
-            .color(AgentStatus::Working);
+        let working =
+            crate::sidebar::Indicators::new(None, None, light, &theme).color(AgentStatus::Working);
         for tone in [
             Tone::Good,
             Tone::Warn,
@@ -71,10 +71,7 @@ fn view_colours_come_from_the_theme() {
         assert_eq!(look.background(), rgb(theme.background));
         assert_eq!(look.side(), rgb(theme.surface));
         assert_eq!(look.selection(), rgb(theme.active));
-        assert_eq!(
-            look.hover(),
-            rgb(mix(theme.background, theme.active, 60))
-        );
+        assert_eq!(look.hover(), rgb(mix(theme.background, theme.active, 60)));
         assert_eq!(look.line(), rgb(theme.active));
     }
 }

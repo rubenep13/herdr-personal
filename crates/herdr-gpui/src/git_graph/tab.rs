@@ -111,6 +111,7 @@ impl HerdrWindow {
             theme: self.theme.clone(),
             ui,
             mono: self.config.terminal.clone(),
+            light: self.theme_light,
         }
     }
 

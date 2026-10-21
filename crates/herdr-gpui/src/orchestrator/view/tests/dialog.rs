@@ -25,6 +25,7 @@ fn the_dispatch_dialog_stays_within_a_short_window(cx: &mut TestAppContext) {
         theme: crate::config::Theme::default(),
         ui,
         mono: config.terminal.clone(),
+        light: false,
     };
     let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
     cx.simulate_resize(size(px(640.), px(400.)));

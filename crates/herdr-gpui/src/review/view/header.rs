@@ -102,7 +102,6 @@ impl HerdrWindow {
         on: bool,
     ) -> Stateful<Div> {
         let theme = &self.theme;
-        let (foreground, surface) = (theme.foreground, theme.surface);
         div()
             .id(name)
             .debug_selector(move || name.into())
@@ -120,14 +119,7 @@ impl HerdrWindow {
             } else {
                 theme.muted
             })))
-            .tooltip(move |_, cx| {
-                cx.new(|_| crate::usage::Hint {
-                    text: hint.into(),
-                    foreground,
-                    surface,
-                })
-                .into()
-            })
+            .tooltip(self.menu_look().tooltip(hint))
     }
 
     /// Shows the diff unified or side by side; notes and the place stay.
