@@ -85,6 +85,8 @@ impl HerdrWindow {
         let input = cx.new(SearchInput::new);
         input.update(cx, |input, cx| {
             input.set_placeholder("Find", cx);
+            // The bar's field draws the frame.
+            input.set_frameless(cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
         });
         if focus {
@@ -368,37 +370,14 @@ impl HerdrWindow {
         let surface = surface.filter(|surface| surface.popup.is_none())?;
         let pane = pane_of(surface, bar.search.pane_id())?;
         let cell_height = self.config.terminal.line_height();
-        let theme = &self.theme;
+        let look = self.view_look();
         let has_matches = bar.search.has_matches();
         let label = bar
             .search
             .error()
             .map_or_else(|| bar.search.label(), str::to_owned);
         let button = |id: &'static str, icon: &'static str, step: Option<Step>| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .flex_none()
-                .size(px(22.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded(px(crate::config::corners::CONTROL))
-                .when(step.is_none() || has_matches, |button| {
-                    button
-                        .cursor_pointer()
-                        .hover(|button| button.bg(rgba((theme.foreground << 8) | 0x14)))
-                })
-                .child(
-                    svg()
-                        .path(icon)
-                        .size(px(if step.is_none() { 12. } else { 14. }))
-                        .text_color(rgb(if step.is_none() || has_matches {
-                            theme.foreground
-                        } else {
-                            theme.muted
-                        })),
-                )
+            look.icon_button(id, id.into(), icon, false, step.is_none() || has_matches)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_click(cx.listener(move |this, _, window, cx| {
                     cx.stop_propagation();
@@ -408,6 +387,16 @@ impl HerdrWindow {
                     }
                 }))
         };
+        let count = div()
+            .debug_selector(|| "find-count".into())
+            .flex_none()
+            .text_size(px(look.scale().secondary))
+            .text_color(if bar.search.error().is_some() {
+                look.settings().danger()
+            } else {
+                look.muted()
+            })
+            .child(label);
         Some(
             div()
                 .absolute()
@@ -418,38 +407,29 @@ impl HerdrWindow {
                 .justify_end()
                 .p(px(6.))
                 .child(
-                    div()
+                    look.menu()
+                        .panel(div())
                         .id("find-bar")
                         .debug_selector(|| "find-bar".into())
                         .occlude()
                         .min_w_0()
-                        .w(px(320.))
+                        .w(px(BAR_WIDTH))
                         .flex_shrink(1.)
                         .flex()
                         .items_center()
-                        .gap(px(4.))
-                        .p(px(4.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .bg(rgb(theme.surface))
-                        .text_color(rgb(theme.foreground))
-                        .text_size(px(self.config.ui.size))
-                        .shadow_md()
+                        .gap(look.at(2.))
+                        .p(look.at(4.))
+                        // The menus' panel in small.
+                        .rounded(look.at(SMALL_PANEL_RADIUS))
+                        .text_size(px(look.scale().name))
                         .on_key_down(cx.listener(Self::find_key_down))
                         .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
-                        .child(div().flex_1().min_w_0().child(bar.input.clone()))
                         .child(
-                            div()
-                                .debug_selector(|| "find-count".into())
-                                .flex_none()
-                                .px(px(4.))
-                                .text_color(rgb(if bar.search.error().is_some() {
-                                    theme.ink(theme.palette[1])
-                                } else {
-                                    theme.muted
-                                }))
-                                .child(label),
+                            look.field("find-field".into(), false, Some("icons/search.svg"))
+                                .flex_1()
+                                .flex_shrink(1.)
+                                .child(div().flex_1().min_w_0().child(bar.input.clone()))
+                                .child(count),
                         )
                         .child(button(
                             "find-older",
@@ -466,6 +446,10 @@ impl HerdrWindow {
         )
     }
 }
+
+/// The find bar's width, and the small panels' corners at `[ui] size = 12`.
+const BAR_WIDTH: f32 = 320.;
+pub(super) const SMALL_PANEL_RADIUS: f32 = 10.;
 
 fn pane_of<'a>(surface: &'a PaneSurfaceFrame, pane_id: &str) -> Option<&'a PaneSurfacePane> {
     surface.panes.iter().find(|pane| pane.pane_id == pane_id)

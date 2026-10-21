@@ -224,6 +224,8 @@ impl HerdrWindow {
         let input = cx.new(SearchInput::new);
         input.update(cx, |input, cx| {
             input.set_placeholder("Search", cx);
+            // The badge's field draws the frame.
+            input.set_frameless(cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
             if !query.is_empty() {
                 input.replace_text_in_range(None, query, window, cx);
@@ -473,7 +475,7 @@ impl HerdrWindow {
         let pane = pane_of(Some(surface), state.mode.pane_id())?;
         let cell_height = self.config.terminal.line_height();
         let rect = pane.rect;
-        let theme = &self.theme;
+        let look = self.view_look();
         let bottom = f32::from(rect.y.saturating_add(rect.height)) * cell_height;
         let corner = div()
             .absolute()
@@ -482,6 +484,14 @@ impl HerdrWindow {
             .flex()
             .justify_end()
             .px(px(6.));
+        // Both are the menus' panel in small, as the find bar is.
+        let small_panel = || {
+            look.menu()
+                .panel(div())
+                .rounded(look.at(super::find::SMALL_PANEL_RADIUS))
+                .text_size(px(look.scale().name))
+                .text_color(look.title())
+        };
         if let Some(prompt) = &state.prompt {
             let marker = match prompt.direction {
                 SearchDirection::Forward => "/",
@@ -489,7 +499,7 @@ impl HerdrWindow {
             };
             return Some(
                 corner.top(px(bottom - 44.)).child(
-                    div()
+                    small_panel()
                         .id("copy-search")
                         .debug_selector(|| "copy-search".into())
                         .occlude()
@@ -498,18 +508,15 @@ impl HerdrWindow {
                         .flex_shrink(1.)
                         .flex()
                         .items_center()
-                        .gap(px(4.))
-                        .p(px(4.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .bg(rgb(theme.surface))
-                        .text_color(rgb(theme.foreground))
-                        .text_size(px(self.config.ui.size))
-                        .shadow_md()
+                        .p(look.at(4.))
                         .on_key_down(cx.listener(Self::copy_search_key_down))
-                        .child(div().flex_none().px(px(4.)).child(marker))
-                        .child(div().flex_1().min_w_0().child(prompt.input.clone())),
+                        .child(
+                            look.field("copy-search-field".into(), false, None)
+                                .flex_1()
+                                .flex_shrink(1.)
+                                .child(div().flex_none().text_color(look.muted()).child(marker))
+                                .child(div().flex_1().min_w_0().child(prompt.input.clone())),
+                        ),
                 ),
             );
         }
@@ -519,18 +526,14 @@ impl HerdrWindow {
         );
         Some(
             corner.top(px(bottom - 32.)).child(
-                div()
+                small_panel()
                     .debug_selector(|| "copy-mode".into())
                     .min_w_0()
                     .overflow_hidden()
                     .whitespace_nowrap()
                     .text_ellipsis()
-                    .px(px(8.))
-                    .py(px(2.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.palette[3]))
-                    .text_color(rgb(theme.text_on(theme.palette[3])))
-                    .text_size(px(self.config.ui.size))
+                    .px(look.at(10.))
+                    .py(look.at(3.))
                     .child(label),
             ),
         )

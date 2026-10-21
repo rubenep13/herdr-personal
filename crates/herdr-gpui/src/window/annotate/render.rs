@@ -1,5 +1,8 @@
 use super::*;
-use crate::{config::corners, fonts::StyledFont};
+use crate::{
+    design::{ButtonKind, Header},
+    fonts::StyledFont,
+};
 
 /// Prefer just below the selection, flip above it at the bottom edge, and
 /// clamp to the pane. Both the pill and composer use these same coordinates.
@@ -92,9 +95,14 @@ impl HerdrWindow {
         };
         let bounds = placement(pane_bounds, anchor, desired);
         let theme = &self.theme;
+        let look = self.view_look();
+        let hover = look.hover();
         let content = match composer {
             Some(composer) => self.terminal_note_card(composer, cx),
-            None => div()
+            // The menus' panel in small, as the find bar's.
+            None => look
+                .menu()
+                .panel(div())
                 .id("terminal-annotate")
                 .debug_selector(|| "terminal-annotate".into())
                 .occlude()
@@ -102,13 +110,11 @@ impl HerdrWindow {
                 .flex()
                 .items_center()
                 .justify_center()
-                .gap_2()
-                .px_3()
-                .rounded_full()
-                .shadow_md()
-                .bg(rgb(theme.surface))
+                .gap(look.at(8.))
+                .px(look.at(12.))
+                .rounded(look.at(crate::window::find::SMALL_PANEL_RADIUS))
                 .cursor_pointer()
-                .hover(|style| style.bg(rgb(theme.active)))
+                .hover(move |style| style.bg(hover))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
@@ -123,7 +129,7 @@ impl HerdrWindow {
                         .path("icons/note.svg")
                         .flex_none()
                         .size(px(16.))
-                        .text_color(rgb(theme.subtext())),
+                        .text_color(look.muted()),
                 )
                 .child(div().min_w_0().truncate().child("Annotate")),
         };
@@ -143,7 +149,8 @@ impl HerdrWindow {
     }
 
     fn terminal_note_card(&self, composer: &Composer, cx: &mut Context<Self>) -> Stateful<Div> {
-        let theme = &self.theme;
+        let look = self.view_look();
+        let dialog = look.dialog();
         let queued = self.terminal_notes.queued.len();
         let hint = if queued > 0 {
             format!("{queued} queued · Enter to send")
@@ -152,130 +159,86 @@ impl HerdrWindow {
         } else {
             "Enter to send".into()
         };
-        let button = |id: &'static str, label: &'static str, primary: bool| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .flex_none()
-                .px_3()
-                .py_1p5()
-                .rounded_full()
-                .cursor_pointer()
-                .when(primary, |button| {
-                    button
-                        .bg(rgb(theme.primary()))
-                        .text_color(rgb(theme.text_on(theme.primary())))
-                })
-                .when(!primary, |button| {
-                    button
-                        .text_color(rgb(theme.subtext()))
-                        .hover(|s| s.bg(rgb(theme.active)))
-                })
-                .child(label)
-        };
-        div()
+        let close = look
+            .menu()
+            .close_button("terminal-note-cancel")
+            .on_click(cx.listener(|this, _, window, cx| this.close_terminal_note(window, cx)));
+        look.menu()
+            .panel(div())
             .id("terminal-note")
             .debug_selector(|| "terminal-note".into())
             .occlude()
             .size_full()
             .overflow_y_scroll()
-            .rounded(px(corners::CONTROL))
-            .bg(rgb(theme.surface))
-            .shadow_xl()
             .on_key_down(cx.listener(Self::terminal_note_key_down))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
             .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
             .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
+            .child(dialog.header(
+                Header {
+                    selector: "terminal-note-header",
+                    icon: "icons/note.svg",
+                    title: ("terminal-note-title", "Note to agent"),
+                    sub: None,
+                    danger: false,
+                },
+                close,
+            ))
             .child(
                 div()
                     .flex()
                     .flex_col()
-                    .gap_3()
-                    .p(px(14.))
+                    .gap(look.at(10.))
+                    .p(look.at(12.))
                     .child(
-                        div()
-                            .flex_none()
-                            .h(px(24.))
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .child(
-                                svg()
-                                    .path("icons/note.svg")
-                                    .flex_none()
-                                    .size(px(16.))
-                                    .text_color(rgb(theme.subtext())),
-                            )
-                            .child(
-                                div()
-                                    .debug_selector(|| "terminal-note-title".into())
-                                    .flex_1()
-                                    .min_w_0()
-                                    .truncate()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Note to agent"),
-                            )
-                            .child(
-                                div()
-                                    .id("terminal-note-cancel")
-                                    .debug_selector(|| "terminal-note-cancel".into())
-                                    .flex_none()
-                                    .size(px(24.))
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .rounded_full()
-                                    .cursor_pointer()
-                                    .hover(|style| style.bg(rgb(theme.active)))
-                                    .child(
-                                        svg()
-                                            .path("icons/close.svg")
-                                            .size(px(13.))
-                                            .text_color(rgb(theme.subtext())),
-                                    )
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.close_terminal_note(window, cx)
-                                    })),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .debug_selector(|| "terminal-note-input".into())
-                            .flex_none()
+                        look.settings()
+                            .field("terminal-note-input".into(), true)
                             .min_w_0()
-                            .p_3()
-                            .rounded(px(corners::CONTROL))
-                            .bg(rgb(theme.background))
-                            .child(composer.input.clone()),
+                            .child(div().flex_1().min_w_0().child(composer.input.clone())),
                     )
                     .child(
                         div()
                             .flex_none()
-                            .h(px(32.))
                             .flex()
                             .items_center()
-                            .gap_1()
+                            .gap(look.at(6.))
                             .child(
                                 div()
                                     .debug_selector(|| "terminal-note-hint".into())
                                     .flex_1()
                                     .min_w_0()
                                     .truncate()
-                                    .text_size(px(11.))
-                                    .text_color(rgb(theme.subtext()))
+                                    .text_size(px(look.scale().detail))
+                                    .text_color(look.muted())
                                     .child(hint),
                             )
-                            .child(button("terminal-note-queue", "Queue", false).on_click(
-                                cx.listener(|this, _, window, cx| {
-                                    this.add_terminal_note(false, window, cx)
-                                }),
-                            ))
-                            .child(button("terminal-note-send", "Send", true).on_click(
-                                cx.listener(|this, _, window, cx| {
-                                    this.add_terminal_note(true, window, cx)
-                                }),
-                            )),
+                            .child(
+                                look.button(
+                                    "terminal-note-queue",
+                                    "terminal-note-queue".into(),
+                                    None,
+                                    "Queue",
+                                    ButtonKind::Normal,
+                                    true,
+                                )
+                                .on_click(cx.listener(
+                                    |this, _, window, cx| this.add_terminal_note(false, window, cx),
+                                )),
+                            )
+                            .child(
+                                look.button(
+                                    "terminal-note-send",
+                                    "terminal-note-send".into(),
+                                    None,
+                                    "Send",
+                                    ButtonKind::Primary,
+                                    true,
+                                )
+                                .on_click(cx.listener(
+                                    |this, _, window, cx| this.add_terminal_note(true, window, cx),
+                                )),
+                            ),
                     ),
             )
     }
