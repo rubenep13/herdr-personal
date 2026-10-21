@@ -159,20 +159,18 @@ fn workspace_dialog_sections_and_buttons_stay_inside_the_panel(cx: &mut gpui::Te
             assert_eq!(field.right(), subject.right());
             assert!(cancel.right() <= submit.left());
             assert!(submit.right() < panel.right());
-            // A short window scrolls the new worktree form above its footer,
-            // so the daemon's answer may sit below the fold until scrolled to.
-            if height > 400. {
-                assert!(error.bottom() <= cancel.top());
-            } else if action == WorkspaceAction::NewWorktree {
-                let form = cx.debug_bounds("new-worktree-form").unwrap();
-                assert!(form.bottom() <= cancel.top(), "{form:?} over {cancel:?}");
-            } else {
-                assert!(error.bottom() <= cancel.top());
-            }
+            assert!(error.bottom() <= cancel.top());
             // The checkout follows the branch it is derived from, and the
             // daemon's answer follows whichever one the dialog is about.
             assert!(field.bottom() <= subject.top() || field == subject);
-            assert!(subject.bottom() <= error.top());
+            // The new worktree form scrolls above the daemon's answer, which
+            // sits outside it; in a short window the preview may scroll.
+            if action == WorkspaceAction::NewWorktree {
+                let form = cx.debug_bounds("new-worktree-form").unwrap();
+                assert!(form.bottom() <= error.top() + px(1.), "{form:?} {error:?}");
+            } else {
+                assert!(subject.bottom() <= error.top());
+            }
         }
     }
 }

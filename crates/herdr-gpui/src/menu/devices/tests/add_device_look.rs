@@ -61,3 +61,46 @@ fn add_device_has_a_cross_and_a_compact_rail(cx: &mut gpui::TestAppContext) {
     let rail = cx.debug_bounds("add-device-rail").unwrap();
     assert!(rail.size.width <= px(52.), "{rail:?}");
 }
+
+#[gpui::test]
+fn add_device_fields_wear_the_dialogs_frame(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = open(900., cx);
+    view.read_with(cx, |view, cx| {
+        for field in &view.menu.device_setup.as_ref().unwrap().fields {
+            assert_eq!(field.read(cx).frame(), crate::search_input::Frame::Field);
+        }
+    });
+}
+
+#[cfg(feature = "boat")]
+#[gpui::test]
+fn a_cloud_source_ends_in_the_shared_footer(cx: &mut gpui::TestAppContext) {
+    let (_, cx) = open(900., cx);
+    let boat = cx.debug_bounds("add-device-source-boat").unwrap();
+    cx.simulate_click(boat.center(), Modifiers::default());
+    draw(cx);
+    let footer = cx.debug_bounds("cloud-setup-footer").unwrap();
+    let settings = cx.debug_bounds("cloud-setup-settings").unwrap();
+    assert!(
+        footer.contains(&settings.center()),
+        "{settings:?} in {footer:?}"
+    );
+    assert_eq!(settings.size.height, px(30.));
+}
+
+#[cfg(feature = "coder")]
+#[gpui::test]
+fn coder_signs_out_and_errs_in_the_shared_pieces(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = cx.add_window_view(fixture_window);
+    cx.simulate_resize(size(px(900.), px(760.)));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_coder_fixture(window, cx);
+            view.menu.coder.as_mut().unwrap().error = Some("Coder refused the token".into());
+        })
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("coder-setup-error").is_some());
+    let sign_out = cx.debug_bounds("coder-sign-out").unwrap();
+    assert_eq!(sign_out.size.height, px(26.));
+}

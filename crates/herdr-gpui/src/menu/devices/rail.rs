@@ -401,19 +401,16 @@ impl HerdrWindow {
             }
             _ => format!("{}.", crate::cloud::offer(provider)),
         };
+        let look = self.dialog_look();
         let pane = div()
             .flex_1()
             .min_h_0()
             .flex()
             .flex_col()
             .child(
-                div()
+                look.body("cloud-setup-body")
                     .flex_1()
                     .min_h_0()
-                    .p(px(16.))
-                    .flex()
-                    .flex_col()
-                    .gap(px(12.))
                     .child(
                         div()
                             .flex()
@@ -426,39 +423,38 @@ impl HerdrWindow {
                                     .size(px(24.))
                                     .text_color(rgb(theme.foreground)),
                             )
-                            .child(div().font_weight(FontWeight::SEMIBOLD).child(name)),
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_size(px(look.settings().scale().name))
+                                    .text_color(rgb(theme.foreground))
+                                    .child(name),
+                            ),
                     )
-                    .child(div().text_color(rgb(theme.subtext())).child(text))
-                    .children(self.menu.error.clone().map(|error| {
-                        div()
-                            .debug_selector(|| "cloud-setup-error".into())
-                            .text_color(super::super::danger(theme))
-                            .child(error)
-                    })),
+                    .child(look.lead("cloud-setup-text", text))
+                    .children(
+                        self.menu
+                            .error
+                            .clone()
+                            .map(|error| look.error("cloud-setup-error".into(), error)),
+                    ),
             )
             .child(
-                div()
-                    .flex_none()
-                    .p(px(16.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .flex()
-                    .justify_end()
-                    .child(
-                        div()
-                            .id("cloud-setup-settings")
-                            .debug_selector(|| "cloud-setup-settings".into())
-                            .p(px(8.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .bg(rgb(theme.active))
-                            .cursor_pointer()
-                            .hover(|s| {
-                                s.bg(rgb(theme.active).blend(rgba((theme.foreground << 8) | 0x20)))
-                            })
-                            .child("Open Settings…")
-                            .on_click(cx.listener(move |this, _, window, cx| {
+                look.footer("cloud-setup-footer")
+                    .hint("Esc", "cancel")
+                    .hint("↵", "open")
+                    .button(
+                        look.button(
+                            "cloud-setup-settings",
+                            "Open Settings…",
+                            crate::design::ButtonKind::Primary,
+                            true,
+                        )
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
                                 this.open_provider_settings(provider, window, cx);
-                            })),
+                            },
+                        )),
                     ),
             );
         self.add_device_frame("cloud-setup-dialog", "cloud-setup-close", compact, pane, cx)

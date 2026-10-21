@@ -239,17 +239,28 @@ impl HerdrWindow {
         if self.menu.input.is_some() && action != WorkspaceAction::NewWorktree {
             body = body.child(self.render_dialog_input(window, cx));
         }
-        if let Some(error) = &self.menu.error {
-            body = body.child(look.error("dialog-error".into(), error.clone()));
-        }
-        if creating || removing {
-            // Dismissing only closes the panel; the daemon keeps the queued work.
+        let error = self
+            .menu
+            .error
+            .as_ref()
+            .map(|error| look.error("dialog-error".into(), error.clone()));
+        // Dismissing only closes the panel; the daemon keeps the queued work.
+        let waiting = (creating || removing).then(|| {
             let waiting = match self.dispatch_job.as_ref().filter(|_| dispatching) {
                 Some(job) => format!("{} Dismissing does not cancel it.", job.status()),
                 None => "Waiting for the daemon. Dismissing does not cancel it.".to_owned(),
             };
-            body = body.child(look.note("dialog-waiting".into(), NoteTone::Info, waiting));
-        }
+            look.note("dialog-waiting".into(), NoteTone::Info, waiting)
+        });
+        // The new worktree form scrolls inside a fixed height, so the daemon's
+        // answer sits under it, above the footer, where no scroll hides it.
+        let under_form = action == WorkspaceAction::NewWorktree;
+        let (error, waiting) = if under_form {
+            (error, waiting)
+        } else {
+            body = body.children(error).children(waiting);
+            (None, None)
+        };
         // A picker owns the panel's height, so its list scrolls inside the
         // dialog instead of growing it past the window.
         let listing = action == WorkspaceAction::OpenWorktree || self.worktree_listing();
@@ -341,14 +352,34 @@ impl HerdrWindow {
                 // The branch form shares the listings' settled height, so it
                 // fills the space above the footer and scrolls within it.
                 div()
-                    .id("new-worktree-form")
-                    .debug_selector(|| "new-worktree-form".into())
                     .flex()
                     .flex_col()
                     .flex_1()
                     .min_h_0()
-                    .overflow_y_scroll()
-                    .child(body)
+                    .child(
+                        div()
+                            .id("new-worktree-form")
+                            .debug_selector(|| "new-worktree-form".into())
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_h_0()
+                            .overflow_y_scroll()
+                            .child(body),
+                    )
+                    .when(error.is_some() || waiting.is_some(), |column| {
+                        column.child(
+                            div()
+                                .flex_none()
+                                .flex()
+                                .flex_col()
+                                .gap(look.at(8.))
+                                .px(look.at(16.))
+                                .pb(look.at(12.))
+                                .children(error)
+                                .children(waiting),
+                        )
+                    })
                     .into_any_element()
             } else {
                 body.into_any_element()

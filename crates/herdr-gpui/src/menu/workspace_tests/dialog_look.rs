@@ -153,3 +153,43 @@ fn buttons_stay_inside_a_small_window(cx: &mut TestAppContext) {
         );
     }
 }
+
+#[gpui::test]
+fn a_new_worktree_error_stays_in_view_in_a_small_window(cx: &mut TestAppContext) {
+    let (view, cx) = open_dialog("w3", WorkspaceAction::NewWorktree, (480., 400., 12.), cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.menu.error = Some("The daemon refused to create the worktree. ".repeat(3));
+        })
+    });
+    redraw(cx);
+    let form = cx.debug_bounds("new-worktree-form").unwrap();
+    let error = cx.debug_bounds("dialog-error").unwrap();
+    let footer = cx.debug_bounds("dialog-footer").unwrap();
+    // Outside the scrolling form, so no scroll is needed to read it.
+    assert!(
+        error.top() >= form.bottom() - px(1.),
+        "{error:?} under {form:?}"
+    );
+    assert!(
+        error.bottom() <= footer.top() + px(1.),
+        "{error:?} over {footer:?}"
+    );
+}
+
+#[gpui::test]
+fn the_archive_script_check_is_a_note(cx: &mut TestAppContext) {
+    let (view, cx) = open_dialog("w4", WorkspaceAction::DeleteWorktree, (800., 600., 12.), cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.menu.deletion = Some(Deletion {
+                path: Some("/endpoint/.herdr/worktrees/agent-launcher/child".into()),
+                archive: ArchiveCheck::Reading,
+                ..Deletion::new(None, true)
+            });
+        })
+    });
+    redraw(cx);
+    assert!(cx.debug_bounds("dialog-archive-script").is_some());
+    assert!(cx.debug_bounds("dialog-archive-script-icon").is_some());
+}

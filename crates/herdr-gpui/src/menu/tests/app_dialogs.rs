@@ -67,3 +67,19 @@ fn about_keeps_its_ok_button_last(cx: &mut TestAppContext) {
     );
     assert_eq!(ok.size.height, px(30.));
 }
+
+#[gpui::test]
+fn the_update_preview_reads_as_a_note(cx: &mut TestAppContext) {
+    let (view, cx) = cx.add_window_view(crate::sidebar::layout_tests::fixture_window);
+    cx.simulate_resize(size(px(900.), px(700.)));
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_app_update(false, window, cx);
+            view.update_preview = Some(crate::updater::State::Idle);
+            cx.notify();
+        });
+        window.draw(cx).clear(cx);
+    });
+    assert!(cx.debug_bounds("app-update-preview").is_some());
+    assert!(cx.debug_bounds("app-update-preview-note-icon").is_some());
+}

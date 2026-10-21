@@ -338,13 +338,14 @@ impl HerdrWindow {
                     ))
                     .when(self.update_preview.is_some(), |body| {
                         body.child(
-                            div()
-                                .debug_selector(|| "app-update-preview".into())
-                                .p(px(12.))
-                                .rounded(px(crate::config::corners::CONTROL))
-                                .bg(rgb(theme.background))
+                            look.well("app-update-preview".into(), None)
+                                .flex()
+                                .flex_col()
+                                .gap(px(4.))
                                 .child(div().font_weight(FontWeight::SEMIBOLD).child("QA preview"))
-                                .child(div().pt(px(4.)).text_color(rgb(theme.subtext())).child(
+                                .child(look.note(
+                                    "app-update-preview-note".into(),
+                                    crate::design::NoteTone::Info,
                                     "Synthetic update state only. No network or installation is performed. Close or Escape dismisses this preview.",
                                 )),
                         )

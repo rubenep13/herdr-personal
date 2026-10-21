@@ -344,6 +344,7 @@ impl DialogLook {
             NoteTone::Done => "icons/check.svg",
         };
         let ink = self.note_ink(tone);
+        let mark = self.mark(format!("{selector}-icon"), icon, ink);
         div()
             .debug_selector(move || selector)
             .min_w_0()
@@ -352,12 +353,13 @@ impl DialogLook {
             .gap(self.at(NOTE_GAP))
             .text_size(px(self.scale.name - 0.5))
             .text_color(ink)
-            .child(self.mark(icon, ink))
+            .child(mark)
             .child(div().flex_1().min_w_0().child(text.into()))
     }
 
     /// What went wrong, in full, in a box washed with the danger red.
     pub(crate) fn error(&self, selector: String, text: impl Into<SharedString>) -> Div {
+        let mark = self.mark(format!("{selector}-icon"), "icons/alert.svg", self.danger);
         div()
             .debug_selector(move || selector)
             .min_w_0()
@@ -370,13 +372,14 @@ impl DialogLook {
             .bg(self.error_fill())
             .text_size(px(self.scale.name - 0.5))
             .text_color(self.danger)
-            .child(self.mark("icons/alert.svg", self.danger))
+            .child(mark)
             .child(div().flex_1().min_w_0().child(text.into()))
     }
 
     /// A note's or an error's icon, lowered to sit on its first line.
-    fn mark(&self, icon: &'static str, ink: Rgba) -> gpui::Svg {
+    fn mark(&self, selector: String, icon: &'static str, ink: Rgba) -> gpui::Svg {
         svg()
+            .debug_selector(move || selector)
             .path(icon)
             .size(self.at(NOTE_ICON))
             .flex_none()

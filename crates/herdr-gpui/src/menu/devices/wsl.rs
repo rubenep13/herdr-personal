@@ -51,6 +51,7 @@ impl HerdrWindow {
         let session = cx.new(SearchInput::new);
         session.update(cx, |input, cx| {
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            input.set_frame(crate::search_input::Frame::Field, cx);
             input.set_placeholder("default", cx);
         });
         window.focus(&session.read(cx).focus.clone(), cx);

@@ -472,12 +472,9 @@ impl HerdrWindow {
             body = body
                 .child(div().mb(px(12.)).child("1. Copy your one-time code"))
                 .child(
-                    div()
+                    self.dialog_look()
+                        .well("github-code".into(), None)
                         .p(px(16.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .bg(rgb(theme.background))
                         .child(
                             div().id("github-code-scroll").overflow_x_scroll().child(
                                 div()
@@ -518,20 +515,16 @@ impl HerdrWindow {
         if let Some(field) = self.render_github_token() {
             body = body.child(field);
         } else if !auth.connected() || auth.failed {
-            body = body.child(
-                div()
-                    .debug_selector(|| "github-status".into())
-                    .mt(px(16.))
-                    .p(px(10.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.background))
-                    .text_color(rgb(if auth.failed {
-                        theme.ink(theme.palette[1])
-                    } else {
-                        theme.muted
-                    }))
-                    .child(message),
-            );
+            let look = self.dialog_look();
+            body = body.child(div().mt(px(16.)).child(if auth.failed {
+                look.error("github-status".into(), message)
+            } else {
+                look.note(
+                    "github-status".into(),
+                    crate::design::NoteTone::Info,
+                    message,
+                )
+            }));
         }
         if let Some(note) = auth
             .profile

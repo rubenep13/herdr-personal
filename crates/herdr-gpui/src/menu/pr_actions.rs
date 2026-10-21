@@ -265,6 +265,7 @@ impl HerdrWindow {
     pub(super) fn render_pr_review(&self, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
         let look = self.menu_look();
+        let hover = look.line();
         let mut body = div()
             .id("pr-review-body")
             .debug_selector(|| "pr-review-body".into())
@@ -300,6 +301,11 @@ impl HerdrWindow {
                 body.child(
                     div()
                         .debug_selector(|| "pr-review-check".into())
+                        // A menu's row: its height, inset and rounded fill.
+                        .h(px(look.row_height()))
+                        .px(look.at(10.))
+                        .rounded(px(crate::design::SELECTION_RADIUS))
+                        .hover(move |row| row.bg(hover))
                         .flex()
                         .items_center()
                         .gap(px(8.))
@@ -337,7 +343,10 @@ impl HerdrWindow {
                     .child("Loading comments..."),
             );
         } else if let Some(error) = self.pr_actions.comments_error() {
-            body = body.child(div().text_color(danger(theme)).child(error.to_owned()));
+            body = body.child(
+                self.dialog_look()
+                    .error("pr-review-error".into(), error.to_owned()),
+            );
         } else if let Some(comments) = self.pr_actions.comments() {
             if comments.is_empty() {
                 body = body.child(div().text_color(rgb(theme.muted)).child("No comments yet"));

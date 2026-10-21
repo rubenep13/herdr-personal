@@ -144,6 +144,7 @@ impl HerdrWindow {
             let input = cx.new(SearchInput::new);
             input.update(cx, |input, cx| {
                 input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+                input.set_frame(crate::search_input::Frame::Field, cx);
                 input.set_placeholder(
                     ["user@hostname or SSH alias", "The SSH target", "default"][index],
                     cx,

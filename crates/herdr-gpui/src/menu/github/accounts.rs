@@ -206,6 +206,7 @@ impl HerdrWindow {
             input.set_masked(true, cx);
             input.set_placeholder("github_pat_… or ghp_…", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            input.set_frame(crate::search_input::Frame::Field, cx);
             window.focus(&input.focus, cx);
         });
         self.menu.github_token = Some(input);
