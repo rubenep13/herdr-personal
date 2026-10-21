@@ -624,23 +624,27 @@ impl GitGraphView {
     }
 
     fn render_message(&self, title: &str, detail: Option<String>) -> AnyElement {
-        let theme = &self.look.theme;
+        let view = self.look.view();
         div()
             .id("graph-message")
             .flex_1()
             .flex()
-            .flex_col()
-            .items_center()
-            .justify_center()
-            .gap_2()
             .child(
-                div()
-                    .text_color(rgb(theme.foreground))
-                    .child(title.to_owned()),
+                view.empty(
+                    "graph-message-title",
+                    Some("icons/git-graph.svg"),
+                    title.to_owned(),
+                )
+                .when_some(detail, |el, detail| {
+                    el.child(
+                        div()
+                            .text_center()
+                            .text_size(px(view.scale().secondary))
+                            .text_color(view.muted())
+                            .child(detail),
+                    )
+                }),
             )
-            .when_some(detail, |el, detail| {
-                el.child(div().text_color(rgb(theme.muted)).child(detail))
-            })
             .into_any_element()
     }
 }
@@ -652,8 +656,9 @@ impl Focusable for GitGraphView {
 }
 
 impl Render for GitGraphView {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = &self.look.theme;
+        let view = self.look.view();
         let body = match (&self.history, &self.error) {
             (None, Some(error)) => self.render_message(
                 &error_title(error, self.remote.as_deref()),
@@ -677,24 +682,15 @@ impl Render for GitGraphView {
                 .flex()
                 .flex_col()
                 .when_some(error.clone(), |el, error| {
-                    el.child(
-                        div()
-                            .debug_selector(|| "graph-banner".to_owned())
-                            .flex_none()
-                            .px_3()
-                            .py_1()
-                            .text_size(px(12.5))
-                            .bg(rgb(crate::config::mix(
-                                theme.background,
-                                theme.ink(theme.palette[3]),
-                                14,
-                            )))
-                            .text_color(rgb(theme.foreground))
-                            .child(format!(
+                    el.child(div().flex_none().px(view.at(12.)).py(view.at(8.)).child(
+                        view.dialog().warning(
+                            "graph-banner".to_owned(),
+                            format!(
                                 "{} \u{2014} r reloads",
                                 error_title(&error, self.remote.as_deref())
-                            )),
-                    )
+                            ),
+                        ),
+                    ))
                 })
                 .child(self.render_columns(cx))
                 .child(
@@ -718,9 +714,10 @@ impl Render for GitGraphView {
                 )
                 .into_any_element(),
         };
-        let bar = self.render_bar(cx);
+        let searching = self.search_input.read(cx).focus.is_focused(window);
+        let bar = self.render_bar(searching, cx);
         let panel = self.render_panel(cx);
-        let results = self.render_results(header::BAR_H, cx);
+        let results = self.render_results(f32::from(view.at(header::BAR_H)), cx);
         let help = self.render_help(cx);
         let width = self.width.clone();
         let measure = canvas(

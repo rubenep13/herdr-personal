@@ -27,7 +27,6 @@ pub(crate) const MESSAGE_MIN: f32 = 220.;
 pub(crate) const AUTHOR_W: f32 = 150.;
 pub(crate) const DATE_W: f32 = 118.;
 pub(crate) const SHA_W: f32 = 78.;
-pub(crate) const HEADER_H: f32 = 26.;
 
 /// Branch labels: height, padding each side, text size, icon size and the
 /// room an icon takes.

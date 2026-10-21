@@ -32,7 +32,13 @@ fn question_mark_shows_every_shortcut(cx: &mut TestAppContext) {
     assert!(drawn(cx, "graph-help"));
     for row in 0..SHORTCUTS.len() {
         assert!(drawn(cx, &format!("graph-help-row-{row}")), "row {row}");
+        // Each key is drawn as a key.
+        assert!(
+            drawn(cx, &format!("graph-help-row-{row}-key-0")),
+            "row {row}"
+        );
     }
+    assert!(drawn(cx, "graph-help-header"));
     cx.simulate_keystrokes("escape");
     draw(cx);
     assert!(!drawn(cx, "graph-help"));

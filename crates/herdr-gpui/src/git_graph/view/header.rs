@@ -5,19 +5,29 @@
 use super::GitGraphView;
 use crate::{
     browser::checkout_name,
-    config::mix,
+    design::Tone,
     git_graph::{
-        geometry::{AUTHOR_W, DATE_W, HEADER_H, MESSAGE_MIN, REFS_DEFAULT, SHA_W},
+        geometry::{MESSAGE_MIN, REFS_DEFAULT},
         prefs::{GraphPrefs, GraphPrefsStore},
     },
     panel_resize::RESIZE_HOVER,
 };
 use gpui::{prelude::*, *};
 
-/// The top bar's height.
+/// The top bar's height, at the graph's `[ui]`-sized face of 12.
 pub(super) const BAR_H: f32 = 40.;
 /// How wide a column's grabbable edge is.
 const EDGE: f32 = 6.;
+/// The refs column's heading starts past the labels' inset.
+const REFS_INSET: f32 = 16.;
+/// The gear's button, the menu's least width and the room it keeps from
+/// the heading's edge.
+const GEAR: f32 = 22.;
+const MENU_WIDTH: f32 = 180.;
+const MENU_OFFSET: f32 = 6.;
+const CHECKBOX: f32 = 16.;
+/// The column headings' height, as every list's.
+const COLUMNS_H: f32 = 28.;
 
 /// A column whose right edge is being dragged.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,70 +77,40 @@ impl GitGraphView {
         (name.to_owned(), branch)
     }
 
-    pub(super) fn render_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_bar(&self, searching: bool, cx: &mut Context<Self>) -> AnyElement {
         let theme = &self.look.theme;
+        let view = self.look.view();
         let (name, branch) = self.repository_and_branch();
-        let button = |id: &'static str, icon: &'static str, enabled: bool| {
-            div()
-                .id(id)
-                .debug_selector(move || id.to_owned())
-                .flex_none()
-                .size(px(28.))
-                .rounded(px(4.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .when(enabled, |el| {
-                    el.cursor_pointer()
-                        .hover(|style| style.bg(rgb(theme.active)))
-                })
-                .child(svg().size(px(14.)).path(icon).text_color(rgb(if enabled {
-                    theme.subtext()
-                } else {
-                    theme.muted
-                })))
-        };
         let live = match self.liveness() {
             super::Liveness::Live => theme.ink(theme.palette[2]),
             super::Liveness::Reconnecting => theme.ink(theme.palette[3]),
             super::Liveness::Offline => theme.muted,
         };
-        div()
-            .debug_selector(|| "graph-bar".to_owned())
-            .flex_none()
-            .h(px(BAR_H))
-            .px_3()
-            .flex()
-            .items_center()
-            .gap_2()
-            .bg(rgb(theme.surface))
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .line_height(px(BAR_H))
-            .child(
-                div()
-                    .flex_none()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(theme.foreground))
-                    .child(name),
-            )
+        view.bar("graph-bar")
+            .child(view.bar_title(Some("icons/git-graph.svg"), name, None))
             .when_some(branch, |bar, branch| {
                 bar.child(
                     div()
                         .debug_selector(|| "graph-branch".to_owned())
                         .min_w_0()
+                        .flex_shrink(1.)
                         .flex()
                         .items_center()
-                        .gap_1()
-                        .text_color(rgb(theme.subtext()))
+                        .gap(view.at(5.))
                         .child(
                             svg()
                                 .flex_none()
-                                .size(px(13.))
-                                .path("icons/graph-check.svg")
-                                .text_color(rgb(theme.subtext())),
+                                .size(view.at(11.))
+                                .path("icons/git-branch.svg")
+                                .text_color(view.muted()),
                         )
-                        .child(div().min_w_0().truncate().child(branch)),
+                        .child(
+                            view.settings()
+                                .chip("graph-branch-chip".to_owned(), branch, Tone::Neutral)
+                                .flex_shrink(1.)
+                                .min_w_0()
+                                .truncate(),
+                        ),
                 )
             })
             .child(div().flex_1())
@@ -140,36 +120,44 @@ impl GitGraphView {
                     .flex_none()
                     .flex()
                     .items_center()
-                    .gap(px(6.))
-                    .text_size(px(11.5))
-                    .text_color(rgb(theme.muted))
-                    .child(div().size(px(7.)).rounded_full().bg(rgb(live)))
+                    .gap(view.at(6.))
+                    .mr(view.at(4.))
+                    .text_size(px(view.scale().detail))
+                    .text_color(view.muted())
+                    .child(view.status_dot(live, false))
                     .child(self.indicator()),
             )
             .child(
-                button("graph-reload", "icons/graph-refresh.svg", true)
-                    .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
+                view.icon_button(
+                    "graph-reload",
+                    "graph-reload".to_owned(),
+                    "icons/refresh.svg",
+                    false,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.reload(cx))),
             )
+            // A question mark in a circle, where it was a written one.
             .child(
-                div()
-                    .id("graph-help-button")
-                    .debug_selector(|| "graph-help-button".to_owned())
-                    .flex_none()
-                    .size(px(28.))
-                    .rounded(px(4.))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .cursor_pointer()
-                    .text_color(rgb(theme.subtext()))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .hover(|style| style.bg(rgb(theme.active)))
-                    .child("?")
-                    .on_click(cx.listener(|this, _, _, cx| this.toggle_help(cx))),
+                view.icon_button(
+                    "graph-help-button",
+                    "graph-help-button".to_owned(),
+                    "icons/help.svg",
+                    self.help,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.toggle_help(cx))),
             )
-            .child(match self.render_search_field() {
+            .child(match self.render_search_field(searching) {
                 Some(field) => field,
-                None => button("graph-search", "icons/search.svg", true)
+                None => view
+                    .icon_button(
+                        "graph-search",
+                        "graph-search".to_owned(),
+                        "icons/search.svg",
+                        false,
+                        true,
+                    )
                     .on_click(cx.listener(|this, _, window, cx| this.open_search(window, cx)))
                     .into_any_element(),
             })
@@ -178,6 +166,7 @@ impl GitGraphView {
 
     pub(super) fn render_columns(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = &self.look.theme;
+        let view = self.look.view();
         let prefs = self.prefs;
         let column = |key: &'static str, label: &'static str| {
             div()
@@ -199,7 +188,7 @@ impl GitGraphView {
                 .top_0()
                 .right_0()
                 .h_full()
-                .w(px(EDGE))
+                .w(view.at(EDGE))
                 .cursor(CursorStyle::ResizeLeftRight)
                 .hover(|style| style.bg(rgba(RESIZE_HOVER)))
                 .on_mouse_down(MouseButton::Left, move |event, _, cx| {
@@ -214,29 +203,25 @@ impl GitGraphView {
                 })
                 .on_drag(drag, |_, _, _, cx| cx.new(|_| EmptyView))
         };
-        div()
-            .debug_selector(|| "graph-cols".to_owned())
+        // The columns keep their widths, which the rows share; the headings
+        // wear the lists' column style.
+        view.columns("graph-cols")
             .relative()
-            .flex_none()
-            .h(px(HEADER_H))
             .w_full()
-            .flex()
-            .bg(rgb(theme.surface))
+            .px_0()
+            .gap_0()
+            .bg(view.background())
             .border_b_1()
-            .border_color(rgb(theme.active))
-            .text_color(rgb(theme.muted))
-            .text_size(px(10.5))
-            .line_height(px(HEADER_H))
-            .font_weight(FontWeight::SEMIBOLD)
+            .border_color(view.line())
             .child(
-                column("refs", "BRANCH / TAG")
+                column("refs", "Branch / tag")
                     .flex_none()
                     .w(px(prefs.refs_width))
-                    .pl(px(16.))
+                    .pl(view.at(REFS_INSET))
                     .child(edge(ColumnDrag::Refs, "graph-col-refs-resize")),
             )
             .child(
-                column("graph", "GRAPH")
+                column("graph", "Graph")
                     .flex_none()
                     .w(px(self.graph_width()))
                     .border_l_1()
@@ -244,7 +229,7 @@ impl GitGraphView {
                     .child(edge(ColumnDrag::Graph, "graph-col-graph-resize")),
             )
             .child(
-                column("msg", "COMMIT MESSAGE")
+                column("msg", "Commit message")
                     .flex_1()
                     .min_w(px(MESSAGE_MIN))
                     .border_l_1()
@@ -263,28 +248,26 @@ impl GitGraphView {
             )
             .child(
                 div()
-                    .id("graph-col-gear")
-                    .debug_selector(|| "graph-col-gear".to_owned())
                     .absolute()
-                    .right(px(4.))
-                    .top(px(2.))
-                    .size(px(22.))
-                    .rounded(px(3.))
+                    .top_0()
+                    .bottom_0()
+                    .right(view.at(4.))
                     .flex()
                     .items_center()
-                    .justify_center()
-                    .cursor_pointer()
-                    .hover(|style| style.bg(rgb(theme.active)))
                     .child(
-                        svg()
-                            .size(px(14.))
-                            .path("icons/graph-settings.svg")
-                            .text_color(rgb(theme.muted)),
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.column_menu = !this.column_menu;
-                        cx.notify();
-                    })),
+                        view.icon_button(
+                            "graph-col-gear",
+                            "graph-col-gear".to_owned(),
+                            "icons/settings.svg",
+                            self.column_menu,
+                            true,
+                        )
+                        .size(view.at(GEAR))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.column_menu = !this.column_menu;
+                            cx.notify();
+                        })),
+                    ),
             )
             .when(self.column_menu, |header| {
                 header.child(self.render_column_menu())
@@ -295,71 +278,40 @@ impl GitGraphView {
     /// The gear's menu: one checkbox per optional column.
     fn render_column_menu(&self) -> AnyElement {
         let theme = &self.look.theme;
+        let view = self.look.view();
         let prefs = self.prefs;
-        let widths = [AUTHOR_W, DATE_W, SHA_W];
+        let (colours, ring) = (crate::toggles::colors(theme, true), theme.muted);
         deferred(
-            div()
-                .id("graph-col-menu")
-                .debug_selector(|| "graph-col-menu".to_owned())
+            view.menu_panel("graph-col-menu")
                 // Clicks here never reach the rows underneath.
                 .occlude()
                 .absolute()
-                .right(px(6.))
-                .top(px(HEADER_H + 2.))
-                .min_w(px(160.))
-                .p(px(6.))
-                .rounded(px(6.))
-                .border_1()
-                .border_color(rgb(theme.active))
-                .bg(rgb(mix(theme.surface, theme.foreground, 4)))
-                .shadow_lg()
-                .flex()
-                .flex_col()
-                .text_size(px(12.5))
-                .line_height(px(24.))
+                .right(view.at(MENU_OFFSET))
+                .top(view.at(COLUMNS_H + 2.))
+                .min_w(view.at(MENU_WIDTH))
                 .font_weight(FontWeight::NORMAL)
                 .child(
-                    div()
-                        .px(px(6.))
-                        .text_size(px(11.))
-                        .text_color(rgb(theme.muted))
-                        .child("COLUMNS"),
+                    view.menu()
+                        .section("graph-col-menu-section".to_owned(), "Columns"),
                 )
-                .children(OPTIONAL.into_iter().zip(widths).map(|((key, label), _)| {
+                .children(OPTIONAL.into_iter().map(|(key, label)| {
                     let on = is_on(&prefs, key);
-                    div()
-                        .id(SharedString::from(format!("graph-col-menu-{key}")))
-                        .debug_selector(move || format!("graph-col-menu-{key}"))
-                        .px(px(6.))
-                        .rounded(px(4.))
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .cursor_pointer()
-                        .text_color(rgb(theme.foreground))
-                        .hover(|style| style.bg(rgb(theme.active)))
-                        .child(
-                            div()
-                                .size(px(14.))
-                                .rounded(px(3.))
-                                .border_1()
-                                .border_color(rgb(theme.subtext()))
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .when(on, |box_| {
-                                    box_.child(
-                                        svg()
-                                            .size(px(11.))
-                                            .path("icons/graph-check.svg")
-                                            .text_color(rgb(theme.foreground)),
-                                    )
-                                }),
-                        )
-                        .child(label)
-                        .on_click(move |_, _, cx| {
-                            GraphPrefsStore::update(cx, |prefs| toggle(prefs, key));
-                        })
+                    view.row(
+                        SharedString::from(format!("graph-col-menu-{key}")),
+                        format!("graph-col-menu-{key}"),
+                        false,
+                        false,
+                    )
+                    .child(crate::toggles::checkbox_in(
+                        colours,
+                        ring,
+                        f32::from(view.at(CHECKBOX)),
+                        on,
+                    ))
+                    .child(label)
+                    .on_click(move |_, _, cx| {
+                        GraphPrefsStore::update(cx, |prefs| toggle(prefs, key));
+                    })
                 })),
         )
         .into_any_element()

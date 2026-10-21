@@ -24,6 +24,7 @@ mod help;
 mod keys;
 mod layout;
 mod live;
+mod look;
 mod prefs;
 #[cfg(unix)]
 mod readonly;
