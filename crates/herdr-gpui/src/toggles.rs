@@ -15,6 +15,13 @@ pub(crate) fn colors(theme: &Theme, checked: bool) -> (u32, u32) {
     } else {
         theme.active
     };
+    (fill, ink_on(theme, fill))
+}
+
+/// What reads on `fill`: the window's background or its text, whichever
+/// reads better, moved as far as the contrast setting needs. Set marks and
+/// coloured buttons draw their text in it.
+pub(crate) fn ink_on(theme: &Theme, fill: u32) -> u32 {
     let ink = if crate::contrast::ratio(theme.background, fill)
         >= crate::contrast::ratio(theme.foreground, fill)
     {
@@ -22,13 +29,17 @@ pub(crate) fn colors(theme: &Theme, checked: bool) -> (u32, u32) {
     } else {
         theme.foreground
     };
-    let ink = crate::contrast::ink(ink, &[fill], theme.contrast.mark_ratio());
-    (fill, ink)
+    crate::contrast::ink(ink, &[fill], theme.contrast.mark_ratio())
 }
 
 /// An outlined box when clear; a primary-filled box with a check mark when set.
 pub(crate) fn checkbox(theme: &Theme, size: f32, checked: bool) -> Div {
-    let (fill, ink) = colors(theme, true);
+    checkbox_in(colors(theme, true), theme.muted, size, checked)
+}
+
+/// [`checkbox`] from colours already worked out: the set mark's fill and ink,
+/// as [`colors`] gives them, and the clear box's ring.
+pub(crate) fn checkbox_in((fill, ink): (u32, u32), ring: u32, size: f32, checked: bool) -> Div {
     div()
         .size(px(size))
         .flex_none()
@@ -45,7 +56,7 @@ pub(crate) fn checkbox(theme: &Theme, size: f32, checked: bool) -> Div {
                     .text_color(rgb(ink)),
             )
         })
-        .when(!checked, |mark| mark.border_color(rgb(theme.muted)))
+        .when(!checked, |mark| mark.border_color(rgb(ring)))
 }
 
 /// An outlined circle when clear; a primary-filled circle with a center dot

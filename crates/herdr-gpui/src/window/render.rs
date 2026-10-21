@@ -613,7 +613,8 @@ impl Render for HerdrWindow {
                                 .flex()
                                 .overflow_hidden()
                                 .child(
-                                    div()
+                                    self.dialog_look()
+                                        .flash(div())
                                         .debug_selector(|| "flash".into())
                                         .min_w_0()
                                         .flex()
@@ -621,14 +622,12 @@ impl Render for HerdrWindow {
                                         .gap(px(8.))
                                         .px(px(12.))
                                         .py(px(6.))
-                                        .rounded(px(crate::config::corners::CONTROL))
-                                        .border_1()
-                                        .border_color(rgb(flash.accent(&self.theme)))
-                                        .bg(rgb(self.theme.surface))
+                                        .text_size(px(self.config.ui.size + 0.5))
                                         .text_color(rgb(self.theme.foreground))
                                         .child(
                                             div()
-                                                .size(px(6.))
+                                                .debug_selector(|| "flash-dot".into())
+                                                .size(px(7.))
                                                 .flex_none()
                                                 .rounded_full()
                                                 .bg(rgb(flash.accent(&self.theme))),

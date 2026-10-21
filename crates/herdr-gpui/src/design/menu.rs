@@ -70,13 +70,15 @@ pub(crate) struct ItemState {
 }
 
 /// A menu's heading: an icon and a bold title, and optionally a second
-/// line with its own small icon. Each text carries its selector.
+/// line with its own small icon. Each text carries its selector. A heading
+/// over a destructive action draws its icon in the danger red.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Header<'a> {
     pub(crate) selector: &'static str,
     pub(crate) icon: &'static str,
     pub(crate) title: (&'static str, &'a str),
     pub(crate) sub: Option<(&'static str, &'static str, &'a str)>,
+    pub(crate) danger: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -278,7 +280,9 @@ impl MenuLook {
         self.frame(id, selector, self.list_row_height(), state)
     }
 
-    fn leading(&self, leading: Leading, state: ItemState) -> Div {
+    /// A row's leading slot: the icon, check or strip that opens it, in the
+    /// colour its state gives. Two-line rows start with it too.
+    pub(crate) fn leading(&self, leading: Leading, state: ItemState) -> Div {
         let size = self.at(ICON);
         let color = if state.danger || state.disabled {
             self.ink(state)
@@ -517,12 +521,18 @@ impl MenuLook {
             )
     }
 
+    /// A heading's icon: grey, or the danger red over a destructive action.
+    pub(super) fn header_icon(&self, danger: bool) -> Rgba {
+        if danger { self.danger } else { self.muted }
+    }
+
     pub(crate) fn header(&self, header: Header<'_>) -> Div {
         let Header {
             selector,
             icon,
             title: (title_selector, title),
             sub,
+            danger,
         } = header;
         div()
             .debug_selector(move || selector.into())
@@ -547,7 +557,7 @@ impl MenuLook {
                             .path(icon)
                             .size(self.at(HEADER_ICON))
                             .flex_none()
-                            .text_color(self.muted)
+                            .text_color(self.header_icon(danger))
                             .debug_selector(move || format!("{selector}-icon")),
                     )
                     .child(

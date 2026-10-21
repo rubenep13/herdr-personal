@@ -3,6 +3,8 @@ use super::super::{Page, git::Row};
 use crate::{pr_actions::Action, pull_request::MergeMethod, sidebar::layout_tests::REPO_KEY};
 use gpui::{Entity, TestAppContext, VisualTestContext, point, px, size};
 
+mod look;
+
 fn input() -> crate::pull_request::Input {
     crate::pull_request::Input {
         checkout: None,

@@ -219,6 +219,7 @@ macro_rules! embedded_icons {
 // on different lines.
 embedded_icons! {
     // keep-sorted start
+    "alert.svg",
     "arrow-left.svg",
     "arrow-right.svg",
     "bell.svg",
@@ -264,6 +265,7 @@ embedded_icons! {
     "layers.svg",
     "link.svg",
     "lock.svg",
+    "megaphone.svg",
     "menu.svg",
     "more.svg",
     "mouse.svg",

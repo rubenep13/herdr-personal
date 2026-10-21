@@ -4,6 +4,7 @@ use gpui::TestAppContext;
 
 mod accounts;
 mod github_cli;
+mod look;
 
 #[gpui::test]
 fn successful_signin_dismisses_only_the_signin_panel_and_restores_focus(cx: &mut TestAppContext) {
@@ -145,14 +146,13 @@ fn removed_hosts_drop_their_account_from_memory(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn signout_uses_the_theme_danger_color(cx: &mut TestAppContext) {
-    use gpui::Styled;
     let (view, cx) = cx.add_window_view(crate::sidebar::layout_tests::fixture_window);
     cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
-            let mut button = view.github_button(Action::SignOut, "Sign out", cx);
+        view.update(cx, |view, _| {
+            // A danger button: filled with the theme's danger red.
             assert_eq!(
-                button.text_style().color,
-                Some(crate::menu::danger(&view.theme).into())
+                view.github_kind(Action::SignOut),
+                crate::design::ButtonKind::Danger
             );
         })
     });
@@ -179,11 +179,11 @@ fn connected_panel_is_content_sized_with_only_header_close(cx: &mut TestAppConte
         assert!(cx.debug_bounds("github-status").is_none());
         assert!(cx.debug_bounds("github-close").is_none());
         assert!(cx.debug_bounds("github-header-close").is_some());
-        // The mark is vector, so it is sharp at the header's own size, and
-        // the avatar slot beside it stays square for a round crop.
-        let mark = cx.debug_bounds("github-mark").unwrap();
+        // The heading's mark is the dialogs' 16 px icon, and the avatar
+        // slot stays square for a round crop.
+        let mark = cx.debug_bounds("github-header-icon").unwrap();
         let avatar = cx.debug_bounds("github-avatar").unwrap();
-        assert_eq!(mark.size, gpui::size(gpui::px(28.), gpui::px(28.)));
+        assert_eq!(mark.size, gpui::size(gpui::px(16.), gpui::px(16.)));
         assert_eq!(avatar.size, gpui::size(gpui::px(40.), gpui::px(40.)));
         // Sign out, Add account, then Close.
         cx.simulate_keystrokes("tab tab tab enter");

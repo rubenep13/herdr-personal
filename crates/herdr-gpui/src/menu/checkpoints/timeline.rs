@@ -2,12 +2,7 @@
 //! rail of dots, with its clock time and diff, and a day break wherever the
 //! date changes.
 
-use crate::{
-    HerdrWindow,
-    checkpoint::Checkpoint,
-    config::{corners, mix},
-    fonts::StyledFont,
-};
+use crate::{HerdrWindow, checkpoint::Checkpoint, config::mix, fonts::StyledFont};
 use chrono::{DateTime, Datelike, Days, TimeZone};
 use gpui::{prelude::*, *};
 
@@ -152,7 +147,7 @@ impl HerdrWindow {
                 .pl(px(4.))
                 .pr(px(8.))
                 .h(px(height))
-                .rounded(px(corners::SMALL))
+                .rounded(px(crate::design::SELECTION_RADIUS))
                 .when(selected, |row| row.bg(rgb(theme.active)))
                 .hover(|row| row.bg(rgb(theme.active)))
                 .child(

@@ -333,7 +333,7 @@ impl HerdrWindow {
     }
 
     /// A tab's state colour, as the sidebar's badges draw it.
-    fn status_color(&self, status: AgentStatus) -> u32 {
+    pub(super) fn status_color(&self, status: AgentStatus) -> u32 {
         let indicators = crate::sidebar::Indicators::new(
             self.settings.shared.as_ref(),
             self.config.status_icons,

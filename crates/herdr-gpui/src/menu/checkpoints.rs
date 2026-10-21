@@ -6,6 +6,7 @@ use super::Page;
 use crate::{
     HerdrWindow,
     checkpoint::{Checkout, Listing, age, host_for},
+    design::{ButtonKind, Header, NoteTone},
 };
 use gpui::{prelude::*, *};
 use herdr_client::protocol::AgentStatus;
@@ -107,16 +108,22 @@ impl HerdrWindow {
             return div();
         };
         let theme = &self.theme;
-        let font = &self.config.ui;
         let muted = rgb(theme.muted);
-        let danger = crate::menu::danger(theme);
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |elapsed| {
                 i64::try_from(elapsed.as_secs()).unwrap_or(i64::MAX)
             });
-        let line = |text: String| div().min_w_0().child(text);
-        let mut body = div().flex().flex_col().gap(px(6.)).px(px(16.)).py(px(12.));
+        let look = self.dialog_look();
+        let text_size = px(look.settings().scale().name);
+        let line = |text: String| {
+            div()
+                .min_w_0()
+                .text_size(text_size)
+                .text_color(rgb(theme.subtext()))
+                .child(text)
+        };
+        let mut body = look.body("checkpoints-sheet");
         let confirming = view.confirming_checkpoint();
         if let Some(checkpoint) = confirming {
             body = body
@@ -126,7 +133,8 @@ impl HerdrWindow {
                         checkpoint.label,
                         age(checkpoint.created, now)
                     ))
-                    .font_weight(FontWeight::SEMIBOLD),
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(rgb(theme.foreground)),
                 )
                 .child(line(format!(
                     "Files in this checkout go back to how they were then, and {} moves back to the commit it was on. Files created since are removed; ignored files are left alone.",
@@ -137,14 +145,11 @@ impl HerdrWindow {
                         .text_color(muted),
                 );
             if self.checkpoint_agent_working() {
-                body = body.child(
-                    line(
-                        "An agent in this workspace is still working and may keep changing files."
-                            .into(),
-                    )
-                    .debug_selector(|| "checkpoints-agent-working".into())
-                    .text_color(danger),
-                );
+                body = body.child(look.note(
+                    "checkpoints-agent-working".into(),
+                    NoteTone::Warning,
+                    "An agent in this workspace is still working and may keep changing files.",
+                ));
             }
         } else {
             match &view.listing {
@@ -152,11 +157,7 @@ impl HerdrWindow {
                     body = body.child(line("Loading checkpoints...".into()).text_color(muted));
                 }
                 Listing::Failed(error) => {
-                    body = body.child(
-                        line(error.clone())
-                            .debug_selector(|| "checkpoints-error".into())
-                            .text_color(danger),
-                    );
+                    body = body.child(look.error("checkpoints-error".into(), error.clone()));
                 }
                 Listing::Ready(list) if list.is_empty() => {
                     body = body.child(
@@ -174,109 +175,83 @@ impl HerdrWindow {
             }
         }
         if let Some(error) = &view.error {
-            body = body.child(
-                line(error.clone())
-                    .debug_selector(|| "checkpoints-restore-error".into())
-                    .text_color(danger),
-            );
+            body = body.child(look.error("checkpoints-restore-error".into(), error.clone()));
         }
-        let button = |id: &'static str| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px(px(12.))
-                .py(px(6.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .border_1()
-                .cursor_pointer()
+        // Back from a confirmation, else close: what Esc does too.
+        let back = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| match &mut this
+            .checkpoints
+            .view
+        {
+            Some(view) if view.confirming.is_some() && !view.restoring => {
+                view.confirming = None;
+                cx.notify();
+            }
+            _ => this.dismiss_menu(window, cx),
         };
-        let mut footer = div()
-            .flex()
-            .justify_end()
-            .gap(px(8.))
-            .px(px(16.))
-            .py(px(12.))
-            .border_t_1()
-            .border_color(rgb(theme.active))
-            .child(
-                button("checkpoints-cancel")
-                    .border_color(rgb(theme.active))
-                    .hover(|button| button.bg(rgb(theme.active)))
-                    .child(if confirming.is_some() {
+        let mut footer = look
+            .footer("checkpoints-footer")
+            .hint(
+                "Esc",
+                if confirming.is_some() {
+                    "cancel"
+                } else {
+                    "close"
+                },
+            )
+            .button(
+                look.button(
+                    "checkpoints-cancel",
+                    if confirming.is_some() {
                         "Cancel"
                     } else {
                         "Close"
-                    })
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        cx.stop_propagation();
-                        match &mut this.checkpoints.view {
-                            Some(view) if view.confirming.is_some() && !view.restoring => {
-                                view.confirming = None;
-                                cx.notify();
-                            }
-                            _ => this.dismiss_menu(window, cx),
-                        }
-                    })),
+                    },
+                    ButtonKind::Normal,
+                    true,
+                )
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    cx.stop_propagation();
+                    back(this, window, cx);
+                })),
             );
         if confirming.is_some() {
             let armed = !view.restoring;
-            footer = footer.child(
-                button("checkpoints-restore")
-                    .border_color(danger)
-                    .text_color(danger)
-                    .child(if armed { "Restore" } else { "Restoring..." })
-                    .when(!armed, |button| {
-                        button.opacity(0.4).cursor(CursorStyle::OperationNotAllowed)
-                    })
-                    .when(armed, |button| {
-                        button
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                cx.stop_propagation();
-                                this.checkpoints.restore();
-                                cx.notify();
-                            }))
-                    }),
+            footer = footer.button(
+                look.button(
+                    "checkpoints-restore",
+                    if armed { "Restore" } else { "Restoring..." },
+                    ButtonKind::Danger,
+                    armed,
+                )
+                .when(armed, |button| {
+                    button.on_click(cx.listener(|this, _, _, cx| {
+                        cx.stop_propagation();
+                        this.checkpoints.restore();
+                        cx.notify();
+                    }))
+                }),
             );
         }
+        let place = format!("{} \u{b7} {}", view.title, view.checkout.branch);
         div()
             .flex()
             .flex_col()
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        svg()
-                            .path("icons/refresh.svg")
-                            .size(px(16.))
-                            .flex_none()
-                            .text_color(muted),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Checkpoints"),
-                            )
-                            .child(
-                                div().truncate().text_color(muted).child(format!(
-                                    "{} \u{b7} {}",
-                                    view.title, view.checkout.branch
-                                )),
-                            ),
-                    ),
+                look.header(
+                    Header {
+                        selector: "checkpoints-header",
+                        icon: "icons/refresh.svg",
+                        title: ("checkpoints-title", "Checkpoints"),
+                        sub: Some(("icons/folder.svg", "checkpoints-place", &place)),
+                        danger: false,
+                    },
+                    look.menu()
+                        .close_button("checkpoints-dismiss")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            back(this, window, cx);
+                        })),
+                ),
             )
             .child(
                 div()

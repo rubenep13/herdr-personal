@@ -5,7 +5,7 @@
 pub(super) mod items;
 mod keys;
 
-use super::{MENU_MARGIN, Page, WorkspaceAction, devices::rail};
+use super::{Look, MENU_MARGIN, Page, WorkspaceAction, devices::rail};
 use crate::{HerdrWindow, actions, design::Leading, fonts::StyledFont};
 use gpui::{prelude::*, *};
 use herdr_client::Method;
@@ -79,6 +79,11 @@ impl HerdrWindow {
     /// The redesigned menus' look, for this window's theme and `[ui]` face.
     pub(crate) fn menu_look(&self) -> crate::design::MenuLook {
         crate::design::MenuLook::of(&self.theme, &self.config.ui, self.theme_light)
+    }
+
+    /// The redesigned dialogs' look, for this window's theme and `[ui]` face.
+    pub(crate) fn dialog_look(&self) -> crate::design::DialogLook {
+        crate::design::DialogLook::of(&self.theme, &self.config.ui, self.theme_light)
     }
 
     pub(crate) fn menu_target_current(&self) -> bool {
@@ -304,6 +309,10 @@ impl HerdrWindow {
         // modal decision, not a continuation of the row it came from, so it
         // centres over a dimmed window the way the Herdr TUI's dialogs do.
         let pointer_anchored = page.pointer_anchored();
+        let git_popup = matches!(
+            page,
+            Page::Git | Page::GitCommit | Page::PrReview | Page::PrComment | Page::PrMerge
+        );
         let mut panel = div()
             .id("menu-panel")
             .debug_selector(|| "menu-panel".into())
@@ -374,7 +383,8 @@ impl HerdrWindow {
                             .max(px(0.))
                             .min(px(if page == Page::Git { 340. } else { 420. })))
                         .max_h((viewport.height - px(24.)).max(px(0.)))
-                        .when(page == Page::Git, |panel| {
+                        // The Git popup's forms keep the popup's top and room.
+                        .when(git_popup, |panel| {
                             let top = crate::titlebar::HEIGHT
                                 + crate::worktree_banner::reserved(
                                     env!("HERDR_BUILD_WORKTREE") == "1",
@@ -480,7 +490,9 @@ impl HerdrWindow {
                     panel
                         .when(!settled && !lists, |panel| panel.overflow_y_scroll())
                         .when(lists, |panel| panel.overflow_hidden())
-                        .when(!matches!(page, Page::Dialog(_)), |panel| panel.p(px(6.)))
+                        .when(page.look() != Look::Dialog && !session_modal, |panel| {
+                            panel.p(px(6.))
+                        })
                 },
             )
             .when(
@@ -544,9 +556,9 @@ impl HerdrWindow {
                 panel.w((viewport.width - px(24.)).max(px(0.)).min(px(340.)))
             })
             .map(|panel| {
-                // Menus and pickers wear the redesigned panel; a session's
-                // create or delete form is a dialog and keeps the old one.
-                if page.redesigned() && !session_modal {
+                // Every page wears the redesigned panel but those whose turn
+                // has not come.
+                if page.look() != Look::Legacy {
                     let look = self.menu_look();
                     look.panel(panel)
                         .text_color(look.ink(crate::design::ItemState::default()))
@@ -606,7 +618,7 @@ impl HerdrWindow {
         } else if page == Page::Devices {
             panel = panel.child(self.render_devices(cx));
         } else if page == Page::Sessions {
-            panel = panel.child(self.render_sessions(cx));
+            panel = panel.child(self.render_sessions(window, cx));
         } else if let Page::Usage(provider) = page {
             panel = panel.child(self.render_usage_panel(provider, cx));
         } else if page == Page::AddDevice {
@@ -627,7 +639,7 @@ impl HerdrWindow {
                 cx,
             ));
         } else if let Page::Dialog(action) = page {
-            panel = panel.child(self.render_workspace_dialog(action, cx));
+            panel = panel.child(self.render_workspace_dialog(action, window, cx));
         } else if page == Page::CarryPane {
             panel = panel.child(self.render_carry(cx));
         } else if page == Page::Teleport {
@@ -635,15 +647,15 @@ impl HerdrWindow {
         } else if page == Page::Checkpoints {
             panel = panel.child(self.render_checkpoints(cx));
         } else if page == Page::FanOut {
-            panel = panel.child(self.render_fan_out(cx));
+            panel = panel.child(self.render_fan_out(window, cx));
         } else if page == Page::Git {
             panel = panel.child(self.render_git_menu(cx));
         } else if page == Page::GitCommit {
-            panel = panel.child(self.render_git_commit(cx));
+            panel = panel.child(self.render_git_commit(window, cx));
         } else if page == Page::PrReview {
             panel = panel.child(self.render_pr_review(cx));
         } else if page == Page::PrComment {
-            panel = panel.child(self.render_pr_comment(cx));
+            panel = panel.child(self.render_pr_comment(window, cx));
         } else if page == Page::PrMerge {
             panel = panel.child(self.render_pr_merge(cx));
         } else if matches!(
@@ -654,9 +666,9 @@ impl HerdrWindow {
                 | Page::DeviceTheme
                 | Page::RemoveDevice
         ) {
-            panel = panel.child(self.render_host_menu(cx));
+            panel = panel.child(self.render_host_menu(window, cx));
         } else if matches!(page, Page::Tab | Page::RenameTab) {
-            panel = panel.child(self.render_tab_menu(cx));
+            panel = panel.child(self.render_tab_menu(window, cx));
         } else if page == Page::Group {
             panel = self.render_group_menu(panel, cx);
         } else if page == Page::MovePane {
@@ -665,7 +677,7 @@ impl HerdrWindow {
             page,
             Page::Pane | Page::RenamePane | Page::PaneProcesses | Page::KillProcesses
         ) {
-            panel = panel.child(self.render_pane_menu(cx));
+            panel = panel.child(self.render_pane_menu(window, cx));
         } else if page == Page::Keybinds {
             panel = panel.child(self.render_keybinds(cx));
         } else if page == Page::Themes {
@@ -691,46 +703,7 @@ impl HerdrWindow {
         } else if page == Page::OpenLink {
             panel = panel.child(self.render_open_link(cx));
         } else if page == Page::Install {
-            panel = panel
-                .child(div().p(px(8.)).child("Herdr must be installed"))
-                .child(div().p(px(8.)).child(
-                    "Install Herdr first, then choose Terminal > Reconnect. The Install button opens the Herdr website; nothing is installed automatically.",
-                ))
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap(px(8.))
-                        .p(px(8.))
-                        .child(
-                            div()
-                                .id("menu-install")
-                                .debug_selector(|| "menu-install".into())
-                                .p(px(8.))
-                                .rounded(px(crate::config::corners::CONTROL))
-                                .bg(rgb(theme.active))
-                                .cursor_pointer()
-                                .child("Install")
-                                .on_click(|_, _, cx| {
-                                    cx.stop_propagation();
-                                    cx.open_url(crate::about::WEBSITE);
-                                }),
-                        )
-                        .child(
-                            div()
-                                .id("menu-dismiss")
-                                .debug_selector(|| "menu-dismiss".into())
-                                .p(px(8.))
-                                .rounded(px(crate::config::corners::CONTROL))
-                                .hover(|button| button.bg(rgb(theme.active)))
-                                .cursor_pointer()
-                                .child("Dismiss")
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    this.dismiss_menu(window, cx);
-                                })),
-                        ),
-                );
+            panel = panel.child(self.render_install(cx));
         } else {
             panel = panel.child(self.render_release_notes(cx));
         }
@@ -809,7 +782,9 @@ impl HerdrWindow {
             )
             .on_key_down(cx.listener(Self::menu_key_down))
             .child(if pointer_anchored {
-                let position = if page == Page::Git {
+                // The Git popup and the forms it turns into hang under the
+                // titlebar's Git button, so a form never jumps from its menu.
+                let position = if git_popup {
                     point(
                         self.menu.anchor.x,
                         px(crate::titlebar::HEIGHT

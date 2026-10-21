@@ -450,6 +450,7 @@ impl HerdrWindow {
             .child(look.header(Header {
                 selector: "theme-header",
                 icon: "icons/palette.svg",
+                danger: false,
                 title: ("theme-title", "Color Scheme"),
                 sub: None,
             }))

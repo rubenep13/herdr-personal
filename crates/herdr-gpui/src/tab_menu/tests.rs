@@ -347,3 +347,4 @@ fn rename_response_is_correlated_and_survives_surface_invalidation(cx: &mut Test
 }
 
 mod look;
+mod rename_look;

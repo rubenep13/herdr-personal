@@ -6,6 +6,7 @@
 use super::PaneMenu;
 use crate::{
     HerdrWindow,
+    design::{ButtonKind, Header, NoteTone},
     menu::Page,
     processes::{Identity, Listing, Outcome, Refusal, Update, Watch},
 };
@@ -341,32 +342,29 @@ impl HerdrWindow {
         } else {
             format!("Processes in {}", pane.target.label)
         };
-        let mut body = div().p(px(8.)).flex().flex_col().gap(px(8.)).child(
-            div()
-                .flex()
-                .items_baseline()
-                .gap(px(8.))
-                .child(
+        let look = self.dialog_look();
+        let header = look.menu().header(Header {
+            selector: "pane-processes-header",
+            icon: "icons/pulse.svg",
+            title: ("pane-processes-title", &title),
+            sub: None,
+            danger: false,
+        });
+        let mut body = look.form_body("pane-processes-body").when_some(
+            processes.listing.as_ref(),
+            |body, listing| {
+                body.child(
                     div()
-                        .flex_1()
-                        .min_w_0()
-                        .truncate()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(title),
+                        .debug_selector(|| "pane-processes-total".into())
+                        .text_size(px(look.settings().scale().secondary))
+                        .text_color(muted)
+                        .child(format!(
+                            "{} · {}",
+                            cpu_text(Some(listing.cpu)),
+                            memory_text(listing.memory)
+                        )),
                 )
-                .when_some(processes.listing.as_ref(), |header, listing| {
-                    header.child(
-                        div()
-                            .debug_selector(|| "pane-processes-total".into())
-                            .flex_none()
-                            .text_color(muted)
-                            .child(format!(
-                                "{} · {}",
-                                cpu_text(Some(listing.cpu)),
-                                memory_text(listing.memory)
-                            )),
-                    )
-                }),
+            },
         );
         let mut list = div()
             .id("pane-processes-list")
@@ -487,113 +485,92 @@ impl HerdrWindow {
             .or_else(|| processes.ending.then(|| "Ending processes…".to_owned()))
             .or_else(|| processes.report.clone());
         let count = processes.chosen.len();
-        body.when_some(status, |body, status| {
-            body.child(
-                div()
-                    .debug_selector(|| "pane-processes-status".into())
-                    .text_color(muted)
-                    .child(status),
+        let label = match count {
+            0 => "End Process…".to_owned(),
+            1 => "End 1 Process…".to_owned(),
+            n => format!("End {n} Processes…"),
+        };
+        let armed = count > 0 && !processes.ending;
+        div()
+            .flex()
+            .flex_col()
+            .child(header)
+            .child(body.when_some(status, |body, status| {
+                body.child(look.note("pane-processes-status".into(), NoteTone::Info, status))
+            }))
+            .child(
+                look.form_footer("pane-processes-footer").button(
+                    look.small_button("pane-processes-end", label, ButtonKind::Danger, armed)
+                        .when(armed, |button| {
+                            button.on_click(
+                                cx.listener(|this, _, _, cx| this.confirm_pane_processes(cx)),
+                            )
+                        }),
+                ),
             )
-        })
-        .child(
-            div().flex().justify_end().child(
-                div()
-                    .id("pane-processes-end")
-                    .debug_selector(|| "pane-processes-end".into())
-                    .px(px(12.))
-                    .py(px(6.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .when(count > 0 && !processes.ending, |button| {
-                        button
-                            .bg(rgb(theme.active))
-                            .cursor_pointer()
-                            .on_click(cx.listener(|this, _, _, cx| this.confirm_pane_processes(cx)))
-                    })
-                    .when(count == 0 || processes.ending, |button| {
-                        button.text_color(muted)
-                    })
-                    .child(match count {
-                        0 => "End Process…".to_owned(),
-                        1 => "End 1 Process…".to_owned(),
-                        n => format!("End {n} Processes…"),
-                    }),
-            ),
-        )
     }
 
     pub(super) fn render_kill_processes(&self, pane: &PaneMenu, cx: &mut Context<Self>) -> Div {
         let Some(processes) = &pane.processes else {
             return div();
         };
-        let theme = &self.theme;
+        let look = self.dialog_look();
+        let muted = rgb(self.theme.muted);
         let count = processes.chosen.len();
         let noun = if count == 1 { "process" } else { "processes" };
+        let title = format!("End {count} {noun}?");
         div()
-            .p(px(12.))
             .flex()
             .flex_col()
-            .gap(px(12.))
+            .child(look.menu().header(Header {
+                selector: "pane-kill-header",
+                icon: "icons/close.svg",
+                title: ("pane-kill-title", &title),
+                sub: None,
+                danger: true,
+            }))
             .child(
-                div()
-                    .text_size(px(self.config.ui.size * 1.35))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(format!("End {count} {noun}?")),
-            )
-            .child(div().flex().flex_col().children(processes.chosen_rows().map(
-                |row| {
-                    div()
-                        .flex()
-                        .gap(px(8.))
-                        .child(div().flex_none().child(row.entry.name.clone()))
-                        .child(
+                look.form_body("pane-kill-body")
+                    .child(div().flex().flex_col().children(processes.chosen_rows().map(
+                        |row| {
                             div()
-                                .flex_none()
-                                .text_color(rgb(theme.muted))
-                                .child(format!("pid {}", row.entry.identity.pid)),
-                        )
-                },
-            )))
-            .child(div().text_color(rgb(theme.subtext())).child(
-                "Each is asked to quit (SIGTERM), and may lose unsaved work. Processes they started keep running unless chosen too.",
-            ))
+                                .flex()
+                                .gap(px(8.))
+                                .child(div().flex_none().child(row.entry.name.clone()))
+                                .child(
+                                    div()
+                                        .flex_none()
+                                        .text_color(muted)
+                                        .child(format!("pid {}", row.entry.identity.pid)),
+                                )
+                        },
+                    )))
+                    .child(look.lead(
+                        "pane-kill-text",
+                        "Each is asked to quit (SIGTERM), and may lose unsaved work. Processes they started keep running unless chosen too.",
+                    )),
+            )
             .child(
-                div()
-                    .flex()
-                    .justify_end()
-                    .gap(px(8.))
-                    .child(
-                        div()
-                            .id("pane-processes-cancel")
-                            .debug_selector(|| "pane-processes-cancel".into())
-                            .px(px(12.))
-                            .py(px(6.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .border_1()
-                            .border_color(rgb(theme.active))
-                            .cursor_pointer()
-                            .hover(|s| s.bg(rgb(theme.active)))
-                            .child("Cancel")
+                look.form_footer("pane-kill-footer")
+                    .button(
+                        look.small_button("pane-processes-cancel", "Cancel", ButtonKind::Normal, true)
                             .on_click(cx.listener(|this, _, _, cx| {
                                 this.leave_kill_confirmation();
                                 cx.notify();
                             })),
                     )
-                    .child(
-                        div()
-                            .id("pane-processes-confirm")
-                            .debug_selector(|| "pane-processes-confirm".into())
-                            .px(px(12.))
-                            .py(px(6.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .bg(rgb(theme.active))
-                            .text_color(crate::menu::danger(theme))
-                            .cursor_pointer()
-                            .child(if count == 1 {
+                    .button(
+                        look.small_button(
+                            "pane-processes-confirm",
+                            if count == 1 {
                                 "End Process".to_owned()
                             } else {
                                 format!("End {count} Processes")
-                            })
-                            .on_click(cx.listener(|this, _, _, cx| this.end_pane_processes(cx))),
+                            },
+                            ButtonKind::Danger,
+                            true,
+                        )
+                        .on_click(cx.listener(|this, _, _, cx| this.end_pane_processes(cx))),
                     ),
             )
     }

@@ -5,6 +5,8 @@
 mod dispatch;
 pub(super) mod popover;
 mod render;
+#[cfg(test)]
+pub(super) use render::submit_kind;
 mod requests;
 mod scripts;
 

@@ -58,7 +58,7 @@ pub(in crate::menu) struct Wizard {
     job: Option<worker::Worker>,
     /// Why the last step failed, kept with this form while another source
     /// of Add Device shows.
-    error: Option<String>,
+    pub(in crate::menu) error: Option<String>,
 }
 
 impl HerdrWindow {
@@ -80,6 +80,7 @@ impl HerdrWindow {
         let input = cx.new(SearchInput::new);
         input.update(cx, |input, cx| {
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            input.set_frame(crate::search_input::Frame::Field, cx);
             input.set_placeholder(placeholder, cx);
             if !text.is_empty() {
                 input.set_text_selected(text, cx);
@@ -599,15 +600,13 @@ impl HerdrWindow {
             )
             .when(wizard.phase == Phase::Choose, |header| {
                 header.child(
-                    div()
-                        .id("coder-sign-out")
-                        .flex_none()
-                        .px_2()
-                        .py_1()
-                        .cursor_pointer()
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .hover(|s| s.bg(rgb(theme.active)))
-                        .child("Sign out")
+                    self.dialog_look()
+                        .small_button(
+                            "coder-sign-out",
+                            "Sign out",
+                            crate::design::ButtonKind::Normal,
+                            true,
+                        )
                         .on_click(cx.listener(|this, _, _, cx| this.coder_sign_out(cx))),
                 )
             });
@@ -664,14 +663,21 @@ impl HerdrWindow {
                 }),
         };
         if let Some(status) = &wizard.status {
-            body = body.child(div().flex_none().child(status.clone()));
+            body = body.child(
+                self.dialog_look()
+                    .note(
+                        "coder-setup-status".into(),
+                        crate::design::NoteTone::Info,
+                        status.clone(),
+                    )
+                    .flex_none(),
+            );
         }
         if let Some(error) = &wizard.error {
             body = body.child(
-                div()
-                    .flex_none()
-                    .text_color(super::super::danger(theme))
-                    .child(error.clone()),
+                self.dialog_look()
+                    .error("coder-setup-error".into(), error.clone())
+                    .flex_none(),
             );
         }
         let (label, ready) = match wizard.phase {
@@ -694,36 +700,26 @@ impl HerdrWindow {
             .flex()
             .flex_col()
             .child(body)
-            .child(
-                div()
-                    .flex_none()
-                    .p(px(16.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .flex()
-                    .justify_end()
-                    .child(
-                        div()
-                            .id("coder-setup-submit")
-                            .debug_selector(|| "coder-setup-submit".into())
-                            .p(px(8.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .bg(rgb(theme.active))
-                            .when(ready, |button| {
-                                button.cursor_pointer().hover(|s| {
-                                    s.bg(rgb(theme.active)
-                                        .blend(rgba((theme.foreground << 8) | 0x20)))
-                                })
-                            })
-                            .when(!ready, |button| button.text_color(rgb(theme.muted)))
-                            .child(label)
-                            .on_click(cx.listener(move |this, _, window, cx| {
+            .child({
+                let look = self.dialog_look();
+                look.footer("coder-setup-footer")
+                    .hint("Esc", "cancel")
+                    .button(
+                        look.button(
+                            "coder-setup-submit",
+                            label,
+                            crate::design::ButtonKind::Primary,
+                            ready,
+                        )
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
                                 if ready {
                                     this.submit_coder(window, cx);
                                 }
-                            })),
-                    ),
-            );
+                            },
+                        )),
+                    )
+            });
         self.add_device_frame("coder-setup-dialog", "coder-setup-close", compact, pane, cx)
     }
 

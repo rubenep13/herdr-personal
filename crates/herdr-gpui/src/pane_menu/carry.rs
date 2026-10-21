@@ -7,6 +7,7 @@
 use super::Target;
 use crate::{
     HerdrWindow,
+    design::{ButtonKind, Header, NoteTone},
     menu::Page,
     progress::{self, Progress},
     teleport::{
@@ -401,8 +402,6 @@ impl HerdrWindow {
         };
         let theme = &self.theme;
         let muted = rgb(theme.muted);
-        let subtext = rgb(theme.subtext());
-        let danger = crate::menu::danger(theme);
         let bar = |progress| {
             progress::bar(
                 "pane-carry-progress",
@@ -411,14 +410,10 @@ impl HerdrWindow {
                 rgb(theme.active).into(),
             )
         };
+        let look = self.dialog_look();
         let line = |text: String| div().min_w_0().child(text);
-        let mut body = div().flex().flex_col().gap(px(6.)).p(px(8.));
-        body = body.child(
-            div()
-                .text_color(muted)
-                .truncate()
-                .child(format!("Move pane to {}", carry.destination)),
-        );
+        let mut body = look.form_body("pane-carry-body");
+        let title = format!("Move pane to {}", carry.destination);
         let (primary, armed) = match &carry.stage {
             Stage::Reviewing => {
                 body = body.child(bar(Progress::Busy)).child(
@@ -463,75 +458,76 @@ impl HerdrWindow {
                         "{} unpushed commit(s), {} changed file(s), {} untracked",
                         state.unpushed, state.changed, state.untracked
                     )))
-                    .child(
-                        line(review.describe())
-                            .debug_selector(|| "pane-carry-runs".into())
-                            .when(matches!(review.action, carry::Action::Missing(_)), |row| {
-                                row.text_color(danger)
-                            }),
-                    )
-                    .child(
-                        line(
-                            "The changes are copied: this checkout keeps them. The pane here closes once it runs there."
-                                .into(),
-                        )
-                        .text_color(subtext),
-                    );
+                    .child(look.note(
+                        "pane-carry-runs".into(),
+                        if matches!(review.action, carry::Action::Missing(_)) {
+                            NoteTone::Warning
+                        } else {
+                            NoteTone::Info
+                        },
+                        review.describe(),
+                    ))
+                    .child(look.lead(
+                        "pane-carry-copied",
+                        "The changes are copied: this checkout keeps them. The pane here closes once it runs there.",
+                    ));
                 ("Move", true)
             }
             Stage::Moving(step) => {
                 body = body
                     .child(bar(Progress::Working(step.map_or(0., Step::progress))))
-                    .child(
-                        line(step.map_or("Starting", Step::label).to_owned())
-                            .debug_selector(|| "pane-carry-step".into())
-                            .text_color(muted),
-                    )
-                    .child(
-                        line("Closing this menu does not stop the move.".into())
-                            .text_color(subtext),
-                    );
+                    .child(look.note(
+                        "pane-carry-step".into(),
+                        NoteTone::Info,
+                        step.map_or("Starting", Step::label),
+                    ))
+                    .child(look.lead(
+                        "pane-carry-keeps-going",
+                        "Closing this menu does not stop the move.",
+                    ));
                 ("Moving\u{2026}", false)
             }
             Stage::Failed(error) => {
-                body = body.child(
-                    line(error.clone())
-                        .debug_selector(|| "pane-carry-error".into())
-                        .text_color(danger),
-                );
+                body = body.child(look.error("pane-carry-error".into(), error.clone()));
                 ("Close", true)
             }
         };
-        body.child(
-            div().flex().justify_end().pt(px(4.)).child(
-                div()
-                    .id("pane-carry-submit")
-                    .debug_selector(|| "pane-carry-submit".into())
-                    .px(px(12.))
-                    .py(px(4.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .border_1()
-                    .border_color(rgb(if armed {
-                        theme.foreground
-                    } else {
-                        theme.active
-                    }))
-                    .text_color(if armed { rgb(theme.foreground) } else { muted })
-                    .child(primary)
+        let failed = matches!(carry.stage, Stage::Failed(_));
+        div()
+            .flex()
+            .flex_col()
+            .child(look.menu().header(Header {
+                selector: "pane-carry-header",
+                icon: "icons/teleport.svg",
+                title: ("pane-carry-title", &title),
+                sub: None,
+                danger: false,
+            }))
+            .child(body)
+            .child(
+                look.form_footer("pane-carry-footer").button(
+                    look.small_button(
+                        "pane-carry-submit",
+                        primary,
+                        // Closing after a failure is the plain choice.
+                        if failed {
+                            ButtonKind::Normal
+                        } else {
+                            ButtonKind::Primary
+                        },
+                        armed,
+                    )
                     .when(!armed, |button| {
-                        button.opacity(0.4).cursor(CursorStyle::OperationNotAllowed)
+                        button.cursor(CursorStyle::OperationNotAllowed)
                     })
                     .when(armed, |button| {
-                        button
-                            .cursor_pointer()
-                            .bg(rgb(theme.active))
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.submit_carry(window, cx);
-                            }))
+                        button.on_click(cx.listener(|this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.submit_carry(window, cx);
+                        }))
                     }),
-            ),
-        )
+                ),
+            )
     }
 }
 

@@ -12,6 +12,7 @@ use gpui::{Bounds, Entity, Modifiers, Pixels, TestAppContext, VisualTestContext,
 use herdr_client::{ConnectTarget, LocalSession, SessionState};
 
 // Adding a session needs SSH, which Windows does not offer.
+mod edit_look;
 #[cfg(not(windows))]
 mod form_scroll;
 mod look;

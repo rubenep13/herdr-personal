@@ -2,8 +2,8 @@
 //! the delete dialog's archive script, and the setup a new checkout runs.
 //! The scripts themselves are `crate::worktree_scripts`.
 
-use super::super::{Removal, WorkspaceTarget, danger, state::Deletion};
-use crate::HerdrWindow;
+use super::super::{Removal, WorkspaceTarget, state::Deletion};
+use crate::{HerdrWindow, design::NoteTone};
 use gpui::{prelude::*, *};
 use herdr_client::Method;
 
@@ -81,13 +81,10 @@ impl HerdrWindow {
         cx: &mut Context<Self>,
     ) -> Option<Div> {
         use crate::worktree_scripts::{ArchiveCheck, Grant, Trust};
-        let theme = &self.theme;
-        let note = |text: String| {
-            div()
-                .debug_selector(|| "dialog-archive-script".into())
-                .text_color(rgb(theme.muted))
-                .child(text)
-        };
+        let look = self.dialog_look();
+        let note = |text: String| look.note("dialog-archive-script".into(), NoteTone::Info, text);
+        let warning =
+            |text: String| look.note("dialog-archive-script".into(), NoteTone::Warning, text);
         Some(match &deletion.archive {
             // Every deletion there would say so; asking is where it is reported.
             ArchiveCheck::Unread
@@ -96,7 +93,7 @@ impl HerdrWindow {
             }
             ArchiveCheck::Reading => note("Checking for an archive script...".into()),
             ArchiveCheck::Failed(error) => {
-                note(format!("The archive script cannot run: {error}")).text_color(danger(theme))
+                warning(format!("The archive script cannot run: {error}"))
             }
             ArchiveCheck::Read(_) => {
                 let config = deletion.archive.script()?;

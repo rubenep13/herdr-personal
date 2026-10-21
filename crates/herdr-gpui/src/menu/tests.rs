@@ -2,8 +2,12 @@
 use super::*;
 
 // keep-sorted start
+mod agent_dialogs;
+mod app_dialogs;
 mod footer_menu;
+mod install;
 mod keybinds_look;
+mod open_link;
 mod redesigned;
 mod x_mark;
 // keep-sorted end

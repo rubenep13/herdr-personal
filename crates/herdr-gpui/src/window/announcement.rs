@@ -22,6 +22,7 @@ impl HerdrWindow {
         } else {
             format!("Herdr {}", safe_text(&announcement.version, 64))
         };
+        let look = self.dialog_look();
         let card = div()
             .id("announcement")
             .debug_selector(|| "announcement".into())
@@ -30,14 +31,18 @@ impl HerdrWindow {
             .max_w(px(MAX_WIDTH))
             .occlude()
             .flex()
-            .gap(px(8.))
-            .p(px(10.))
-            .rounded(px(crate::config::corners::PANEL))
-            .border_1()
-            .border_color(rgb(accent))
-            .bg(rgb(theme.surface))
+            .gap(look.at(11.))
+            .pt(look.at(11.))
+            .pb(look.at(11.))
+            .pl(look.at(12.))
+            .pr(look.at(8.))
+            .map(|card| look.menu().panel(card))
             .text_color(rgb(theme.foreground))
-            .shadow_lg()
+            .child(look.tile(
+                "announcement-tile".into(),
+                "icons/megaphone.svg",
+                rgb(accent),
+            ))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
             .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
@@ -48,7 +53,13 @@ impl HerdrWindow {
                     .flex()
                     .flex_col()
                     .gap(px(4.))
-                    .child(div().truncate().text_color(rgb(theme.muted)).child(caption))
+                    .child(
+                        div()
+                            .truncate()
+                            .text_size(px(look.settings().scale().secondary))
+                            .text_color(rgb(theme.muted))
+                            .child(caption),
+                    )
                     .child(
                         div()
                             .debug_selector(|| "announcement-title".into())
@@ -69,23 +80,9 @@ impl HerdrWindow {
                     ),
             )
             .child(
-                div()
+                super::config_diagnostic::notice_cross(&look, theme)
                     .id("announcement-dismiss")
                     .debug_selector(|| "announcement-dismiss".into())
-                    .flex_none()
-                    .size(px(24.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(theme.active)))
-                    .child(
-                        svg()
-                            .path("icons/close.svg")
-                            .size(px(12.))
-                            .text_color(rgb(theme.foreground)),
-                    )
                     .on_click(cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
                         this.dismiss_announcement(&version, &id, cx);

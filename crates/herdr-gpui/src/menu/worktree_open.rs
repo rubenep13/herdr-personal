@@ -1,7 +1,11 @@
 //! Existing checkouts come only from the selected daemon, never local Git.
 
 use super::{MenuState, Page, WorkspaceAction, endpoint_error};
-use crate::{HerdrWindow, search_input::SearchInput};
+use crate::{
+    HerdrWindow,
+    design::{ItemState, Leading},
+    search_input::SearchInput,
+};
 use gpui::{prelude::*, *};
 use herdr_client::Method;
 use serde::Deserialize;
@@ -209,6 +213,8 @@ impl HerdrWindow {
         search.update(cx, |input, cx| {
             input.set_placeholder("Search worktrees...", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            // The query row draws the frame.
+            input.set_frameless(cx);
             window.focus(&input.focus, cx);
         });
         let subscription = cx.subscribe(
@@ -249,24 +255,33 @@ impl HerdrWindow {
         let Some(picker) = &self.menu.worktree_open else {
             return div();
         };
-        let mut panel = div().w_full().flex().flex_col().flex_1().min_h_0().child(
-            div()
-                .debug_selector(|| "open-worktree-search".into())
-                .flex_none()
-                .px(px(16.))
-                .py(px(10.))
-                .child(picker.search.clone())
-                .child(
-                    div()
-                        .pt(px(6.))
-                        .text_color(rgb(self.theme.muted))
-                        .child(format!(
-                            "{} of {} worktrees",
-                            picker.filtered.len(),
-                            picker.entries.len()
-                        )),
-                ),
-        );
+        let look = self.menu_look();
+        let mut panel = div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .flex_1()
+            .min_h_0()
+            .child(
+                div()
+                    .debug_selector(|| "open-worktree-search".into())
+                    .flex_none()
+                    .child(look.query("open-worktree-search-icon", picker.search.clone())),
+            )
+            .child(
+                div()
+                    .debug_selector(|| "open-worktree-count".into())
+                    .flex_none()
+                    .px(look.at(16.))
+                    .pt(look.at(8.))
+                    .text_size(px(look.scale().secondary))
+                    .text_color(look.muted())
+                    .child(format!(
+                        "{} of {} worktrees",
+                        picker.filtered.len(),
+                        picker.entries.len()
+                    )),
+            );
         if picker.filtered.is_empty() {
             panel = panel.child(
                 div()
@@ -309,7 +324,9 @@ impl HerdrWindow {
                 .w_full()
                 .track_scroll(&picker.scroll)
                 .flex_1()
-                .min_h_0(),
+                .min_h_0()
+                .px(look.at(6.))
+                .py(look.at(4.)),
             );
         }
         panel
@@ -328,43 +345,57 @@ impl HerdrWindow {
             (_, true) => "detached",
             _ => "",
         };
-        div()
-            .id(row)
-            .debug_selector(move || format!("open-worktree-row-{row}"))
+        let look = self.menu_look();
+        let state = ItemState {
+            selected: row == picker.selected,
+            ..ItemState::default()
+        };
+        look.list_row(row, format!("open-worktree-row-{row}"), state)
             .w_full()
-            .h(px(self.config.ui.line_height() * 2. + 14.))
-            .px(px(16.))
-            .py(px(5.))
-            .flex()
-            .flex_col()
-            .min_w_0()
-            .cursor_pointer()
-            .when(row == picker.selected, |row| row.bg(rgb(self.theme.active)))
-            .hover(|row| row.bg(rgb(self.theme.active)))
+            .child(look.leading(
+                Leading::Icon("icons/folder.svg", format!("open-worktree-row-{row}-icon")),
+                state,
+            ))
             .child(
                 div()
-                    .w_full()
-                    .flex()
+                    .flex_1()
                     .min_w_0()
-                    .gap(px(8.))
-                    .child(div().flex_1().min_w_0().truncate().child(label.to_owned()))
-                    .when(!status.is_empty(), |line| {
-                        line.child(
-                            div()
-                                .debug_selector(move || format!("open-worktree-row-status-{row}"))
-                                .flex_none()
-                                .text_color(rgb(self.theme.muted))
-                                .child(status),
-                        )
-                    }),
+                    .flex()
+                    .flex_col()
+                    .child(
+                        div()
+                            .w_full()
+                            .flex()
+                            .min_w_0()
+                            .gap(look.at(8.))
+                            .child(div().flex_1().min_w_0().truncate().child(label.to_owned()))
+                            .when(!status.is_empty(), |line| {
+                                line.child(
+                                    div()
+                                        .debug_selector(move || {
+                                            format!("open-worktree-row-status-{row}")
+                                        })
+                                        .flex_none()
+                                        .text_color(look.muted())
+                                        .child(status),
+                                )
+                            }),
+                    )
+                    .child(
+                        div()
+                            .w_full()
+                            .truncate()
+                            .text_size(px(look.scale().detail))
+                            .text_color(look.muted())
+                            .child(entry.path.clone()),
+                    ),
             )
-            .child(
-                div()
-                    .w_full()
-                    .truncate()
-                    .text_color(rgb(self.theme.muted))
-                    .child(entry.path.clone()),
-            )
+            .on_hover(cx.listener(move |this, hovered, _, cx| {
+                if *hovered && let Some(picker) = &mut this.menu.worktree_open {
+                    picker.selected = row;
+                    cx.notify();
+                }
+            }))
             .on_click(cx.listener(move |this, _, window, cx| {
                 cx.stop_propagation();
                 if this.menu.page != Some(Page::Dialog(WorkspaceAction::OpenWorktree))

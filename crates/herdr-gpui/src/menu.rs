@@ -10,6 +10,7 @@ mod devices;
 mod fan_out;
 mod git;
 mod github;
+mod install;
 mod open_link;
 mod page;
 mod pr;
@@ -51,8 +52,8 @@ mod worktree_tests;
 
 pub(crate) use state::Cover;
 pub(crate) use {
-    colors::{accent, danger, online, teleported, tint},
-    page::{Page, WorkspaceAction},
+    colors::{accent, danger, danger_value, online, teleported, tint},
+    page::{Look, Page, WorkspaceAction},
     state::{MenuState, Removal},
     theme_rows::{picker_error, picker_footer, theme_row},
     version_mismatch::Notice as VersionNotice,

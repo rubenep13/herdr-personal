@@ -7,6 +7,7 @@ use herdr_client::Method;
 mod close;
 mod close_unconfirmed;
 mod dialog_layout;
+mod dialog_look;
 mod dispatch;
 mod git_graph;
 mod issues;

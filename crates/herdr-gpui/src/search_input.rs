@@ -14,6 +14,16 @@ use crate::{actions, input::ViewInputHandler};
 
 pub struct Changed;
 
+/// The frame an input draws around its text: its own; the one Settings'
+/// fields and the redesigned dialogs wear; or none, inside a frame its owner
+/// draws.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Frame {
+    Own,
+    Field,
+    None,
+}
+
 pub struct SearchInput {
     pub focus: FocusHandle,
     placeholder: String,
@@ -29,7 +39,7 @@ pub struct SearchInput {
     masked: bool,
     /// Whether it draws its own border, background, and padding. A field
     /// set inside a frame its owner draws turns this off.
-    framed: bool,
+    frame: Frame,
     /// Text drawn dimmed after the caret, which the owner offers to complete
     /// what is typed; shown only while the caret ends the text.
     completion: Option<String>,
@@ -151,7 +161,7 @@ impl SearchInput {
             bounds: None,
             scroll: px(0.),
             selecting: false,
-            framed: true,
+            frame: Frame::Own,
             masked: false,
             completion: None,
         }
@@ -165,7 +175,17 @@ impl SearchInput {
 
     /// Draw only the text, inside a frame the owner draws.
     pub(crate) fn set_frameless(&mut self, cx: &mut Context<Self>) {
-        self.framed = false;
+        self.set_frame(Frame::None, cx);
+    }
+
+    /// Read by tests: which frame the input draws.
+    #[cfg(test)]
+    pub(crate) fn frame(&self) -> Frame {
+        self.frame
+    }
+
+    pub(crate) fn set_frame(&mut self, frame: Frame, cx: &mut Context<Self>) {
+        self.frame = frame;
         cx.notify();
     }
 
@@ -480,21 +500,37 @@ impl EntityInputHandler for SearchInput {
 }
 
 impl Render for SearchInput {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let input = cx.entity();
         let painter = input.clone();
         let height = px(self.font.line_height());
+        let focused = self.focus.is_focused(window);
         div()
             .debug_selector(|| "theme-search".into())
             .w_full()
-            .when(self.framed, |field| {
-                field
+            .map(|field| match self.frame {
+                Frame::Own => field
                     .px_2()
                     .py_1()
                     .rounded(px(crate::config::corners::CONTROL))
                     .border_1()
                     .border_color(rgb(self.theme.active))
-                    .bg(rgb(self.theme.background))
+                    .bg(rgb(self.theme.background)),
+                Frame::Field => {
+                    // The frame Settings' fields wear: its ring takes the
+                    // accent while the field has the keyboard.
+                    let look = crate::design::SettingsLook::of(&self.theme, &self.font);
+                    field
+                        .h(px(look.control_height()))
+                        .px(look.at(10.))
+                        .flex()
+                        .items_center()
+                        .rounded(look.at(8.))
+                        .border_1()
+                        .border_color(if focused { look.accent() } else { look.line() })
+                        .bg(look.well())
+                }
+                Frame::None => field,
             })
             .text_color(rgb(self.theme.foreground))
             .text_font(&self.font)
@@ -697,6 +733,7 @@ mod tests {
     use super::*;
 
     mod completion;
+    mod frame;
 
     #[test]
     fn masked_offsets_count_characters_both_ways() {

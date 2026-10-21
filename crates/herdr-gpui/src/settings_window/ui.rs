@@ -428,7 +428,7 @@ pub(in crate::settings_window) fn button(
     look.button(
         ElementId::Name(id.clone()),
         id.to_string(),
-        label,
+        label.into(),
         ButtonKind::Normal,
         ButtonSize::Regular,
         enabled,

@@ -1,10 +1,10 @@
 //! The titlebar's Git actions popup: commit, push, and pull request creation
 //! for the focused local checkout, plus review, comment, and merge for its
 //! open pull request.
-use super::{Page, accent, danger};
+use super::{Page, accent};
 use crate::{
     HerdrWindow,
-    design::{ItemState, Leading},
+    design::{ButtonKind, Header, ItemState, Leading},
     dialog_input::DialogInput,
     git::{Action, Status},
     pull_request::State as PrState,
@@ -586,135 +586,67 @@ impl HerdrWindow {
     /// The commit dialog wears the workspace dialogs' chrome: a titled header
     /// naming the branch, the body, then right-aligned actions. Its primary
     /// action stays unarmed until there is a message to commit.
-    pub(super) fn render_git_commit(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
-        let font = &self.config.ui;
+    pub(super) fn render_git_commit(&self, window: &Window, cx: &mut Context<Self>) -> Div {
+        let look = self.dialog_look();
         let armed = self
             .menu
             .input
             .as_ref()
             .is_some_and(|input| !input.text.trim().is_empty());
-        let mut body = div()
-            .flex()
-            .flex_col()
-            .gap(px(10.))
-            .px(px(16.))
-            .py(px(12.))
+        let branch = self.git.tracked().map(|input| input.branch.clone());
+        let mut body = look
+            .form_body("git-commit-body")
+            .child(look.lead(
+                "git-commit-text",
+                "Stages every change in the checkout, then commits.",
+            ))
             .child(
-                div()
-                    .text_color(rgb(theme.subtext()))
-                    .child("Stages every change in the checkout, then commits."),
-            )
-            .child(
-                div()
-                    .debug_selector(|| "git-commit-summary".into())
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.active))
-                    .px(px(10.))
-                    .py(px(6.))
+                look.well("git-commit-summary".into(), None)
                     .child(summary(self.git.status())),
             );
         if self.menu.input.is_some() {
-            body = body.child(self.render_dialog_input(cx));
+            body = body.child(self.render_dialog_input(window, cx));
         }
         if let Some(error) = &self.menu.error {
-            body = body.child(
-                div()
-                    .debug_selector(|| "git-commit-error".into())
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.active))
-                    .px(px(10.))
-                    .py(px(6.))
-                    .text_color(danger(theme))
-                    .child(error.clone()),
-            );
+            body = body.child(look.error("git-commit-error".into(), error.clone()));
         }
-        let button = |id: &'static str| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px(px(12.))
-                .py(px(6.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .border_1()
-                .cursor_pointer()
-        };
         div()
             .flex()
             .flex_col()
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        svg()
-                            .path(Row::Commit.icon())
-                            .size(px(16.))
-                            .flex_none()
-                            .text_color(rgb(theme.muted)),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Commit"),
-                            )
-                            .when_some(self.git.tracked(), |header, input| {
-                                header.child(
-                                    div()
-                                        .truncate()
-                                        .text_color(rgb(theme.muted))
-                                        .child(input.branch.clone()),
-                                )
-                            }),
-                    ),
+                look.menu().header(Header {
+                    selector: "git-commit-header",
+                    icon: Row::Commit.icon(),
+                    title: ("git-commit-title", "Commit"),
+                    sub: branch
+                        .as_deref()
+                        .map(|branch| ("icons/git-branch.svg", "git-commit-branch", branch)),
+                    danger: false,
+                }),
             )
             .child(body)
             .child(
-                div()
-                    .flex()
-                    .justify_end()
-                    .gap(px(8.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        button("git-commit-cancel")
-                            .border_color(rgb(theme.active))
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .child("Cancel")
+                look.form_footer("git-commit-footer")
+                    .button(
+                        look.small_button("git-commit-cancel", "Cancel", ButtonKind::Normal, true)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 cx.stop_propagation();
                                 this.dismiss_menu(window, cx);
                             })),
                     )
-                    .child(
-                        button("git-commit-submit")
-                            .border_color(rgb(if armed {
-                                theme.foreground
-                            } else {
-                                theme.active
-                            }))
-                            .when(armed, |button| button.bg(rgb(theme.active)))
-                            .text_color(rgb(if armed { theme.foreground } else { theme.muted }))
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .child("Commit")
-                            .on_click(cx.listener(|this, _, _, cx| {
+                    .button(
+                        look.small_button(
+                            "git-commit-submit",
+                            "Commit",
+                            ButtonKind::Primary,
+                            armed,
+                        )
+                        .when(armed, |button| {
+                            button.on_click(cx.listener(|this, _, _, cx| {
                                 cx.stop_propagation();
                                 this.submit_git_commit(cx);
-                            })),
+                            }))
+                        }),
                     ),
             )
     }

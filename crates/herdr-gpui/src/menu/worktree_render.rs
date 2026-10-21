@@ -8,6 +8,7 @@ use super::{
 };
 use crate::{
     HerdrWindow,
+    design::{ItemState, Leading},
     repo_items::{Kind, Origin},
 };
 use gpui::{prelude::*, *};
@@ -18,71 +19,48 @@ impl HerdrWindow {
     /// tab. The GitHub tabs are inert until an account is connected, because
     /// neither listing can be fetched without one, and look it.
     pub(super) fn render_worktree_tabs(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = self.menu_look();
         let connected = self.menu.github.connected();
         let Some(source) = &self.menu.worktree else {
             return div();
         };
         let busy = source.busy();
-        let mut strip = div()
-            .debug_selector(|| "worktree-tabs".into())
-            .flex()
-            .gap(px(4.))
-            .px(px(16.))
-            .pt(px(10.));
+        let mut strip = look.tabs("worktree-tabs");
         for tab in Tab::ALL {
             let label = tab.label();
             let enabled = connected || tab.kind().is_none();
             let selected = tab == source.tab;
-            // A tab that cannot be opened drops its outline and fades, so it
-            // never reads as one more button to press.
+            // A tab that cannot be opened fades and takes no click, so it
+            // never reads as one more tab to press.
             let inert = !selected && (!enabled || busy);
             let hits = source.hits(tab).filter(|_| enabled);
             strip = strip.child(
-                div()
-                    .id(label)
-                    .debug_selector(move || format!("worktree-tab-{label}"))
-                    .flex()
-                    .flex_none()
-                    .gap(px(5.))
-                    .px(px(10.))
-                    .py(px(5.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .border_1()
-                    .border_color(if inert {
-                        transparent_black()
-                    } else if selected {
-                        rgb(theme.foreground).into()
-                    } else {
-                        rgb(theme.active).into()
-                    })
-                    .when(selected, |button| button.bg(rgb(theme.active)))
-                    .text_color(rgb(if selected {
-                        theme.foreground
-                    } else {
-                        theme.muted
+                look.tab(
+                    label,
+                    format!("worktree-tab-{label}"),
+                    "worktree-tab-underline",
+                    selected,
+                )
+                .gap(look.at(5.))
+                .child(label)
+                .when_some(hits, |button, hits| {
+                    button.child(
+                        div()
+                            .debug_selector(move || format!("worktree-tab-count-{label}"))
+                            .text_size(px(look.scale().detail))
+                            .text_color(look.muted())
+                            .child(hits.to_string()),
+                    )
+                })
+                .when(inert, |button| {
+                    button.opacity(0.4).cursor(CursorStyle::OperationNotAllowed)
+                })
+                .when(enabled && !busy, |button| {
+                    button.on_click(cx.listener(move |this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.select_worktree_tab(tab, window, cx);
                     }))
-                    .when(inert, |button| {
-                        button.opacity(0.4).cursor(CursorStyle::OperationNotAllowed)
-                    })
-                    .when(enabled && !busy, |button| {
-                        button
-                            .cursor_pointer()
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.select_worktree_tab(tab, window, cx);
-                            }))
-                    })
-                    .child(label)
-                    .when_some(hits, |button, hits| {
-                        button.child(
-                            div()
-                                .debug_selector(move || format!("worktree-tab-count-{label}"))
-                                .text_color(rgb(theme.muted))
-                                .child(hits.to_string()),
-                        )
-                    }),
+                }),
             );
         }
         div()
@@ -90,9 +68,7 @@ impl HerdrWindow {
             .child(
                 div()
                     .debug_selector(|| "worktree-search".into())
-                    .px(px(16.))
-                    .pt(px(10.))
-                    .child(source.search.clone()),
+                    .child(look.query("worktree-search-icon", source.search.clone())),
             )
             .child(strip)
     }
@@ -102,6 +78,7 @@ impl HerdrWindow {
     pub(super) fn render_worktree_items(&self, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
         let font = &self.config.ui;
+        let look = self.menu_look();
         let Some(source) = &self.menu.worktree else {
             return div();
         };
@@ -206,7 +183,9 @@ impl HerdrWindow {
                     )
                     .track_scroll(&source.scroll)
                     .flex_1()
-                    .min_h_0(),
+                    .min_h_0()
+                    .px(look.at(6.))
+                    .py(look.at(4.)),
                 )
             })
             .child(
@@ -235,8 +214,6 @@ impl HerdrWindow {
     }
 
     fn render_worktree_row(&self, row: usize, cx: &mut Context<Self>) -> AnyElement {
-        let theme = &self.theme;
-        let font = &self.config.ui;
         let Some(source) = &self.menu.worktree else {
             return div().into_any_element();
         };
@@ -270,43 +247,57 @@ impl HerdrWindow {
                 }),
             ),
         };
-        let lines = if detail.is_some() { 2. } else { 1. };
-        let selected = row == source.selected;
-        div()
-            .id(row)
-            .debug_selector(move || format!("worktree-row-{row}"))
-            .w_full()
-            .h(px(font.line_height() * lines + 14.))
-            .px(px(16.))
-            .py(px(5.))
+        let look = self.menu_look();
+        let state = ItemState {
+            selected: row == source.selected,
+            ..ItemState::default()
+        };
+        let icon = match listed {
+            Row::Checkout(_) => "icons/folder.svg",
+            Row::Branch(_) => "icons/git-branch.svg",
+            Row::Item(item) if item.kind == Kind::Issue => "icons/note.svg",
+            Row::Item(_) => "icons/git-branch.svg",
+        };
+        let leading = Leading::Icon(icon, format!("worktree-row-{row}-icon"));
+        let title = div()
             .flex()
-            .flex_col()
-            .justify_center()
-            .cursor_pointer()
-            .when(selected, |row| row.bg(rgb(theme.active)))
-            .hover(|row| row.bg(rgb(theme.active)))
-            .child(
-                div()
-                    .flex()
-                    .gap(px(6.))
-                    .min_w_0()
-                    .when_some(number, |line, number| {
-                        line.child(div().flex_none().text_color(rgb(theme.muted)).child(number))
-                    })
-                    .child(div().flex_1().min_w_0().truncate().child(title))
-                    .when_some(tag, |line, tag| {
-                        line.child(div().flex_none().text_color(rgb(theme.muted)).child(tag))
-                    }),
-            )
-            .when_some(detail, |row, detail| {
-                row.child(
-                    div()
-                        .min_w_0()
-                        .truncate()
-                        .text_color(rgb(theme.muted))
-                        .child(detail),
-                )
+            .gap(look.at(6.))
+            .min_w_0()
+            .when_some(number, |line, number| {
+                line.child(div().flex_none().text_color(look.muted()).child(number))
             })
+            .child(div().flex_1().min_w_0().truncate().child(title))
+            .when_some(tag, |line, tag| {
+                line.child(div().flex_none().text_color(look.muted()).child(tag))
+            });
+        // A row with a detail line is a list's two-line row; a branch is a
+        // menu's one-line row.
+        let frame = match detail {
+            Some(detail) => look
+                .list_row(row, format!("worktree-row-{row}"), state)
+                .child(look.leading(leading, state))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .flex()
+                        .flex_col()
+                        .child(title)
+                        .child(
+                            div()
+                                .min_w_0()
+                                .truncate()
+                                .text_size(px(look.scale().detail))
+                                .text_color(look.muted())
+                                .child(detail),
+                        ),
+                ),
+            None => look
+                .row(row, format!("worktree-row-{row}"), leading, state)
+                .child(div().flex_1().min_w_0().child(title)),
+        };
+        frame
+            .w_full()
             .on_hover(cx.listener(move |this, hovered, _, cx| {
                 if *hovered && let Some(source) = &mut this.menu.worktree {
                     source.selected = row;

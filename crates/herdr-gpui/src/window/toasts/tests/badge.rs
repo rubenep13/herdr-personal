@@ -18,7 +18,8 @@ fn the_badge_leads_the_card_and_an_emoji_leaves_the_title(cx: &mut TestAppContex
     let badge = cx.debug_bounds("toast-badge-local-0").unwrap();
     let dismiss = cx.debug_bounds("toast-dismiss-local-0").unwrap();
     assert_eq!(badge.size, size(px(28.), px(28.)));
-    assert_eq!(badge.left(), card.left() + px(11.));
+    // The hairline and the card's 12 px left padding.
+    assert_eq!(badge.left(), card.left() + px(13.));
     assert!(badge.top() >= card.top() && badge.bottom() <= card.bottom());
     assert!(badge.right() < dismiss.left());
     // The emoji is drawn once, in the badge, not again in the title.

@@ -107,9 +107,10 @@ pub(super) fn circle(mark: Mark<'_>, theme: &crate::config::Theme, accent: u32) 
                 .bottom(px(-2.))
                 .size(px(12.))
                 .rounded_full()
-                // The ring cuts the dot out of the disc against the card.
+                // The ring cuts the dot out of the disc against the card,
+                // which wears the menus' panel: the window's background.
                 .border_2()
-                .border_color(rgb(theme.surface))
+                .border_color(rgb(theme.background))
                 .bg(rgb(accent)),
         )
 }

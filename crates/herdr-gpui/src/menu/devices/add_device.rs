@@ -4,6 +4,7 @@
 use super::{Page, discover::Discovery, setup};
 use crate::{
     HerdrWindow, NavigationTarget,
+    design::{ButtonKind, NoteTone},
     search_input::{Changed, SearchInput},
 };
 use gpui::{prelude::*, *};
@@ -143,6 +144,7 @@ impl HerdrWindow {
             let input = cx.new(SearchInput::new);
             input.update(cx, |input, cx| {
                 input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+                input.set_frame(crate::search_input::Frame::Field, cx);
                 input.set_placeholder(
                     ["user@hostname or SSH alias", "The SSH target", "default"][index],
                     cx,
@@ -225,7 +227,6 @@ impl HerdrWindow {
         compact: bool,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
-        let theme = &self.theme;
         let frame = |pane: Div, cx: &mut Context<Self>| {
             self.add_device_frame(
                 "device-setup-dialog",
@@ -245,11 +246,23 @@ impl HerdrWindow {
             })
             .flatten();
         setup.fields[0].update(cx, |field, cx| field.set_completion(ghost, cx));
-        let mut body = div().id("device-setup-body").debug_selector(|| "device-setup-body".into())
+        let look = self.dialog_look();
+        let mut body = div()
+            .id("device-setup-body")
+            .debug_selector(|| "device-setup-body".into())
             .flex_1()
-            .min_h_0().overflow_y_scroll().p(px(16.)).flex().flex_col().gap(px(12.))
-            .child(div().flex_none().text_color(rgb(theme.subtext()))
-                .child("Herdr checks the host over SSH and saves the device. If Herdr is missing or SSH needs your input, setup continues in a local workspace."));
+            .min_h_0()
+            .overflow_y_scroll()
+            .pt(look.at(14.))
+            .px(look.at(16.))
+            .pb(look.at(16.))
+            .flex()
+            .flex_col()
+            .gap(look.at(12.))
+            .child(look.lead(
+                "device-setup-text",
+                "Herdr checks the host over SSH and saves the device. If Herdr is missing or SSH needs your input, setup continues in a local workspace.",
+            ));
         for (index, (label, field)) in [
             "SSH target",
             "Label (optional)",
@@ -260,13 +273,16 @@ impl HerdrWindow {
         .enumerate()
         {
             body = body.child(
-                div()
-                    .flex_none()
-                    .flex()
-                    .flex_col()
-                    .gap(px(6.))
-                    .child(label)
-                    .child(field.clone()),
+                look.label(
+                    [
+                        "device-setup-label-0",
+                        "device-setup-label-1",
+                        "device-setup-label-2",
+                    ][index],
+                    label,
+                )
+                .flex_none()
+                .child(field.clone()),
             );
             // Suggestions fill the target, so they sit right under it, and
             // only while the form can still take one.
@@ -279,10 +295,8 @@ impl HerdrWindow {
         }
         if let Some(error) = &setup.error {
             body = body.child(
-                div()
-                    .flex_none()
-                    .text_color(crate::menu::danger(theme))
-                    .child(error.clone()),
+                look.error("device-setup-error".into(), error.clone())
+                    .flex_none(),
             );
         }
         let status = match &setup.step {
@@ -315,61 +329,70 @@ impl HerdrWindow {
         };
         if let Some(status) = status {
             body = body.child(
-                div()
-                    .debug_selector(|| "device-setup-status".into())
-                    .flex_none()
-                    .text_color(rgb(theme.muted))
-                    .child(status),
+                look.note("device-setup-status".into(), NoteTone::Info, status)
+                    .flex_none(),
             );
         }
-        let button = |id: &'static str, label: SharedString, enabled: bool| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .p(px(8.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .bg(rgb(theme.active))
-                .when(enabled, |button| {
-                    button.cursor_pointer().hover(|s| {
-                        s.bg(rgb(theme.active).blend(rgba((theme.foreground << 8) | 0x20)))
-                    })
-                })
-                .when(!enabled, |button| button.text_color(rgb(theme.muted)))
-                .child(label)
+        let button = |id: &'static str, label: SharedString, kind: ButtonKind, enabled: bool| {
+            look.button(id, label, kind, enabled)
         };
-        let mut footer = div()
-            .debug_selector(|| "device-setup-footer".into())
-            .flex_none()
-            .p(px(16.))
-            .border_t_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .justify_end()
-            .gap(px(8.));
-        let cancel = button("device-setup-cancel", "Cancel".into(), true)
-            .on_click(cx.listener(|this, _, _, cx| this.cancel_device_step(cx)));
+        let mut footer = look
+            .footer("device-setup-footer")
+            .wrap()
+            .hint("Esc", "cancel");
+        let cancel = button(
+            "device-setup-cancel",
+            "Cancel".into(),
+            ButtonKind::Normal,
+            true,
+        )
+        .on_click(cx.listener(|this, _, _, cx| this.cancel_device_step(cx)));
         footer = match &setup.step {
-            Step::Confirm(_, offer) => footer.child(cancel).child(
-                button("device-setup-submit", offer.action().into(), true)
-                    .on_click(cx.listener(|this, _, _, cx| this.open_setup_space(cx))),
+            Step::Confirm(_, offer) => footer.button(cancel).button(
+                button(
+                    "device-setup-submit",
+                    offer.action().into(),
+                    ButtonKind::Primary,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.open_setup_space(cx))),
             ),
-            Step::AwaitingLocalNetwork(_) => footer
-                .children(self.local_network_settings_button("device-setup-settings", cx))
-                .child(cancel),
+            Step::AwaitingLocalNetwork(_) => {
+                let mut footer = footer;
+                if let Some(settings) =
+                    self.local_network_settings_button("device-setup-settings", cx)
+                {
+                    footer = footer.button(settings);
+                }
+                footer.button(cancel)
+            }
             // Enter does not trust a key: only this button does.
-            Step::TrustKey(..) => footer.child(cancel).child(
-                button("device-setup-trust", "Trust key".into(), true)
-                    .on_click(cx.listener(|this, _, _, cx| this.trust_host_key(cx))),
+            Step::TrustKey(..) => footer.button(cancel).button(
+                button(
+                    "device-setup-trust",
+                    "Trust key".into(),
+                    ButtonKind::Primary,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.trust_host_key(cx))),
             ),
             step => {
                 let ready = matches!(step, Step::Form);
-                footer.child(
+                let footer = if ready {
+                    footer.hint("↵", "add")
+                } else {
+                    footer
+                };
+                footer.button(
                     button(
                         "device-setup-submit",
                         if ready { "Add device" } else { "Checking…" }.into(),
+                        ButtonKind::Primary,
                         ready,
                     )
-                    .on_click(cx.listener(|this, _, _, cx| this.submit_device_setup(cx))),
+                    .when(ready, |button| {
+                        button.on_click(cx.listener(|this, _, _, cx| this.submit_device_setup(cx)))
+                    }),
                 )
             }
         };

@@ -1,6 +1,10 @@
 //! Classic macOS-style About box: build identity only. It reads embedded build
 //! constants, never the daemon or the network; links open in the browser.
-use crate::{HerdrWindow, menu::Page};
+use crate::{
+    HerdrWindow,
+    design::{ButtonKind, Header},
+    menu::Page,
+};
 use gpui::{prelude::*, *};
 use std::sync::{Arc, LazyLock};
 
@@ -33,15 +37,18 @@ impl HerdrWindow {
     pub(super) fn render_about(&self, cx: &mut Context<Self>) -> Div {
         let font = &self.config.ui;
         let theme = &self.theme;
+        let look = self.dialog_look();
         let muted = rgb(theme.muted);
-        div()
-            .debug_selector(|| "about".into())
+        let close = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+            this.dismiss_menu(window, cx);
+        };
+        let identity = div()
             .flex()
             .flex_col()
             .items_center()
             .gap(px(6.))
             .px(px(24.))
-            .py(px(28.))
+            .py(px(20.))
             .text_center()
             .child(
                 div()
@@ -49,14 +56,6 @@ impl HerdrWindow {
                     .size(px(96.))
                     .mb(px(6.))
                     .child(img(ICON.clone()).size_full()),
-            )
-            .child(
-                div()
-                    .debug_selector(|| "about-name".into())
-                    .text_size(px(font.size * 1.8))
-                    .line_height(px(font.size * 2.2))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(crate::constants::WINDOW_TITLE),
             )
             .child(
                 div()
@@ -68,14 +67,14 @@ impl HerdrWindow {
                 div()
                     .debug_selector(|| "about-summary".into())
                     .pt(px(6.))
-                    .text_color(muted)
+                    .text_color(rgb(theme.subtext()))
                     .child(SUMMARY),
             )
             .child(
                 div()
                     .debug_selector(|| "about-unaffiliated".into())
                     .pt(px(4.))
-                    .text_size(px(font.size * 0.85))
+                    .text_size(px(look.settings().scale().detail))
                     .text_color(muted)
                     .child(UNAFFILIATED),
             )
@@ -97,7 +96,7 @@ impl HerdrWindow {
                     .items_center()
                     .gap(px(3.))
                     .pt(px(10.))
-                    .text_size(px(font.size * 0.85))
+                    .text_size(px(look.settings().scale().detail))
                     .text_color(muted)
                     .child(COPYRIGHT_YEAR)
                     .child(self.about_link("about-author", AUTHOR, AUTHOR_URL))
@@ -112,24 +111,37 @@ impl HerdrWindow {
                         ),
                     )
                     .child(LICENSE),
-            )
+            );
+        div()
+            .debug_selector(|| "about".into())
+            .flex()
+            .flex_col()
             .child(
-                div()
-                    .id("about-close")
-                    .debug_selector(|| "about-close".into())
-                    .mt(px(14.))
-                    .px(px(16.))
-                    .py(px(6.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .border_1()
-                    .border_color(rgb(theme.active))
-                    .bg(rgb(theme.active))
-                    .cursor_pointer()
-                    .child("OK")
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        cx.stop_propagation();
-                        this.dismiss_menu(window, cx);
-                    })),
+                look.header(
+                    Header {
+                        selector: "about-header",
+                        icon: "icons/info.svg",
+                        title: ("about-name", crate::constants::WINDOW_TITLE),
+                        sub: None,
+                        danger: false,
+                    },
+                    look.menu()
+                        .close_button("about-dismiss")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            close(this, window, cx);
+                        })),
+                ),
+            )
+            .child(identity)
+            .child(
+                look.footer("about-footer").hint("Esc", "close").button(
+                    look.button("about-close", "OK", ButtonKind::Primary, true)
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            close(this, window, cx);
+                        })),
+                ),
             )
     }
 
@@ -248,8 +260,9 @@ mod tests {
                 assert!(row.top() >= about.top() && row.bottom() <= about.bottom());
                 assert!(row.left() >= about.left() && row.right() <= about.right());
             }
-            assert!(icon.bottom() <= name.top());
-            assert!(name.bottom() <= version.top());
+            // The name heads the dialog, over the icon and the version.
+            assert!(name.bottom() <= icon.top());
+            assert!(icon.bottom() <= version.top());
             assert!(version.bottom() <= disclaimer.top());
             assert!(disclaimer.bottom() <= copyright.top());
             assert!(copyright.bottom() <= close.top());

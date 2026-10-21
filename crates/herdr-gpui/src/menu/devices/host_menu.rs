@@ -6,7 +6,7 @@ use super::setup;
 use crate::{
     HerdrWindow,
     config::{Config, KeybindingSource},
-    design::{Header, ItemState, Leading},
+    design::{ButtonKind, Header, ItemState, Leading},
     github::Account,
     menu::Page,
     search_input::SearchInput,
@@ -262,6 +262,8 @@ impl HerdrWindow {
                     input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
                     // An empty name falls back to the target, as when adding.
                     input.set_placeholder(&target, cx);
+                    // The dialog's field frame draws the frame.
+                    input.set_frameless(cx);
                     input.set_text_selected(&label, cx);
                     window.focus(&input.focus, cx);
                 });
@@ -289,6 +291,8 @@ impl HerdrWindow {
                 input.update(cx, |input, cx| {
                     input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
                     input.set_placeholder("3000", cx);
+                    // The dialog's field frame draws the frame.
+                    input.set_frameless(cx);
                     window.focus(&input.focus, cx);
                 });
                 if let Some(host) = &mut self.menu.host {
@@ -555,7 +559,7 @@ impl HerdrWindow {
         }
     }
 
-    pub(in crate::menu) fn render_host_menu(&self, cx: &mut Context<Self>) -> Div {
+    pub(in crate::menu) fn render_host_menu(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let Some(host) = &self.menu.host else {
             return div();
         };
@@ -572,6 +576,7 @@ impl HerdrWindow {
                 look.header(Header {
                     selector: "host-menu-header",
                     icon: "icons/computer.svg",
+                    danger: false,
                     title: ("host-menu-name", &host.label),
                     sub: Some(("icons/sessions.svg", "host-menu-place", &place)),
                 })
@@ -651,178 +656,166 @@ impl HerdrWindow {
             return body.child(self.render_forwards(host, cx));
         }
         if self.menu.page == Some(Page::RenameDevice) {
-            return self.render_rename_device(host, cx);
+            return self.render_rename_device(host, window, cx);
         }
         if self.menu.page == Some(Page::ForwardPort) {
-            return self.render_forward_port(host, cx);
+            return self.render_forward_port(host, window, cx);
         }
         if self.menu.page == Some(Page::DeviceTheme) {
             return self.render_device_theme(host, cx);
         }
         let github = self.host_has_github(&host.id);
-        body = body
-            .debug_selector(|| "remove-device".into())
-            .p(px(8.))
-            .gap(px(12.))
-            .child(
-                div()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Remove device"),
-            )
-            .child(
-                div()
-                    .text_color(rgb(theme.subtext()))
-                    .child(removal_note(host)),
-            )
-            .when(github, |body| {
-                body.child(
-                    div()
-                        .id("remove-device-github")
-                        .debug_selector(|| "remove-device-github".into())
-                        .flex()
-                        .items_center()
-                        .gap(px(8.))
-                        .cursor_pointer()
-                        .child(crate::toggles::checkbox(
-                            theme,
-                            self.config.ui.size + 2.,
-                            host.forget_github,
-                        ))
-                        .child("Also delete its GitHub sign-in from this computer")
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            if let Some(host) = &mut this.menu.host {
-                                host.forget_github = !host.forget_github;
-                                cx.notify();
-                            }
-                        })),
-                )
-            })
-            .child(
-                div()
-                    .flex()
-                    .justify_end()
-                    .gap(px(8.))
-                    .child(
-                        div()
-                            .id("remove-device-cancel")
-                            .p(px(6.))
-                            .cursor_pointer()
-                            .child("Cancel")
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                tracing::info!(category = "device_remove", "Remove cancelled");
-                                this.dismiss_menu(window, cx)
+        let dialog = self.dialog_look();
+        body.child(dialog.menu().header(Header {
+            selector: "remove-device-header",
+            icon: "icons/trash.svg",
+            danger: true,
+            title: ("remove-device-title", "Remove device"),
+            sub: Some(("icons/computer.svg", "remove-device-name", &host.label)),
+        }))
+        .child(
+            dialog
+                .form_body("remove-device")
+                .child(dialog.lead("remove-device-text", removal_note(host)))
+                .when(github, |body| {
+                    body.child(
+                        dialog
+                            .checkbox(
+                                "remove-device-github",
+                                "Also delete its GitHub sign-in from this computer",
+                                host.forget_github,
+                            )
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                if let Some(host) = &mut this.menu.host {
+                                    host.forget_github = !host.forget_github;
+                                    cx.notify();
+                                }
                             })),
                     )
-                    .child(
-                        div()
-                            .id("remove-device-submit")
-                            .debug_selector(|| "remove-device-submit".into())
-                            .p(px(6.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .bg(rgb(theme.active))
-                            .text_color(crate::menu::danger(theme))
-                            .cursor_pointer()
-                            .child("Remove")
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.confirm_remove_device(window, cx)
-                            })),
-                    ),
-            );
-        body
+                }),
+        )
+        .child(
+            dialog
+                .form_footer("remove-device-footer")
+                .button(
+                    dialog
+                        .small_button("remove-device-cancel", "Cancel", ButtonKind::Normal, true)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            tracing::info!(category = "device_remove", "Remove cancelled");
+                            this.dismiss_menu(window, cx)
+                        })),
+                )
+                .button(
+                    dialog
+                        .small_button("remove-device-submit", "Remove", ButtonKind::Danger, true)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.confirm_remove_device(window, cx)
+                        })),
+                ),
+        )
     }
 
-    /// A centered modal like Add Device: header with the title and Close,
-    /// the name field in the body, and the action in the footer.
-    fn render_rename_device(&self, host: &HostMenu, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
-        let header = div()
-            .debug_selector(|| "rename-device-header".into())
-            .flex_none()
-            .p(px(16.))
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .items_center()
-            .gap(px(12.))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .text_size(px(self.config.ui.size * 1.35))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Rename device"),
-            )
-            .child(
-                div()
-                    .id("rename-device-close")
-                    .debug_selector(|| "rename-device-close".into())
-                    .px_2()
-                    .py_1()
-                    .cursor_pointer()
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .hover(|s| s.bg(rgb(theme.active)))
-                    .child("Close")
-                    .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
-            );
-        let body = div()
-            .debug_selector(|| "rename-device".into())
-            .min_h_0()
-            .p(px(16.))
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(
-                div()
-                    .text_color(rgb(theme.muted))
-                    .child(format!("{} · {}", host.target, host.session)),
-            )
-            .child(div().flex().flex_col().gap(px(6.)).child("Name").when_some(
-                host.input.clone(),
-                |field, input| {
-                    if host.renaming {
-                        field.child(div().child(input.read(cx).text().to_owned()))
-                    } else {
-                        field.child(input)
-                    }
-                },
-            ))
-            .when_some(host.error.clone(), |body, error| {
-                body.child(div().text_color(crate::menu::danger(theme)).child(error))
-            });
+    /// The device's text field in the frame dialogs' fields wear, its ring
+    /// in the accent while it has the keyboard. While `pending`, the draft
+    /// reads as text.
+    fn device_field(
+        &self,
+        selector: &'static str,
+        host: &HostMenu,
+        pending: bool,
+        window: &Window,
+        cx: &App,
+    ) -> Div {
+        let focused = host
+            .input
+            .as_ref()
+            .is_some_and(|input| input.read(cx).focus.is_focused(window));
+        self.dialog_look()
+            .settings()
+            .field(selector.into(), focused)
+            .w_full()
+            .when_some(host.input.clone(), |field, input| {
+                if pending {
+                    field.child(div().truncate().child(input.read(cx).text().to_owned()))
+                } else {
+                    field.child(div().flex_1().min_w_0().child(input))
+                }
+            })
+    }
+
+    /// A centred dialog: the device it renames in the heading, the name in
+    /// the body, and Cancel and Rename in the footer.
+    fn render_rename_device(
+        &self,
+        host: &HostMenu,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let look = self.dialog_look();
+        let place = format!("{} · {}", host.target, host.session);
         let ready = !host.renaming;
-        let footer = div()
-            .debug_selector(|| "rename-device-footer".into())
-            .flex_none()
-            .p(px(16.))
-            .border_t_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .justify_end()
-            .child(
-                div()
-                    .id("rename-device-submit")
-                    .debug_selector(|| "rename-device-submit".into())
-                    .p(px(8.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.active))
-                    .when(ready, |button| {
-                        button.cursor_pointer().hover(|s| {
-                            s.bg(rgb(theme.active).blend(rgba((theme.foreground << 8) | 0x20)))
-                        })
-                    })
-                    .when(!ready, |button| button.text_color(rgb(theme.muted)))
-                    .child(if ready { "Rename" } else { "Renaming…" })
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.submit_rename_device(window, cx)),
-                    ),
-            );
+        let dismiss = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+            this.dismiss_menu(window, cx)
+        };
         div()
             .flex()
             .flex_col()
             .min_h_0()
-            .child(header)
-            .child(body)
-            .child(footer)
+            .child(
+                look.header(
+                    Header {
+                        selector: "rename-device-header",
+                        icon: "icons/pencil.svg",
+                        title: ("rename-device-title", "Rename device"),
+                        sub: Some(("icons/computer.svg", "rename-device-place", &place)),
+                        danger: false,
+                    },
+                    look.menu().close_button("rename-device-close").on_click(
+                        cx.listener(move |this, _, window, cx| dismiss(this, window, cx)),
+                    ),
+                ),
+            )
+            .child(
+                look.body("rename-device")
+                    .min_h_0()
+                    .child(
+                        look.label("rename-device-name", "Name")
+                            .child(self.device_field(
+                                "rename-device-field",
+                                host,
+                                host.renaming,
+                                window,
+                                cx,
+                            )),
+                    )
+                    .when_some(host.error.clone(), |body, error| {
+                        body.child(look.error("rename-device-error".into(), error))
+                    }),
+            )
+            .child(
+                look.footer("rename-device-footer")
+                    .hint("Esc", "cancel")
+                    .hint("↵", "rename")
+                    .button(
+                        look.button("rename-device-cancel", "Cancel", ButtonKind::Normal, true)
+                            .on_click(
+                                cx.listener(move |this, _, window, cx| dismiss(this, window, cx)),
+                            ),
+                    )
+                    .button(
+                        look.button(
+                            "rename-device-submit",
+                            if ready { "Rename" } else { "Renaming…" },
+                            ButtonKind::Primary,
+                            ready,
+                        )
+                        .on_click(
+                            cx.listener(|this, _, window, cx| {
+                                this.submit_rename_device(window, cx)
+                            }),
+                        ),
+                    ),
+            )
     }
 }
 

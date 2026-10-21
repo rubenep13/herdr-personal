@@ -2,7 +2,11 @@
 //! daemon the notes were read, so its other clients agree. An install command
 //! is shown for the user to review and run; nothing here runs it.
 use super::Page;
-use crate::{HerdrWindow, fonts::StyledFont, notifications::safe_text};
+use crate::{
+    HerdrWindow,
+    design::{ButtonKind, Header, NoteTone},
+    notifications::safe_text,
+};
 use gpui::{prelude::*, *};
 use herdr_client::Method;
 
@@ -34,62 +38,43 @@ impl HerdrWindow {
             }
             (None, None) => "Release notes are unavailable".into(),
         };
-        let mut sheet = div()
-            .debug_selector(|| "release-notes".into())
-            .flex()
-            .flex_col()
-            .child(
-                div()
-                    .debug_selector(|| "release-notes-title".into())
-                    .p(px(8.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(title),
-            );
+        let look = self.dialog_look();
+        let mut body = look.body("release-notes-sheet");
         if update.is_some() {
             let command = snapshot
                 .map(|s| s.update_install_command.trim())
                 .filter(|command| !command.is_empty());
-            sheet = sheet
+            body = body
+                .child(look.lead(
+                    "release-notes-command-lead",
+                    "Suggested command (review and run yourself):",
+                ))
                 .child(
-                    div()
-                        .p(px(8.))
-                        .child("Suggested command (review and run yourself):"),
-                )
-                .child(
-                    div()
-                        .debug_selector(|| "release-notes-command".into())
-                        .mx(px(8.))
-                        .p(px(8.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .bg(rgb(theme.active))
-                        .text_font(&self.config.terminal)
+                    look.well("release-notes-command".into(), Some(&self.config.terminal))
                         .child(command.map_or_else(
                             || "No install command provided by daemon.".into(),
                             |command| safe_text(command, MAX_COMMAND),
                         )),
                 )
-                .child(
-                    div()
-                        .p(px(8.))
-                        .text_color(rgb(theme.subtext()))
-                        .child("Nothing is installed or executed by this panel."),
-                );
+                .child(look.note(
+                    "release-notes-safe".into(),
+                    NoteTone::Info,
+                    "Nothing is installed or executed by this panel.",
+                ));
         }
         if let Some(notes) = notes {
             let lines = self.daemon_text.release_notes.lines(&notes.body);
-            sheet = sheet
-                .when(update.is_some(), |sheet| {
-                    sheet.child(div().p(px(8.)).text_color(rgb(theme.muted)).child(format!(
-                        "Release notes for {}",
-                        safe_text(&notes.version, 64)
-                    )))
+            body = body
+                .when(update.is_some(), |body| {
+                    body.child(look.lead(
+                        "release-notes-for",
+                        format!("Release notes for {}", safe_text(&notes.version, 64)),
+                    ))
                 })
                 .child(
                     div()
                         .id("release-notes-body")
                         .debug_selector(|| "release-notes-body".into())
-                        .px(px(8.))
-                        .py(px(4.))
                         .max_h(px(MAX_BODY_HEIGHT))
                         .overflow_y_scroll()
                         .child(crate::release_notes::render(
@@ -100,18 +85,46 @@ impl HerdrWindow {
                         )),
                 );
         }
-        sheet.child(
-            div()
-                .id("menu-close")
-                .debug_selector(|| "release-notes-close".into())
-                .p(px(8.))
-                .cursor_pointer()
-                .child("Close")
-                .on_click(cx.listener(|this, _, window, cx| {
-                    cx.stop_propagation();
-                    this.dismiss_menu(window, cx);
-                })),
-        )
+        let close = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+            this.dismiss_menu(window, cx);
+        };
+        div()
+            .debug_selector(|| "release-notes".into())
+            .flex()
+            .flex_col()
+            .child(
+                look.header(
+                    Header {
+                        selector: "release-notes-header",
+                        icon: if update.is_some() {
+                            "icons/download.svg"
+                        } else {
+                            "icons/megaphone.svg"
+                        },
+                        title: ("release-notes-title", &title),
+                        sub: None,
+                        danger: false,
+                    },
+                    look.menu()
+                        .close_button("release-notes-dismiss")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            close(this, window, cx);
+                        })),
+                ),
+            )
+            .child(body)
+            .child(
+                look.footer("release-notes-footer")
+                    .hint("Esc", "close")
+                    .button(
+                        look.button("release-notes-close", "Close", ButtonKind::Primary, true)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                cx.stop_propagation();
+                                close(this, window, cx);
+                            })),
+                    ),
+            )
     }
 
     /// Tells the daemon the shown release notes were read, as the sheet closes.

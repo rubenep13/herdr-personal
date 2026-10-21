@@ -2,7 +2,7 @@ use crate::{
     HerdrWindow,
     browser::GroupId,
     controls::Command,
-    design::{ItemState, Leading},
+    design::{ButtonKind, Header, ItemState, Leading},
     menu::Page,
     search_input::SearchInput,
 };
@@ -186,6 +186,8 @@ impl HerdrWindow {
                 input.update(cx, |input, cx| {
                     input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
                     input.set_placeholder("Tab name", cx);
+                    // The form's field frame draws the frame.
+                    input.set_frameless(cx);
                     input.set_text_selected(&target.label, cx);
                     window.focus(&input.focus, cx);
                 });
@@ -316,11 +318,10 @@ impl HerdrWindow {
         }
     }
 
-    pub(super) fn render_tab_menu(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn render_tab_menu(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let Some(tab) = &self.menu.tab else {
             return div();
         };
-        let theme = &self.theme;
         let mut body = div().flex().flex_col();
         if self.menu.page == Some(Page::Tab) {
             let look = self.menu_look();
@@ -350,49 +351,71 @@ impl HerdrWindow {
                 );
             }
         } else {
-            body =
-                body.p(px(8.))
-                    .gap(px(12.))
-                    .child(div().font_weight(FontWeight::SEMIBOLD).child("Rename tab"))
-                    .when_some(tab.input.clone(), |body, input| {
-                        if tab.pending.is_some() {
-                            body.child(div().child(input.read(cx).text().to_owned()))
-                        } else {
-                            body.child(input)
-                        }
-                    })
-                    .child(
-                        div()
-                            .flex()
-                            .justify_end()
-                            .gap(px(8.))
-                            .child(
-                                div()
-                                    .id("tab-rename-cancel")
-                                    .p(px(6.))
-                                    .cursor_pointer()
-                                    .child("Cancel")
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.dismiss_menu(window, cx)
-                                    })),
+            let look = self.dialog_look();
+            let pending = tab.pending.is_some();
+            let field = look
+                .settings()
+                .field(
+                    "tab-rename-field".into(),
+                    tab.input
+                        .as_ref()
+                        .is_some_and(|input| input.read(cx).focus.is_focused(window)),
+                )
+                .w_full()
+                .when_some(tab.input.clone(), |field, input| {
+                    // While the rename is in flight the name reads as text.
+                    if pending {
+                        field.child(div().truncate().child(input.read(cx).text().to_owned()))
+                    } else {
+                        field.child(div().flex_1().min_w_0().child(input))
+                    }
+                });
+            return body
+                .child(look.menu().header(Header {
+                    selector: "tab-rename-header",
+                    icon: "icons/pencil.svg",
+                    title: ("tab-rename-title", "Rename tab"),
+                    sub: (!tab.target.label.is_empty()).then_some((
+                        "icons/tab.svg",
+                        "tab-rename-target",
+                        tab.target.label.as_str(),
+                    )),
+                    danger: false,
+                }))
+                .child(
+                    look.form_body("tab-rename-body")
+                        .child(field)
+                        .when_some(tab.error.clone(), |body, error| {
+                            body.child(look.error("tab-rename-error".into(), error))
+                        }),
+                )
+                .child(
+                    look.form_footer("tab-rename-footer")
+                        .button(
+                            look.small_button(
+                                "tab-rename-cancel",
+                                "Cancel",
+                                ButtonKind::Normal,
+                                true,
                             )
-                            .child(
-                                div()
-                                    .id("tab-rename-submit")
-                                    .p(px(6.))
-                                    .rounded(px(crate::config::corners::CONTROL))
-                                    .bg(rgb(theme.active))
-                                    .cursor_pointer()
-                                    .child(if tab.pending.is_some() {
-                                        "Renaming..."
-                                    } else {
-                                        "Rename"
-                                    })
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.submit_tab_rename(window, cx)
-                                    })),
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)),
                             ),
-                    );
+                        )
+                        .button(
+                            look.small_button(
+                                "tab-rename-submit",
+                                if pending { "Renaming..." } else { "Rename" },
+                                ButtonKind::Primary,
+                                !pending,
+                            )
+                            .on_click(
+                                cx.listener(|this, _, window, cx| {
+                                    this.submit_tab_rename(window, cx)
+                                }),
+                            ),
+                        ),
+                );
         }
         body.when_some(tab.error.clone(), |body, error| {
             // No width of its own, so the labels set the panel's width and

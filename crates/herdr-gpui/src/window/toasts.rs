@@ -4,12 +4,38 @@ use crate::{
     notifications::{Notice, VISIBLE_LIMIT, safe_text},
 };
 use gpui::{prelude::*, *};
-use herdr_client::protocol::{SemanticNotification, SemanticNotificationKind, ToastHerdrPosition};
+use herdr_client::protocol::{
+    AgentStatus, SemanticNotification, SemanticNotificationKind, ToastHerdrPosition,
+};
 use std::{sync::TryLockError, task::Poll, time::Instant};
 
 mod badge;
 
+/// How far a toast that leads somewhere leans toward the hairline under
+/// the pointer.
+const TOAST_HOVER_PERCENT: u32 = 35;
+
 impl HerdrWindow {
+    /// The dot on a toast's badge: the colour the sidebar gives the state
+    /// the notice reports, so every place says it alike; the accent for the
+    /// app's own notices.
+    pub(super) fn toast_dot(&self, kind: SemanticNotificationKind) -> u32 {
+        match kind {
+            SemanticNotificationKind::NeedsAttention => self.status_color(AgentStatus::Blocked),
+            SemanticNotificationKind::Finished => self.status_color(AgentStatus::Done),
+            _ => self.theme.ink(self.theme.primary()),
+        }
+    }
+
+    /// The colour the sidebar tints `label`'s host header with, if any.
+    pub(super) fn host_dot(&self, label: &str) -> Option<u32> {
+        self.config
+            .sidebar_style
+            .hosts
+            .get(label)
+            .map(|colour| self.theme.ink(*colour))
+    }
+
     pub(crate) fn click_toast(
         &mut self,
         endpoint_id: &str,
@@ -259,11 +285,10 @@ impl HerdrWindow {
                 let generation = endpoint.generation;
                 let id = *id;
                 let badge = badge::badge(notice);
-                let accent = self.theme.ink(match notice.kind {
-                    SemanticNotificationKind::NeedsAttention => self.theme.palette[3],
-                    SemanticNotificationKind::Finished => self.theme.palette[2],
-                    _ => self.theme.primary(),
-                });
+                let accent = self.toast_dot(notice.kind);
+                let host_dot = self.host_dot(&endpoint.label);
+                let look = self.menu_look();
+                let group = SharedString::from(format!("toast-{}-{generation}-{id}", endpoint.id));
                 cards.push(
                     div()
                         .id(SharedString::from(format!(
@@ -279,20 +304,17 @@ impl HerdrWindow {
                         .flex_none()
                         .overflow_hidden()
                         .max_h((viewport.height - px(132.)) / visible_limit as f32)
-                        .rounded(px(crate::config::corners::PANEL))
-                        .border_1()
-                        .border_color(rgb(crate::config::mix(
-                            self.theme.surface,
-                            self.theme.foreground,
-                            14,
-                        )))
-                        .bg(rgb(self.theme.surface))
-                        .text_color(rgb(self.theme.foreground))
+                        .map(|card| look.panel(card))
+                        .group(group.clone())
+                        .text_color(rgb(self.theme.subtext()))
                         .text_font(&self.config.ui)
-                        .text_size(px(self.config.ui.size))
-                        .p(px(10.))
+                        .text_size(px(look.scale().name))
+                        .pt(look.at(11.))
+                        .pb(look.at(11.))
+                        .pl(look.at(12.))
+                        .pr(look.at(8.))
                         .flex()
-                        .gap(px(10.))
+                        .gap(look.at(11.))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
                         .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
@@ -303,7 +325,14 @@ impl HerdrWindow {
                                 .as_deref()
                                 .and_then(|s| notice.target(s))
                                 .is_some(),
-                            |d| d.cursor_pointer(),
+                            |d| {
+                                let hover = rgb(crate::config::mix(
+                                    self.theme.background,
+                                    self.theme.active,
+                                    TOAST_HOVER_PERCENT,
+                                ));
+                                d.cursor_pointer().hover(move |d| d.bg(hover))
+                            },
                         )
                         .on_click({
                             let endpoint_id = endpoint_id.clone();
@@ -329,9 +358,31 @@ impl HerdrWindow {
                                 .gap(px(4.))
                                 .child(
                                     div()
-                                        .truncate()
+                                        .min_w_0()
+                                        .flex()
+                                        .items_center()
+                                        .gap(look.at(6.))
+                                        .text_size(px(look.scale().secondary))
                                         .text_color(rgb(self.theme.muted))
-                                        .child(safe_text(&endpoint.label, 80)),
+                                        .when_some(host_dot, |host, colour| {
+                                            let endpoint_id = endpoint.id.clone();
+                                            host.child(
+                                                div()
+                                                    .debug_selector(move || {
+                                                        format!("toast-host-dot-{endpoint_id}-{id}")
+                                                    })
+                                                    .flex_none()
+                                                    .size(look.at(7.))
+                                                    .rounded_full()
+                                                    .bg(rgb(colour)),
+                                            )
+                                        })
+                                        .child(
+                                            div()
+                                                .min_w_0()
+                                                .truncate()
+                                                .child(safe_text(&endpoint.label, 80)),
+                                        ),
                                 )
                                 .child({
                                     let title = SharedString::from(badge.title.to_owned());
@@ -346,13 +397,15 @@ impl HerdrWindow {
                                             }
                                         })
                                         .truncate()
-                                        .font_weight(FontWeight::MEDIUM)
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(rgb(self.theme.foreground))
                                         .child(title)
                                 })
                                 .when_some(notice.body.clone(), |d, body| {
                                     d.child(
                                         div()
                                             .id("body")
+                                            .text_size(px(look.scale().name - 0.5))
                                             .debug_selector({
                                                 let endpoint_id = endpoint.id.clone();
                                                 move || format!("toast-body-{endpoint_id}-{id}")
@@ -395,18 +448,21 @@ impl HerdrWindow {
                                     move || format!("toast-dismiss-{endpoint_id}-{id}")
                                 })
                                 .flex_none()
-                                .size(px(24.))
-                                .rounded(px(crate::config::corners::CONTROL))
+                                .size(look.at(24.))
+                                .rounded(look.at(crate::design::ICON_BUTTON_RADIUS))
                                 .flex()
                                 .items_center()
                                 .justify_center()
                                 .cursor_pointer()
+                                // Quiet until the pointer is on the toast.
+                                .opacity(0.7)
+                                .group_hover(group.clone(), |s| s.opacity(1.))
                                 .hover(|s| s.bg(rgb(self.theme.active)))
                                 .child(
                                     svg()
                                         .path("icons/close.svg")
-                                        .size(px(12.))
-                                        .text_color(rgb(self.theme.foreground)),
+                                        .size(look.at(12.))
+                                        .text_color(rgb(self.theme.muted)),
                                 )
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     cx.stop_propagation();

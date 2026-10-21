@@ -9,6 +9,8 @@ use gpui::{prelude::*, *};
 use herdr_client::{ConnectTarget, LocalSession};
 mod management;
 pub(super) use management::Edit;
+#[cfg(test)]
+pub(super) use management::{Target as EditTarget, edit_kind};
 
 /// A line in the popup, in the order it is painted. Only a row can be selected,
 /// so navigation walks the `Row` entries and skips headers and notes.
@@ -480,9 +482,9 @@ impl HerdrWindow {
         }
     }
 
-    pub(super) fn render_sessions(&self, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_sessions(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         if self.menu.session_edit.is_some() {
-            return self.render_session_edit(cx).into_any_element();
+            return self.render_session_edit(window, cx).into_any_element();
         }
         self.render_session_list(cx)
     }
