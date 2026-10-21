@@ -174,14 +174,17 @@ impl Page {
             | Self::AddWsl
             | Self::AgentSkill
             | Self::AppUpdate
+            | Self::Checkpoints
             | Self::ConfirmClose
             | Self::Dialog(_)
+            | Self::FanOut
             | Self::ForwardPort
             | Self::GitHub
             | Self::Install
             | Self::OpenLink
             | Self::RenameDevice
             | Self::StartAgent
+            | Self::Teleport
             | Self::Update
             | Self::VersionMismatch
             | Self::WorktreeScript => Look::Dialog,

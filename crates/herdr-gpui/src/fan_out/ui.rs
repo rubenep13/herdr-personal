@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{
     HerdrWindow,
+    design::{ButtonKind, ButtonSize, Header, NoteTone},
     icons::AgentIcon,
     menu::Page,
     progress::{self, Progress as Bar},
@@ -174,21 +175,26 @@ impl HerdrWindow {
             return div();
         };
         let theme = &self.theme;
-        let font = &self.config.ui;
         let muted = rgb(theme.muted);
         let danger = crate::menu::danger(theme);
-        let line = |text: String| div().min_w_0().child(text);
-        let small = |id: &'static str, index: usize| {
+        let look = self.dialog_look();
+        let text_size = px(look.settings().scale().name);
+        let line = |text: String| {
             div()
-                .id((id, index))
-                .debug_selector(move || format!("{id}-{index}"))
-                .px(px(8.))
-                .py(px(2.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .border_1()
-                .border_color(rgb(theme.active))
-                .cursor_pointer()
-                .hover(|button| button.bg(rgb(theme.active)))
+                .min_w_0()
+                .text_size(text_size)
+                .text_color(rgb(theme.subtext()))
+                .child(text)
+        };
+        let small = |id: &'static str, index: usize, label: &'static str| {
+            look.settings().button(
+                (id, index),
+                format!("{id}-{index}"),
+                label,
+                ButtonKind::Normal,
+                ButtonSize::Small,
+                true,
+            )
         };
         let prompt = self
             .menu
@@ -196,7 +202,7 @@ impl HerdrWindow {
             .as_ref()
             .map(|input| input.text.as_str())
             .unwrap_or_default();
-        let mut body = div().flex().flex_col().gap(px(8.)).px(px(16.)).py(px(12.));
+        let mut body = look.body("fan-out-sheet");
         let (primary, armed) = match &fan_out.stage {
             Stage::Compose(installed) => {
                 body = body.child(
@@ -227,11 +233,7 @@ impl HerdrWindow {
                             );
                     }
                     Some(Err(error)) => {
-                        body = body.child(
-                            line(error.clone())
-                                .debug_selector(|| "fan-out-error".into())
-                                .text_color(danger),
-                        );
+                        body = body.child(look.error("fan-out-error".into(), error.clone()));
                     }
                     Some(Ok(kinds)) if kinds.is_empty() => {
                         body = body.child(
@@ -271,7 +273,7 @@ impl HerdrWindow {
                                     )
                                     .child(div().flex_1().min_w_0().truncate().child(kind.name()))
                                     .when(count > 0, |row| {
-                                        row.child(small("fan-out-less", index).child("−").on_click(
+                                        row.child(small("fan-out-less", index, "−").on_click(
                                             cx.listener(move |this, _, _, cx| {
                                                 cx.stop_propagation();
                                                 if let Some(fan_out) = &mut this.fan_out
@@ -292,7 +294,7 @@ impl HerdrWindow {
                                                 .child(count.to_string()),
                                         )
                                     })
-                                    .child(small("fan-out-more", index).child("+").on_click(
+                                    .child(small("fan-out-more", index, "+").on_click(
                                         cx.listener(move |this, _, _, cx| {
                                             cx.stop_propagation();
                                             if let Some(fan_out) = &mut this.fan_out
@@ -432,23 +434,23 @@ impl HerdrWindow {
                                     }),
                             )
                             .when(actionable, |row| {
-                                row.child(small("fan-out-open", index).child("Open").on_click(
+                                row.child(small("fan-out-open", index, "Open").on_click(
                                     cx.listener(move |this, _, window, cx| {
                                         cx.stop_propagation();
                                         this.open_fan_out_lane(index, window, cx);
                                     }),
                                 ))
                                 .child(
-                                    small("fan-out-keep", index).child("Keep").on_click(
-                                        cx.listener(move |this, _, _, cx| {
+                                    small("fan-out-keep", index, "Keep").on_click(cx.listener(
+                                        move |this, _, _, cx| {
                                             cx.stop_propagation();
                                             if let Some(fan_out) = &mut this.fan_out {
                                                 fan_out.stage = Stage::Confirm(index);
                                                 fan_out.error = None;
                                                 cx.notify();
                                             }
-                                        }),
-                                    ),
+                                        },
+                                    )),
                                 )
                             }),
                     );
@@ -470,13 +472,13 @@ impl HerdrWindow {
                     }
                     Stage::Confirm(winner) => {
                         let others = fan_out.doomed(winner).len();
-                        body = body.child(
-                            line(format!(
+                        body = body.child(look.note(
+                            "fan-out-confirm".into(),
+                            NoteTone::Warning,
+                            format!(
                                 "Removes the other {others} worktree(s) and their uncommitted changes. Their branches stay, with any commits."
-                            ))
-                            .debug_selector(|| "fan-out-confirm".into())
-                            .text_color(danger),
-                        );
+                            ),
+                        ));
                         (format!("Remove {others} other(s)"), true)
                     }
                     _ => {
@@ -492,22 +494,8 @@ impl HerdrWindow {
             }
         };
         if let Some(error) = &fan_out.error {
-            body = body.child(
-                line(error.clone())
-                    .debug_selector(|| "fan-out-error".into())
-                    .text_color(danger),
-            );
+            body = body.child(look.error("fan-out-error".into(), error.clone()));
         }
-        let button = |id: &'static str| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px(px(12.))
-                .py(px(6.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .border_1()
-                .cursor_pointer()
-        };
         let dismiss = match fan_out.stage {
             Stage::Compose(_) => "Cancel",
             Stage::Confirm(_) => "Back",
@@ -515,42 +503,30 @@ impl HerdrWindow {
             _ if fan_out.busy() => "Hide",
             _ => "Close",
         };
+        let removing = matches!(fan_out.stage, Stage::Confirm(_));
+        let place = format!(
+            "{} on {}",
+            fan_out.origin.repo_label, fan_out.origin.endpoint_label
+        );
         div()
             .flex()
             .flex_col()
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        svg()
-                            .path("icons/fan-out.svg")
-                            .size(px(16.))
-                            .flex_none()
-                            .text_color(muted),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Fan out prompt"),
-                            )
-                            .child(div().truncate().text_color(muted).child(format!(
-                                "{} on {}",
-                                fan_out.origin.repo_label, fan_out.origin.endpoint_label
-                            ))),
-                    ),
+                look.header(
+                    Header {
+                        selector: "fan-out-header",
+                        icon: "icons/fan-out.svg",
+                        title: ("fan-out-title", "Fan out prompt"),
+                        sub: Some(("icons/folder.svg", "fan-out-place", &place)),
+                        danger: false,
+                    },
+                    look.menu()
+                        .close_button("fan-out-dismiss")
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.fan_out_back(window, cx);
+                        })),
+                ),
             )
             .child(
                 div()
@@ -560,45 +536,43 @@ impl HerdrWindow {
                     .child(body),
             )
             .child(
-                div()
-                    .flex()
-                    .justify_end()
-                    .gap(px(8.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        button("fan-out-cancel")
-                            .border_color(rgb(theme.active))
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .child(dismiss)
+                look.footer("fan-out-footer")
+                    .hint("Esc", dismiss_word(dismiss))
+                    .button(
+                        look.button("fan-out-cancel", dismiss, ButtonKind::Normal, true)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 cx.stop_propagation();
                                 this.fan_out_back(window, cx);
                             })),
                     )
-                    .child(
-                        button("fan-out-submit")
-                            .border_color(if armed {
-                                rgb(theme.foreground)
+                    .button(
+                        look.button(
+                            "fan-out-submit",
+                            primary,
+                            if removing {
+                                ButtonKind::Danger
                             } else {
-                                rgb(theme.active)
-                            })
-                            .text_color(if armed { rgb(theme.foreground) } else { muted })
-                            .child(primary)
-                            .when(!armed, |button| {
-                                button.opacity(0.4).cursor(CursorStyle::OperationNotAllowed)
-                            })
-                            .when(armed, |button| {
-                                button.bg(rgb(theme.active)).on_click(cx.listener(
-                                    |this, _, _, cx| {
-                                        cx.stop_propagation();
-                                        this.submit_fan_out(cx);
-                                    },
-                                ))
-                            }),
+                                ButtonKind::Primary
+                            },
+                            armed,
+                        )
+                        .when(armed, |button| {
+                            button.on_click(cx.listener(|this, _, _, cx| {
+                                cx.stop_propagation();
+                                this.submit_fan_out(cx);
+                            }))
+                        }),
                     ),
             )
+    }
+}
+
+/// What Esc does, as the footer names it: the dismiss button's word.
+fn dismiss_word(dismiss: &'static str) -> &'static str {
+    match dismiss {
+        "Back" => "back",
+        "Hide" => "hide",
+        "Close" => "close",
+        _ => "cancel",
     }
 }

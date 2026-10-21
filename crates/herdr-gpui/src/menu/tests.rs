@@ -2,6 +2,7 @@
 use super::*;
 
 // keep-sorted start
+mod agent_dialogs;
 mod app_dialogs;
 mod footer_menu;
 mod install;

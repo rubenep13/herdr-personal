@@ -18,6 +18,7 @@ use super::{
 };
 use crate::{
     HerdrWindow, NavigationTarget,
+    design::{ButtonKind, Header, NoteTone},
     menu::Page,
     progress::{self, Progress},
     window::Flash,
@@ -494,7 +495,6 @@ impl HerdrWindow {
             return div();
         };
         let theme = &self.theme;
-        let font = &self.config.ui;
         let muted = rgb(theme.muted);
         let subtext = rgb(theme.subtext());
         let danger = crate::menu::danger(theme);
@@ -506,8 +506,16 @@ impl HerdrWindow {
                 rgb(theme.active).into(),
             )
         };
-        let line = |text: String| div().min_w_0().child(text);
-        let mut body = div().flex().flex_col().gap(px(8.)).px(px(16.)).py(px(12.));
+        let look = self.dialog_look();
+        let text_size = px(look.settings().scale().name);
+        let line = |text: String| {
+            div()
+                .min_w_0()
+                .text_size(text_size)
+                .text_color(subtext)
+                .child(text)
+        };
+        let mut body = look.body("teleport-sheet");
         let (primary, armed) = match &teleport.stage {
             Stage::Choosing => {
                 if teleport.hosts.is_empty() {
@@ -605,22 +613,22 @@ impl HerdrWindow {
                         )));
                     }
                     GitHubAccess::Unavailable => {
-                        body = body.child(
-                            line(format!(
+                        body = body.child(look.note(
+                            "teleport-github".into(),
+                            NoteTone::Warning,
+                            format!(
                                 "{} cannot reach GitHub, and the GitHub CLI here is not signed in, so pull and push will not work there.",
                                 candidate.place.label
-                            ))
-                            .text_color(danger),
-                        );
+                            ),
+                        ));
                     }
                 }
                 if review.reason == Some(MatchReason::Name) {
-                    body = body.child(
-                        line(
-                            "Matched by name only: this repository's remotes differ there.".into(),
-                        )
-                        .text_color(danger),
-                    );
+                    body = body.child(look.note(
+                        "teleport-name-match".into(),
+                        NoteTone::Warning,
+                        "Matched by name only: this repository's remotes differ there.",
+                    ));
                 }
                 for (index, tab) in review.tabs.iter().enumerate() {
                     let title = tab.label.clone().map_or_else(
@@ -653,11 +661,11 @@ impl HerdrWindow {
                 body = body
                     .child(line(format!("Moving to {}...", candidate.place.label)))
                     .child(bar(Progress::Working(step.map_or(0., Step::progress))))
-                    .child(
-                        line(step.map_or("Starting", Step::label).to_owned())
-                            .debug_selector(|| "teleport-step".into())
-                            .text_color(muted),
-                    )
+                    .child(look.note(
+                        "teleport-step".into(),
+                        NoteTone::Info,
+                        step.map_or("Starting", Step::label),
+                    ))
                     .child(
                         line("Closing this dialog does not stop the move.".into())
                             .text_color(subtext),
@@ -666,11 +674,7 @@ impl HerdrWindow {
             }
             Stage::Failed(error) => {
                 body = body
-                    .child(
-                        line(error.clone())
-                            .debug_selector(|| "teleport-error".into())
-                            .text_color(danger),
-                    )
+                    .child(look.error("teleport-error".into(), error.clone()))
                     .child(
                         line(
                             "The source workspace closes only once the destination is ready."
@@ -681,52 +685,27 @@ impl HerdrWindow {
                 ("Close", true)
             }
         };
-        let button = |id: &'static str| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px(px(12.))
-                .py(px(6.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .border_1()
-                .cursor_pointer()
-        };
+        let place = format!("{} from {}", teleport.label, teleport.source.place.label);
+        let hide = teleport.moving();
         div()
             .flex()
             .flex_col()
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        svg()
-                            .path("icons/teleport.svg")
-                            .size(px(16.))
-                            .flex_none()
-                            .text_color(muted),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Teleport"),
-                            )
-                            .child(div().truncate().text_color(muted).child(format!(
-                                "{} from {}",
-                                teleport.label, teleport.source.place.label
-                            ))),
-                    ),
+                look.header(
+                    Header {
+                        selector: "teleport-header",
+                        icon: "icons/teleport.svg",
+                        title: ("teleport-title", "Teleport"),
+                        sub: Some(("icons/folder.svg", "teleport-place", &place)),
+                        danger: false,
+                    },
+                    look.menu()
+                        .close_button("teleport-dismiss")
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.dismiss_menu(window, cx);
+                        })),
+                ),
             )
             .child(
                 div()
@@ -736,43 +715,27 @@ impl HerdrWindow {
                     .child(body),
             )
             .child(
-                div()
-                    .flex()
-                    .justify_end()
-                    .gap(px(8.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        button("teleport-cancel")
-                            .border_color(rgb(theme.active))
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .child(if teleport.moving() { "Hide" } else { "Cancel" })
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.dismiss_menu(window, cx);
-                            })),
+                look.footer("teleport-footer")
+                    .hint("Esc", if hide { "hide" } else { "cancel" })
+                    .button(
+                        look.button(
+                            "teleport-cancel",
+                            if hide { "Hide" } else { "Cancel" },
+                            ButtonKind::Normal,
+                            true,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.dismiss_menu(window, cx);
+                        })),
                     )
-                    .child(
-                        button("teleport-submit")
-                            .border_color(if armed {
-                                rgb(theme.foreground)
-                            } else {
-                                rgb(theme.active)
-                            })
-                            .text_color(if armed { rgb(theme.foreground) } else { muted })
-                            .child(primary)
-                            .when(!armed, |button| {
-                                button.opacity(0.4).cursor(CursorStyle::OperationNotAllowed)
-                            })
+                    .button(
+                        look.button("teleport-submit", primary, ButtonKind::Primary, armed)
                             .when(armed, |button| {
-                                button.bg(rgb(theme.active)).on_click(cx.listener(
-                                    |this, _, window, cx| {
-                                        cx.stop_propagation();
-                                        this.submit_teleport(window, cx);
-                                    },
-                                ))
+                                button.on_click(cx.listener(|this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.submit_teleport(window, cx);
+                                }))
                             }),
                     ),
             )
