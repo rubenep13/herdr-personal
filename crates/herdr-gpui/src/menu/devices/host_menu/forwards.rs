@@ -2,7 +2,11 @@
 //! port, and the host menu's list of forwards with their actions. The forwards
 //! themselves live in [`crate::port_forward`].
 use super::HostMenu;
-use crate::{HerdrWindow, menu::Page};
+use crate::{
+    HerdrWindow,
+    design::{ButtonKind, Header},
+    menu::Page,
+};
 use gpui::{prelude::*, *};
 use std::num::NonZeroU16;
 
@@ -177,91 +181,75 @@ impl HerdrWindow {
 
     /// A centered modal like Rename: the remote port in the body, Forward in
     /// the footer.
-    pub(super) fn render_forward_port(&self, host: &HostMenu, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
-        let header = div()
-            .debug_selector(|| "forward-port-header".into())
-            .flex_none()
-            .p(px(16.))
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .items_center()
-            .gap(px(12.))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .text_size(px(self.config.ui.size * 1.35))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Forward port"),
-            )
-            .child(
-                div()
-                    .id("forward-port-close")
-                    .px_2()
-                    .py_1()
-                    .cursor_pointer()
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .hover(|s| s.bg(rgb(theme.active)))
-                    .child("Close")
-                    .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
-            );
-        let body = div()
-            .debug_selector(|| "forward-port".into())
-            .min_h_0()
-            .p(px(16.))
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .child(div().text_color(rgb(theme.muted)).child(format!(
-                "Reach a port that a program on {} listens on from this computer, \
-                 over SSH. It stays forwarded until you stop it.",
-                host.label
-            )))
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(6.))
-                    .child("Remote port")
-                    .when_some(host.input.clone(), |field, input| field.child(input)),
-            )
-            .when_some(host.error.clone(), |body, error| {
-                body.child(
-                    div()
-                        .debug_selector(|| "forward-port-error".into())
-                        .text_color(crate::menu::danger(theme))
-                        .child(error),
-                )
-            });
-        let footer = div()
-            .flex_none()
-            .p(px(16.))
-            .border_t_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .justify_end()
-            .child(
-                div()
-                    .id("forward-port-submit")
-                    .debug_selector(|| "forward-port-submit".into())
-                    .p(px(8.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.active))
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(theme.active).blend(rgba((theme.foreground << 8) | 0x20))))
-                    .child("Forward")
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.submit_forward_port(window, cx)),
-                    ),
-            );
+    pub(super) fn render_forward_port(
+        &self,
+        host: &HostMenu,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let look = self.dialog_look();
+        let dismiss = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+            this.dismiss_menu(window, cx)
+        };
         div()
             .flex()
             .flex_col()
             .min_h_0()
-            .child(header)
-            .child(body)
-            .child(footer)
+            .child(
+                look.header(
+                    Header {
+                        selector: "forward-port-header",
+                        icon: "icons/arrow-right.svg",
+                        title: ("forward-port-title", "Forward port"),
+                        sub: Some(("icons/computer.svg", "forward-port-host", &host.label)),
+                        danger: false,
+                    },
+                    look.menu().close_button("forward-port-close").on_click(
+                        cx.listener(move |this, _, window, cx| dismiss(this, window, cx)),
+                    ),
+                ),
+            )
+            .child(
+                look.body("forward-port")
+                    .min_h_0()
+                    .child(look.lead(
+                        "forward-port-text",
+                        format!(
+                            "Reach a port that a program on {} listens on from this computer, \
+                             over SSH. It stays forwarded until you stop it.",
+                            host.label
+                        ),
+                    ))
+                    .child(
+                        look.label("forward-port-label", "Remote port")
+                            .child(self.device_field(
+                                "forward-port-field",
+                                host,
+                                false,
+                                window,
+                                cx,
+                            )),
+                    )
+                    .when_some(host.error.clone(), |body, error| {
+                        body.child(look.error("forward-port-error".into(), error))
+                    }),
+            )
+            .child(
+                look.footer("forward-port-footer")
+                    .hint("Esc", "cancel")
+                    .hint("↵", "forward")
+                    .button(
+                        look.button("forward-port-cancel", "Cancel", ButtonKind::Normal, true)
+                            .on_click(
+                                cx.listener(move |this, _, window, cx| dismiss(this, window, cx)),
+                            ),
+                    )
+                    .button(
+                        look.button("forward-port-submit", "Forward", ButtonKind::Primary, true)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.submit_forward_port(window, cx)
+                            })),
+                    ),
+            )
     }
 }

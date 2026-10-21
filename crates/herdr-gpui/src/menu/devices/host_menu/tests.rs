@@ -5,6 +5,7 @@ use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px,
 #[cfg(feature = "cloud")]
 mod cloud;
 mod device_theme;
+mod forms_look;
 mod forwards;
 mod look;
 mod menu_width;

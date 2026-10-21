@@ -170,8 +170,10 @@ impl Page {
             | Self::AppUpdate
             | Self::ConfirmClose
             | Self::Dialog(_)
+            | Self::ForwardPort
             | Self::Install
             | Self::OpenLink
+            | Self::RenameDevice
             | Self::StartAgent
             | Self::Update
             | Self::VersionMismatch
@@ -179,6 +181,8 @@ impl Page {
             Self::CarryPane
             | Self::KillProcesses
             | Self::PaneProcesses
+            | Self::RemoveDevice
+            | Self::RemoveWsl
             | Self::RenamePane
             | Self::RenameTab => Look::Form,
             _ => Look::Legacy,

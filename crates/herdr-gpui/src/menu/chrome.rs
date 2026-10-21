@@ -660,7 +660,7 @@ impl HerdrWindow {
                 | Page::DeviceTheme
                 | Page::RemoveDevice
         ) {
-            panel = panel.child(self.render_host_menu(cx));
+            panel = panel.child(self.render_host_menu(window, cx));
         } else if matches!(page, Page::Tab | Page::RenameTab) {
             panel = panel.child(self.render_tab_menu(window, cx));
         } else if page == Page::Group {

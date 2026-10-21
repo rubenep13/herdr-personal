@@ -411,52 +411,47 @@ impl HerdrWindow {
     }
 
     pub(in crate::menu) fn render_remove_wsl(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
         let Some(distro) = &self.menu.wsl_remove else {
             return div();
         };
+        let look = self.dialog_look();
         div()
-            .debug_selector(|| "remove-wsl".into())
             .flex()
             .flex_col()
-            .p(px(8.))
-            .gap(px(12.))
-            .child(
-                div()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Remove distribution"),
-            )
-            .child(div().text_color(rgb(theme.subtext())).child(format!(
-                "Remove {distro} from this computer's devices? Herdr keeps running inside it."
+            .child(look.menu().header(crate::design::Header {
+                selector: "remove-wsl-header",
+                icon: "icons/trash.svg",
+                danger: true,
+                title: ("remove-wsl-title", "Remove distribution"),
+                sub: Some(("icons/terminal.svg", "remove-wsl-name", distro)),
+            }))
+            .child(look.form_body("remove-wsl").child(look.lead(
+                "remove-wsl-text",
+                format!(
+                    "Remove {distro} from this computer's devices? Herdr keeps running inside it."
+                ),
             )))
             .child(
-                div()
-                    .flex()
-                    .justify_end()
-                    .gap(px(8.))
-                    .child(
-                        div()
-                            .id("remove-wsl-cancel")
-                            .p(px(6.))
-                            .cursor_pointer()
-                            .child("Cancel")
-                            .on_click(
-                                cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)),
-                            ),
+                look.form_footer("remove-wsl-footer")
+                    .button(
+                        look.small_button(
+                            "remove-wsl-cancel",
+                            "Cancel",
+                            crate::design::ButtonKind::Normal,
+                            true,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx))),
                     )
-                    .child(
-                        div()
-                            .id("remove-wsl-submit")
-                            .debug_selector(|| "remove-wsl-submit".into())
-                            .p(px(6.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .bg(rgb(theme.active))
-                            .text_color(crate::menu::danger(theme))
-                            .cursor_pointer()
-                            .child("Remove")
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.confirm_remove_wsl(window, cx)
-                            })),
+                    .button(
+                        look.small_button(
+                            "remove-wsl-submit",
+                            "Remove",
+                            crate::design::ButtonKind::Danger,
+                            true,
+                        )
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.confirm_remove_wsl(window, cx)),
+                        ),
                     ),
             )
     }
