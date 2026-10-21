@@ -5,7 +5,7 @@
 pub(super) mod items;
 mod keys;
 
-use super::{MENU_MARGIN, Page, WorkspaceAction, devices::rail};
+use super::{Look, MENU_MARGIN, Page, WorkspaceAction, devices::rail};
 use crate::{HerdrWindow, actions, design::Leading, fonts::StyledFont};
 use gpui::{prelude::*, *};
 use herdr_client::Method;
@@ -79,6 +79,11 @@ impl HerdrWindow {
     /// The redesigned menus' look, for this window's theme and `[ui]` face.
     pub(crate) fn menu_look(&self) -> crate::design::MenuLook {
         crate::design::MenuLook::of(&self.theme, &self.config.ui, self.theme_light)
+    }
+
+    /// The redesigned dialogs' look, for this window's theme and `[ui]` face.
+    pub(crate) fn dialog_look(&self) -> crate::design::DialogLook {
+        crate::design::DialogLook::of(&self.theme, &self.config.ui, self.theme_light)
     }
 
     pub(crate) fn menu_target_current(&self) -> bool {
@@ -480,7 +485,10 @@ impl HerdrWindow {
                     panel
                         .when(!settled && !lists, |panel| panel.overflow_y_scroll())
                         .when(lists, |panel| panel.overflow_hidden())
-                        .when(!matches!(page, Page::Dialog(_)), |panel| panel.p(px(6.)))
+                        .when(
+                            !matches!(page, Page::Dialog(_)) && page.look() != Look::Dialog,
+                            |panel| panel.p(px(6.)),
+                        )
                 },
             )
             .when(
@@ -544,9 +552,10 @@ impl HerdrWindow {
                 panel.w((viewport.width - px(24.)).max(px(0.)).min(px(340.)))
             })
             .map(|panel| {
-                // Menus and pickers wear the redesigned panel; a session's
-                // create or delete form is a dialog and keeps the old one.
-                if page.redesigned() && !session_modal {
+                // Every page wears the redesigned panel but those whose turn
+                // has not come; a session's create or delete form is a dialog
+                // and keeps the old one until then.
+                if page.look() != Look::Legacy && !session_modal {
                     let look = self.menu_look();
                     look.panel(panel)
                         .text_color(look.ink(crate::design::ItemState::default()))
@@ -691,46 +700,7 @@ impl HerdrWindow {
         } else if page == Page::OpenLink {
             panel = panel.child(self.render_open_link(cx));
         } else if page == Page::Install {
-            panel = panel
-                .child(div().p(px(8.)).child("Herdr must be installed"))
-                .child(div().p(px(8.)).child(
-                    "Install Herdr first, then choose Terminal > Reconnect. The Install button opens the Herdr website; nothing is installed automatically.",
-                ))
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap(px(8.))
-                        .p(px(8.))
-                        .child(
-                            div()
-                                .id("menu-install")
-                                .debug_selector(|| "menu-install".into())
-                                .p(px(8.))
-                                .rounded(px(crate::config::corners::CONTROL))
-                                .bg(rgb(theme.active))
-                                .cursor_pointer()
-                                .child("Install")
-                                .on_click(|_, _, cx| {
-                                    cx.stop_propagation();
-                                    cx.open_url(crate::about::WEBSITE);
-                                }),
-                        )
-                        .child(
-                            div()
-                                .id("menu-dismiss")
-                                .debug_selector(|| "menu-dismiss".into())
-                                .p(px(8.))
-                                .rounded(px(crate::config::corners::CONTROL))
-                                .hover(|button| button.bg(rgb(theme.active)))
-                                .cursor_pointer()
-                                .child("Dismiss")
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    this.dismiss_menu(window, cx);
-                                })),
-                        ),
-                );
+            panel = panel.child(self.render_install(cx));
         } else {
             panel = panel.child(self.render_release_notes(cx));
         }

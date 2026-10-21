@@ -88,6 +88,18 @@ pub(crate) enum Page {
     // keep-sorted end
 }
 
+/// The panel a page wears: a menu's; a centred dialog's, the same panel
+/// without its padding so its header and footer reach the edges; a form's
+/// that a menu turns into, which keeps the menu's; or the panel from before
+/// the redesign, until the page's turn comes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Look {
+    Menu,
+    Dialog,
+    Form,
+    Legacy,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum WorkspaceAction {
     Rename,
@@ -133,28 +145,29 @@ pub(crate) enum WorkspaceMenuAction {
 }
 
 impl Page {
-    /// Menus and pickers, drawn in the redesigned menu look. Dialogs and
-    /// forms keep their own panel until their phase.
-    pub(crate) fn redesigned(self) -> bool {
-        matches!(
-            self,
+    /// The panel the page wears. Every page names one; dialogs and forms
+    /// leave [`Look::Legacy`] as phase 4 reaches them.
+    pub(crate) fn look(self) -> Look {
+        match self {
             Self::Application
-                | Self::CodeSearch
-                | Self::DeviceTheme
-                | Self::Devices
-                | Self::Git
-                | Self::Group
-                | Self::Host
-                | Self::Keybinds
-                | Self::Menu
-                | Self::MovePane
-                | Self::Palette
-                | Self::Pane
-                | Self::Sessions
-                | Self::Tab
-                | Self::Themes
-                | Self::Workspace
-        )
+            | Self::CodeSearch
+            | Self::DeviceTheme
+            | Self::Devices
+            | Self::Git
+            | Self::Group
+            | Self::Host
+            | Self::Keybinds
+            | Self::Menu
+            | Self::MovePane
+            | Self::Palette
+            | Self::Pane
+            | Self::Sessions
+            | Self::Tab
+            | Self::Themes
+            | Self::Workspace => Look::Menu,
+            Self::Install => Look::Dialog,
+            _ => Look::Legacy,
+        }
     }
 
     /// Context menus open where the pointer asked for them, rather than

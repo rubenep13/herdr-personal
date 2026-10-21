@@ -1,9 +1,9 @@
 use super::*;
 
-/// Menus and pickers take the redesigned panel; dialogs and forms keep
-/// theirs until their own phase.
+/// Each page names the panel it wears. Menus and pickers took the
+/// redesigned one in phase 2; phase 4 moves dialogs and forms page by page.
 #[test]
-fn redesign_dresses_menus_and_pickers_only() {
+fn every_page_has_a_look() {
     for page in [
         Page::Application,
         Page::CodeSearch,
@@ -22,21 +22,8 @@ fn redesign_dresses_menus_and_pickers_only() {
         Page::Themes,
         Page::Workspace,
     ] {
-        assert!(page.redesigned(), "{page:?}");
+        assert_eq!(page.look(), Look::Menu, "{page:?}");
     }
-    for page in [
-        Page::About,
-        Page::ConfirmClose,
-        Page::Dialog(WorkspaceAction::Rename),
-        Page::ForwardPort,
-        Page::GitCommit,
-        Page::KillProcesses,
-        Page::PaneProcesses,
-        Page::RemoveDevice,
-        Page::RenameDevice,
-        Page::RenamePane,
-        Page::RenameTab,
-    ] {
-        assert!(!page.redesigned(), "{page:?}");
-    }
+    assert_eq!(Page::Install.look(), Look::Dialog);
+    assert_eq!(Page::About.look(), Look::Legacy);
 }
