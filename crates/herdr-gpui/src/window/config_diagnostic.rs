@@ -83,6 +83,8 @@ impl HerdrWindow {
     /// anywhere on the chip copies the command, as its icon says; it is never
     /// run. A narrow card truncates the text and still copies all of it.
     fn command_chip(&self, command: &'static str, cx: &mut Context<Self>) -> AnyElement {
+        let look = self.dialog_look();
+        let raised = look.settings().raised();
         let chip = div()
             .id("diagnostic-command")
             .debug_selector(|| "diagnostic-command".into())
@@ -90,9 +92,13 @@ impl HerdrWindow {
             .flex()
             .items_center()
             .gap(px(8.))
-            .p(px(8.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .bg(rgb(self.theme.active))
+            .px(look.at(10.))
+            .py(look.at(7.))
+            .rounded(look.at(8.))
+            .bg(look.well_fill())
+            .border_1()
+            .border_color(look.line())
+            .hover(move |chip| chip.border_color(raised))
             .cursor_pointer()
             .on_click(cx.listener(move |this, _, _, cx| {
                 cx.stop_propagation();
@@ -104,6 +110,8 @@ impl HerdrWindow {
                     .min_w_0()
                     .truncate()
                     .text_font(&self.config.terminal)
+                    .text_size(look.at(12.))
+                    .text_color(rgb(self.theme.foreground))
                     .child(command),
             )
             .child(
@@ -113,15 +121,15 @@ impl HerdrWindow {
                     .child(
                         svg()
                             .path("icons/copy.svg")
-                            .size(px(12.))
-                            .text_color(rgb(self.theme.foreground)),
+                            .size(look.at(14.))
+                            .text_color(rgb(self.theme.muted)),
                     ),
             );
         // A row, so the chip keeps to its text and shrinks with the card. It
-        // starts where the text does, past the accent dot and its gap.
+        // starts where the text does, past the tile and its gap.
         div()
             .min_w_0()
-            .pl(px(14.))
+            .pl(look.at(39.))
             .flex()
             .child(chip)
             .into_any_element()
@@ -138,29 +146,24 @@ impl HerdrWindow {
         dismiss: impl Fn(&mut Self, &mut Context<Self>) + 'static,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let accent = self.theme.ink(self.theme.palette[3]);
+        let look = self.dialog_look();
+        let accent = rgb(self.theme.ink(self.theme.palette[3]));
         let header = div()
             .min_w_0()
             .flex()
-            .gap(px(8.))
-            .child(
-                div()
-                    .mt(px(6.))
-                    .size(px(6.))
-                    .flex_none()
-                    .rounded_full()
-                    .bg(rgb(accent)),
-            )
+            .gap(look.at(11.))
+            .child(look.tile(format!("{selector}-tile"), "icons/alert.svg", accent))
             .child(
                 div()
                     .flex_1()
                     .min_w_0()
                     .flex()
                     .flex_col()
-                    .gap(px(4.))
+                    .gap(look.at(3.))
                     .child(
                         div()
                             .truncate()
+                            .text_size(px(look.settings().scale().secondary))
                             .text_color(rgb(self.theme.muted))
                             .child(label),
                     )
@@ -168,27 +171,15 @@ impl HerdrWindow {
                         div()
                             .debug_selector(move || format!("{selector}-line-{index}"))
                             .truncate()
+                            .text_size(px(look.settings().scale().name - 0.5))
+                            .text_color(rgb(self.theme.subtext()))
                             .child(line.clone())
                     })),
             )
             .child(
-                div()
+                notice_cross(&look, &self.theme)
                     .id("dismiss")
                     .debug_selector(move || format!("{selector}-dismiss"))
-                    .flex_none()
-                    .size(px(24.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .cursor_pointer()
-                    .hover(|s| s.bg(rgb(self.theme.active)))
-                    .child(
-                        svg()
-                            .path("icons/close.svg")
-                            .size(px(12.))
-                            .text_color(rgb(self.theme.foreground)),
-                    )
                     .on_click(cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
                         dismiss(this, cx);
@@ -202,12 +193,12 @@ impl HerdrWindow {
             .max_w(px(MAX_WIDTH))
             .flex()
             .flex_col()
-            .gap(px(8.))
-            .p(px(10.))
-            .rounded(px(crate::config::corners::PANEL))
-            .border_1()
-            .border_color(rgb(accent))
-            .bg(rgb(self.theme.surface))
+            .gap(look.at(8.))
+            .pt(look.at(11.))
+            .pb(look.at(11.))
+            .pl(look.at(12.))
+            .pr(look.at(8.))
+            .map(|card| look.menu().panel(card))
             .text_color(rgb(self.theme.foreground))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
@@ -237,6 +228,27 @@ impl HerdrWindow {
             cx.notify();
         }
     }
+}
+
+/// A notice's cross: the pickers' cross at 24, quiet in the grey. The
+/// caller adds its id, selector and click.
+pub(super) fn notice_cross(look: &crate::design::DialogLook, theme: &crate::config::Theme) -> Div {
+    let hover = rgb(theme.active);
+    div()
+        .flex_none()
+        .size(look.at(24.))
+        .rounded(look.at(crate::design::ICON_BUTTON_RADIUS))
+        .flex()
+        .items_center()
+        .justify_center()
+        .cursor_pointer()
+        .hover(move |s| s.bg(hover))
+        .child(
+            svg()
+                .path("icons/close.svg")
+                .size(look.at(12.))
+                .text_color(rgb(theme.muted)),
+        )
 }
 
 #[cfg(test)]
