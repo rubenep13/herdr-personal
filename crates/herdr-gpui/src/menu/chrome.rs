@@ -86,6 +86,11 @@ impl HerdrWindow {
         crate::design::DialogLook::of(&self.theme, &self.config.ui, self.theme_light)
     }
 
+    /// The redesigned views' look, for this window's theme and `[ui]` face.
+    pub(crate) fn view_look(&self) -> crate::design::ViewLook {
+        crate::design::ViewLook::of(&self.theme, &self.config.ui, self.theme_light)
+    }
+
     pub(crate) fn menu_target_current(&self) -> bool {
         self.menu.endpoint_target
             == (

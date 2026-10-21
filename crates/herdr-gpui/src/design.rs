@@ -8,9 +8,11 @@ use crate::config::FontConfig;
 mod dialog;
 mod menu;
 mod settings;
+mod view;
 pub(crate) use dialog::{DialogLook, Footer, NoteTone};
 pub(crate) use menu::{Header, ItemState, Leading, MenuLook, keycaps, menu_hover};
 pub(crate) use settings::{ButtonKind, ButtonSize, SettingsLook, Tone};
+pub(crate) use view::{Edge, ViewLook};
 
 /// A host's or space's row.
 pub(crate) const ROW_HEIGHT: f32 = 34.;
