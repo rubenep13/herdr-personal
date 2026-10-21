@@ -9,6 +9,7 @@ mod badge;
 mod described;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod local_peer_warning;
+mod look;
 
 #[gpui::test]
 fn targeted_previews_use_only_current_snapshot_ids(cx: &mut TestAppContext) {
