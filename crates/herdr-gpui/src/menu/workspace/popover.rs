@@ -111,6 +111,7 @@ impl HerdrWindow {
                     Header {
                         selector: "workspace-menu-header",
                         icon: "icons/folder.svg",
+                        danger: false,
                         title: ("workspace-menu-name", &target.label),
                         sub: branch.map(|branch| {
                             ("icons/git-branch.svg", "workspace-menu-branch", branch)

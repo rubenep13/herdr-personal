@@ -34,12 +34,17 @@ pub(crate) fn teleported(theme: &crate::config::Theme) -> Rgba {
 /// dark surfaces, and errors are text, so this keeps the WCAG text minimum
 /// rather than a mark's.
 pub(crate) fn danger(theme: &crate::config::Theme) -> Rgba {
+    rgb(danger_value(theme))
+}
+
+/// [`danger`] as a value to mix or measure.
+pub(crate) fn danger_value(theme: &crate::config::Theme) -> u32 {
     let red = crate::config::mix(theme.foreground, theme.palette[9], TINT_PERCENT);
-    rgb(crate::contrast::ink_on_chrome(
+    crate::contrast::ink_on_chrome(
         red,
         [theme.background, theme.surface, theme.active],
         TEXT_RATIO,
-    ))
+    )
 }
 
 /// WCAG's minimum contrast for body text.

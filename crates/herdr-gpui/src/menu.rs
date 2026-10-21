@@ -51,7 +51,7 @@ mod worktree_tests;
 
 pub(crate) use state::Cover;
 pub(crate) use {
-    colors::{accent, danger, online, teleported, tint},
+    colors::{accent, danger, danger_value, online, teleported, tint},
     page::{Page, WorkspaceAction},
     state::{MenuState, Removal},
     theme_rows::{picker_error, picker_footer, theme_row},

@@ -505,6 +505,7 @@ impl HerdrWindow {
                 look.header(Header {
                     selector: "keybinds-header",
                     icon: "icons/keyboard.svg",
+                    danger: false,
                     title: ("keybinds-title", "Keyboard Shortcuts"),
                     sub: None,
                 })

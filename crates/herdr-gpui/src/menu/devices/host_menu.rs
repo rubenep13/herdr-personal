@@ -572,6 +572,7 @@ impl HerdrWindow {
                 look.header(Header {
                     selector: "host-menu-header",
                     icon: "icons/computer.svg",
+                    danger: false,
                     title: ("host-menu-name", &host.label),
                     sub: Some(("icons/sessions.svg", "host-menu-place", &place)),
                 })

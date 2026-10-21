@@ -50,11 +50,13 @@ const TONE_PERCENT: u32 = 13;
 const BUTTON_HOVER_PERCENT: u32 = 10;
 const PRIMARY_HOVER_PERCENT: u32 = 15;
 
-/// A button's weight: the page's plain action, or the one it leads with.
+/// A button's weight: the page's plain action, the one it leads with, or
+/// one that destroys something.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ButtonKind {
     Normal,
     Primary,
+    Danger,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -95,6 +97,8 @@ pub(crate) struct SettingsLook {
     shared_fill: Rgba,
     local_fill: Rgba,
     danger: Rgba,
+    danger_hover: Rgba,
+    on_danger: Rgba,
     good: Rgba,
     good_fill: Rgba,
     warn: Rgba,
@@ -110,6 +114,7 @@ pub(crate) struct SettingsLook {
 impl SettingsLook {
     pub(crate) fn of(theme: &Theme, font: &FontConfig) -> Self {
         let good = theme.ink(theme.palette[2]);
+        let danger = crate::menu::danger_value(theme);
         // The theme has no orange: warnings take the ANSI yellow.
         let warn = theme.ink(theme.palette[3]);
         Self {
@@ -134,10 +139,12 @@ impl SettingsLook {
                 theme.foreground,
                 PRIMARY_HOVER_PERCENT,
             )),
-            on_accent: rgb(theme.background),
+            on_accent: rgb(crate::toggles::ink_on(theme, theme.primary())),
             shared_fill: rgb(mix(theme.background, theme.primary(), SHARED_PERCENT)),
             local_fill: rgb(mix(theme.background, theme.active, LOCAL_PERCENT)),
-            danger: crate::menu::danger(theme),
+            danger: rgb(danger),
+            danger_hover: rgb(mix(danger, theme.foreground, PRIMARY_HOVER_PERCENT)),
+            on_danger: rgb(crate::toggles::ink_on(theme, danger)),
             good: rgb(good),
             good_fill: rgb(mix(theme.background, good, TONE_PERCENT)),
             warn: rgb(warn),
@@ -309,10 +316,7 @@ impl SettingsLook {
                 self.scale.name - 0.5,
             ),
         };
-        let (fill, hover, ink) = match kind {
-            ButtonKind::Normal => (self.line, self.button_hover, self.title),
-            ButtonKind::Primary => (self.accent, self.accent_hover, self.on_accent),
-        };
+        let (fill, hover, ink) = self.button_colours(kind);
         div()
             .id(id)
             .debug_selector(move || selector)
@@ -328,7 +332,7 @@ impl SettingsLook {
             .text_color(ink)
             .text_size(px(text))
             .whitespace_nowrap()
-            .when(kind == ButtonKind::Primary, |button| {
+            .when(kind != ButtonKind::Normal, |button| {
                 button.font_weight(FontWeight::MEDIUM)
             })
             .child(label.into())
@@ -338,6 +342,18 @@ impl SettingsLook {
                     .hover(move |button| button.bg(hover))
             })
             .when(!enabled, |button| button.opacity(0.5))
+    }
+
+    /// A button's fill, its hovered fill and its text: the hairline for a
+    /// plain one, the accent for the one a page leads with, the danger red
+    /// for one that destroys something, with whatever reads on the coloured
+    /// ones (the window's background on the Catppuccin themes).
+    pub(super) fn button_colours(&self, kind: ButtonKind) -> (Rgba, Rgba, Rgba) {
+        match kind {
+            ButtonKind::Normal => (self.line, self.button_hover, self.title),
+            ButtonKind::Primary => (self.accent, self.accent_hover, self.on_accent),
+            ButtonKind::Danger => (self.danger, self.danger_hover, self.on_danger),
+        }
     }
 
     /// A small label in its tone's colours: a status, or where a setting is

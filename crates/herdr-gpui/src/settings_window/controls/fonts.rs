@@ -404,6 +404,7 @@ impl SettingsWindow {
             .child(look.header(Header {
                 selector: "settings-font-picker-header",
                 icon: "icons/text-size.svg",
+                danger: false,
                 title: ("settings-font-picker-title", &title),
                 sub: None,
             }))

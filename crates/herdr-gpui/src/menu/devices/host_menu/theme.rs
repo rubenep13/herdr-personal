@@ -479,6 +479,7 @@ impl HerdrWindow {
             .child(look.header(Header {
                 selector: "device-theme-header",
                 icon: "icons/computer.svg",
+                danger: false,
                 title: ("device-theme-title", &title),
                 sub: None,
             }))
