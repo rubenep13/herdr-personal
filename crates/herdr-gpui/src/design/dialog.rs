@@ -142,6 +142,8 @@ impl DialogLook {
         self.line
     }
 
+    /// Read by tests: errors draw from the field.
+    #[cfg(test)]
     pub(crate) fn error_ink(&self) -> Rgba {
         self.danger
     }
