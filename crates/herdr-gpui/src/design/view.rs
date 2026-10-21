@@ -679,7 +679,8 @@ impl ViewLook {
             .child(div().flex_1())
     }
 
-    /// A card's title row. The caller adds its controls at the right.
+    /// A card's title row. The caller adds what follows the title, and a
+    /// spacer before any controls that sit at the right.
     pub(crate) fn card_header(&self, selector: &'static str, title: &'static str) -> Div {
         self.heading(selector, CARD_HEADER, CARD_PADDING_RIGHT)
             .child(
@@ -690,7 +691,6 @@ impl ViewLook {
                     .text_color(self.title)
                     .child(title),
             )
-            .child(div().flex_1())
     }
 
     fn heading(&self, selector: &'static str, height: f32, right: f32) -> Div {

@@ -3,6 +3,7 @@
 mod add_device;
 mod clock;
 mod history;
+mod look;
 mod model;
 mod narrow_layout;
 mod page;
