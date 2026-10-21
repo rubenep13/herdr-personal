@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 //! A search input keeps its own frame wherever it is not asked for another:
 //! the dialogs' fields ask for Settings' frame, and the rest of the app
 //! (browser toolbar, find bar, Settings' number editor) keeps today's.
