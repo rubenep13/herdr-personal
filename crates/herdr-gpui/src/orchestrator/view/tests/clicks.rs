@@ -20,6 +20,12 @@ fn the_run_arrow_asks_to_open_the_run(cx: &mut TestAppContext) {
     };
     let config = crate::config::Config::default();
     let look = Look {
+        indicators: crate::sidebar::Indicators::new(
+            None,
+            None,
+            false,
+            &crate::config::Theme::default(),
+        ),
         theme: crate::config::Theme::default(),
         ui: config.ui.clone(),
         mono: config.terminal.clone(),

@@ -19,6 +19,12 @@ fn destination_inventory_reconciles_selection_and_ignores_other_hosts(cx: &mut T
     };
     let config = crate::config::Config::default();
     let look = Look {
+        indicators: crate::sidebar::Indicators::new(
+            None,
+            None,
+            false,
+            &crate::config::Theme::default(),
+        ),
         theme: crate::config::Theme::default(),
         ui: config.ui,
         mono: config.terminal,

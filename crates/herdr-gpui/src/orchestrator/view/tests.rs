@@ -10,9 +10,11 @@ mod clicks;
 mod conversation;
 mod dialog;
 mod host_badges;
+mod look;
 mod markdown;
 mod rows;
 mod sessions;
+mod status_colours;
 
 fn at(value: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(value)

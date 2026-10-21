@@ -22,6 +22,12 @@ fn the_dispatch_dialog_stays_within_a_short_window(cx: &mut TestAppContext) {
     let mut ui = config.ui.clone();
     ui.size = 48.;
     let look = Look {
+        indicators: crate::sidebar::Indicators::new(
+            None,
+            None,
+            false,
+            &crate::config::Theme::default(),
+        ),
         theme: crate::config::Theme::default(),
         ui,
         mono: config.terminal.clone(),

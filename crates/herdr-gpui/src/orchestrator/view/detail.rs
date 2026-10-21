@@ -5,12 +5,13 @@ use super::{
     Detail, DetailTab, Event, OrchestratorView,
     dispatch::Confirm,
     list::source_mark,
-    look::{BLUE, CYAN, age, agent_icon},
+    look::{age, agent_icon},
     rows::Tab,
     rows::{RunRow, Runs},
 };
 use crate::{
     config::{corners, mix},
+    design::Tone,
     fonts::StyledFont,
     orchestrator::{Access, Item, Owner},
     release_notes,
@@ -154,9 +155,9 @@ impl OrchestratorView {
                     .items_center()
                     .gap_2()
                     .child(source_mark(look, item.key.source.provider))
-                    .child(look.badge(item.state.replace('_', " "), look.state_hue(&item.state)))
+                    .child(look.badge(item.state.replace('_', " "), look.state_tone(&item.state)))
                     .when_some(item.priority, |el, priority| {
-                        el.child(look.badge(format!("P{priority}"), look.priority_hue(priority)))
+                        el.child(look.badge(format!("P{priority}"), look.priority_tone(priority)))
                     })
                     .when_some(item.pull_request.as_ref(), |el, pr| {
                         el.child(
@@ -349,13 +350,13 @@ impl OrchestratorView {
             .child(row("Source", text(source)))
             .child(row(
                 "Status",
-                look.badge(item.state.replace('_', " "), look.state_hue(&item.state))
+                look.badge(item.state.replace('_', " "), look.state_tone(&item.state))
                     .into_any_element(),
             ))
             .when_some(item.priority, |el, priority| {
                 el.child(row(
                     "Priority",
-                    look.badge(format!("P{priority}"), look.priority_hue(priority))
+                    look.badge(format!("P{priority}"), look.priority_tone(priority))
                         .into_any_element(),
                 ))
             })
@@ -484,9 +485,9 @@ impl OrchestratorView {
                             .child(look.badge(
                                 run.owner.as_str(),
                                 if run.owner == Owner::HerdrGpui {
-                                    BLUE
+                                    Tone::Accent
                                 } else {
-                                    CYAN
+                                    Tone::Neutral
                                 },
                             ))
                             .child(div().flex_1())

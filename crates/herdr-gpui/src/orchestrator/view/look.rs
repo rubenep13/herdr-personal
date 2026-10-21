@@ -1,12 +1,17 @@
 //! The orchestrator's small drawing parts, in the window's theme and fonts:
-//! badges, chips, buttons, status dots. Every color comes from the theme.
+//! badges, chips, buttons, status dots. Since the redesign's fifth phase
+//! they are the views' shared pieces at the orchestrator's face, and runs
+//! show their state in Herdr's colours.
 
 use super::rows::Status;
 use crate::{
-    config::{FontConfig, Theme, corners, mix},
+    config::{FontConfig, Theme, mix},
+    design::{ButtonKind, Tone},
     fonts::StyledFont,
+    sidebar::Indicators,
 };
 use gpui::{prelude::*, *};
+use herdr_client::protocol::AgentStatus;
 
 pub(crate) const RED: usize = 1;
 pub(crate) const GREEN: usize = 2;
@@ -23,6 +28,18 @@ pub(crate) struct Look {
     pub(crate) mono: FontConfig,
     /// Whether the theme is light, which softens the panels' shadows.
     pub(crate) light: bool,
+    /// Herdr's status colours, the user's own included, for runs' states.
+    pub(crate) indicators: Indicators,
+}
+
+/// `label` with only its first letter capital, as the redesign's section
+/// labels are: «LATEST RUN» reads «Latest run».
+pub(crate) fn sentence(label: &str) -> String {
+    let lower = label.to_lowercase();
+    let mut letters = lower.chars();
+    letters.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(letters).collect()
+    })
 }
 
 impl Look {
@@ -47,27 +64,31 @@ impl Look {
         px(self.ui.size - 1.)
     }
 
-    /// A list row `base` pixels tall at the usual text size, grown in step
-    /// with larger text so its lines never spill into the next row.
-    pub(crate) fn row(&self, base: f32) -> f32 {
-        /// The text size row heights are designed for.
-        const DESIGNED: f32 = 14.;
-        base * (self.ui.size / DESIGNED).max(1.)
-    }
-
     pub(crate) fn tiny(&self) -> Pixels {
         px((self.ui.size - 2.).max(9.))
     }
 
+    /// A run's state in the sidebar's colours: working yellow, waiting red,
+    /// idle green, done teal; a failure in the danger red, stopped grey.
     pub(crate) fn status_hue(&self, status: Status) -> u32 {
-        self.hue(match status {
-            Status::Starting | Status::Idle => BLUE,
-            Status::Working => GREEN,
-            Status::NeedsInput => YELLOW,
-            Status::Done => CYAN,
-            Status::Failed => RED,
-            Status::Stopped => return self.theme.muted,
-        })
+        match status {
+            Status::Starting | Status::Working => self.indicators.color(AgentStatus::Working),
+            Status::NeedsInput => self.indicators.color(AgentStatus::Blocked),
+            Status::Idle => self.indicators.color(AgentStatus::Idle),
+            Status::Done => self.indicators.color(AgentStatus::Done),
+            Status::Failed => crate::menu::danger_value(&self.theme),
+            Status::Stopped => self.theme.muted,
+        }
+    }
+
+    /// A run's state as a chip: a failure in red, so it never reads as
+    /// waiting, stopped in grey, the rest in their status colour.
+    pub(crate) fn status_tone(&self, status: Status) -> Tone {
+        match status {
+            Status::Failed => Tone::Danger,
+            Status::Stopped => Tone::Neutral,
+            status => Tone::Status(self.status_hue(status)),
+        }
     }
 
     pub(crate) fn icon(&self, path: &'static str, size: f32, color: u32) -> Svg {
@@ -86,31 +107,16 @@ impl Look {
             .bg(rgb(color))
     }
 
-    /// A short colored word, such as a state or priority.
-    pub(crate) fn badge(&self, text: impl Into<SharedString>, index: usize) -> Div {
-        div()
-            .flex_none()
-            .whitespace_nowrap()
-            .px(px(6.))
-            .rounded(px(corners::SMALL))
-            .bg(rgb(self.wash(index)))
-            .text_color(rgb(self.hue(index)))
-            .text_size(self.tiny())
-            .child(text.into())
+    /// A short coloured word, such as a state or priority, in its tone.
+    pub(crate) fn badge(&self, text: impl Into<SharedString>, tone: Tone) -> Div {
+        self.view()
+            .settings()
+            .chip("orchestrator-badge".to_owned(), text, tone)
     }
 
     /// A neutral tag, such as a label or host.
     pub(crate) fn chip(&self, text: impl Into<SharedString>) -> Div {
-        div()
-            .flex_none()
-            .whitespace_nowrap()
-            .px(px(6.))
-            .py(px(1.))
-            .rounded(px(corners::SMALL))
-            .bg(rgb(self.theme.active))
-            .text_color(rgb(self.theme.subtext()))
-            .text_size(self.small())
-            .child(text.into())
+        self.badge(text, Tone::Neutral)
     }
 
     pub(crate) fn mono(&self, text: impl Into<SharedString>) -> Div {
@@ -127,118 +133,82 @@ impl Look {
             .child(text.into())
     }
 
-    pub(crate) fn label(&self, text: impl Into<SharedString>) -> Div {
+    /// A section's label, quiet and in sentence case.
+    pub(crate) fn label(&self, text: impl AsRef<str>) -> Div {
+        let view = self.view();
         div()
-            .text_size(self.tiny())
-            .text_color(rgb(self.theme.muted))
-            .font_weight(FontWeight::SEMIBOLD)
-            .child(text.into())
+            .text_size(px(view.scale().detail))
+            .text_color(view.muted())
+            .font_weight(FontWeight::MEDIUM)
+            .child(sentence(text.as_ref()))
     }
 
-    /// A clickable button; `primary` fills it with the theme's accent.
+    /// A small button; `primary` is the action a part leads with. Its
+    /// selector is its id.
     pub(crate) fn button(
         &self,
         id: impl Into<ElementId>,
         label: impl Into<SharedString>,
         primary: bool,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
-        let fill = if primary {
-            theme.primary()
-        } else {
-            theme.surface
-        };
-        let hover = mix(fill, theme.foreground, 8);
-        div()
-            .id(id)
-            .flex_none()
-            .flex()
-            .items_center()
-            .gap_1()
-            .px_3()
-            .py(px(4.))
-            .rounded(px(corners::CONTROL))
-            .bg(rgb(fill))
-            .hover(move |style| style.bg(rgb(hover)))
-            .cursor_pointer()
-            .when(!primary, |el| el.border_1().border_color(rgb(theme.active)))
-            .text_color(rgb(if primary {
-                theme.text_on(fill)
+        let id = id.into();
+        let selector = id.to_string();
+        self.view().button(
+            id,
+            selector,
+            None,
+            label,
+            if primary {
+                ButtonKind::Primary
             } else {
-                theme.foreground
-            }))
-            .text_size(self.small())
-            .whitespace_nowrap()
-            .child(label.into())
+                ButtonKind::Normal
+            },
+            true,
+        )
     }
 
+    /// A square button holding one icon; its selector is its id.
     pub(crate) fn icon_button(
         &self,
         id: impl Into<ElementId>,
         path: &'static str,
     ) -> Stateful<Div> {
-        let hover = self.theme.active;
-        div()
-            .id(id)
-            .flex_none()
-            .size(px(24.))
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(corners::SMALL))
-            .hover(move |style| style.bg(rgb(hover)))
-            .cursor_pointer()
-            .child(self.icon(path, 14., self.theme.subtext()))
+        let id = id.into();
+        let selector = id.to_string();
+        self.view().icon_button(id, selector, path, false, true)
     }
 
-    /// A filter pill: a quiet fill, the accent wash while on.
+    /// A filter that turns on and off, as a pill; its selector is its id.
     pub(crate) fn toggle(
         &self,
         id: impl Into<ElementId>,
         label: &'static str,
         on: bool,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
-        div()
-            .id(id)
-            .flex_none()
-            .px_3()
-            .py(px(3.))
-            .rounded_full()
-            .bg(rgb(if on {
-                theme.primary_wash()
-            } else {
-                theme.surface
-            }))
-            .cursor_pointer()
-            .text_size(self.small())
-            .text_color(rgb(if on {
-                theme.foreground
-            } else {
-                theme.subtext()
-            }))
-            .whitespace_nowrap()
-            .child(label)
+        let id = id.into();
+        let selector = id.to_string();
+        self.view().pill(id, selector, label, on)
     }
 
-    /// The color of an item's state word.
-    pub(crate) fn state_hue(&self, state: &str) -> usize {
+    /// An item's state as a chip: open in green, under way in the accent,
+    /// blocked in yellow, merged in mauve, closed in red.
+    pub(crate) fn state_tone(&self, state: &str) -> Tone {
         match state {
-            "open" => GREEN,
-            "in_progress" | "in progress" | "draft" => BLUE,
-            "blocked" => YELLOW,
-            "merged" => MAGENTA,
-            "closed" | "tombstone" => RED,
-            _ => CYAN,
+            "open" => Tone::Good,
+            "in_progress" | "in progress" | "draft" => Tone::Accent,
+            "blocked" => Tone::Warn,
+            "merged" => Tone::Merged,
+            "closed" | "tombstone" => Tone::Danger,
+            _ => Tone::Neutral,
         }
     }
 
-    /// The color of a Beads priority, P0 hottest.
-    pub(crate) fn priority_hue(&self, priority: i64) -> usize {
+    /// A Beads priority as a chip, P0 and P1 hottest.
+    pub(crate) fn priority_tone(&self, priority: i64) -> Tone {
         match priority {
-            0 | 1 => RED,
-            2 => YELLOW,
-            _ => BLUE,
+            0 | 1 => Tone::Danger,
+            2 => Tone::Warn,
+            _ => Tone::Neutral,
         }
     }
 }

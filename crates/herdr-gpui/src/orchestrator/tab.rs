@@ -166,6 +166,12 @@ impl HerdrWindow {
         let mut ui = self.config.ui.clone();
         ui.size = self.config.terminal.size;
         Look {
+            indicators: crate::sidebar::Indicators::new(
+                self.settings.shared.as_ref(),
+                self.config.status_icons,
+                self.theme_light,
+                &self.theme,
+            ),
             theme: self.theme.clone(),
             ui,
             mono: self.config.terminal.clone(),

@@ -543,9 +543,11 @@ impl ViewLook {
             .hover(move |dropdown| dropdown.border_color(hover))
             .when_some(icon, |dropdown, icon| dropdown.child(glyph(icon)))
             .when_some(prefix, |dropdown, prefix| {
-                dropdown.child(div().text_color(self.muted).child(prefix))
+                dropdown.child(div().flex_none().text_color(self.muted).child(prefix))
             })
-            .child(value.into())
+            // Where the caller lets the dropdown narrow, its value ends in
+            // an ellipsis.
+            .child(div().min_w_0().truncate().child(value.into()))
             .child(glyph("icons/chevron-down.svg"))
     }
 

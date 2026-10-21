@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{
     config::{corners, mix},
+    design::Tone,
     pr_actions::{self, Comment, CommentKind, Review},
     pull_request::State,
     release_notes::{self, Line},
@@ -320,7 +321,7 @@ impl OrchestratorView {
                 badges
                     .into_iter()
                     .filter(|(count, ..)| *count > 0)
-                    .map(|(count, one, many, hue)| look.badge(plural(count, one, many), hue)),
+                    .map(|(count, one, many, hue)| look.badge(plural(count, one, many), tone(hue))),
             )
             .child(div().flex_1())
             .child(look.muted(format!(
@@ -513,7 +514,7 @@ impl OrchestratorView {
                             "replies",
                         )))
                     })
-                    .child(look.badge(state, hue)),
+                    .child(look.badge(state, tone(hue))),
             )
             .child(self.body(comment))
             .into_any_element()
@@ -581,7 +582,9 @@ impl OrchestratorView {
                 )
             })
             .child(look.muted(action.to_owned()).min_w_0().truncate())
-            .when_some(verdict, |el, (text, hue)| el.child(look.badge(text, hue)))
+            .when_some(verdict, |el, (text, hue)| {
+                el.child(look.badge(text, tone(hue)))
+            })
             .child(div().flex_1())
             .child(
                 look.muted(ago(&comment.created_at, now))
@@ -666,4 +669,16 @@ fn thread_key(comment: &Comment) -> String {
         _ => "",
     };
     format!("{}\u{0}{}\u{0}{}", comment.author, path, comment.created_at)
+}
+
+/// A palette colour's chip tone, for the conversation's coloured words.
+fn tone(hue: usize) -> Tone {
+    match hue {
+        GREEN => Tone::Good,
+        RED => Tone::Danger,
+        YELLOW => Tone::Warn,
+        MAGENTA => Tone::Merged,
+        BLUE => Tone::Accent,
+        _ => Tone::Neutral,
+    }
 }

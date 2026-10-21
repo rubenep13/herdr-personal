@@ -3,45 +3,57 @@
 
 use super::{
     OrchestratorView,
-    look::{BLUE, CYAN, GREEN, Look, MAGENTA, RED, YELLOW, age, agent_icon},
+    look::{GREEN, Look, RED, YELLOW, age, agent_icon},
     rows::{Group, ItemRow, RunLine, Tab},
 };
 use crate::{
+    design::Tone,
     fonts::StyledFont,
     orchestrator::{Owner, Provider, SyncState},
 };
 use gpui::{prelude::*, *};
+use herdr_client::protocol::AgentStatus;
 
-/// Row heights at the usual text size; [`Look::row`] grows them with it.
-const ISSUE_ROW: f32 = 30.;
-const PULL_REQUEST_ROW: f32 = 40.;
-const RUN_ROW: f32 = 34.;
+/// Whether a tab's rows hold two lines: a pull request's author and branch
+/// under its title, a run's agent beside what it works on.
+fn two_lines(tab: Tab) -> bool {
+    tab != Tab::Issues
+}
+
+/// How far a list keeps its rows from its sides, at the face's size of 12.
+const LIST_INSET: f32 = 8.;
 
 impl OrchestratorView {
+    /// The height every row of the shown tab takes, which the virtual list
+    /// relies on.
+    fn row_height(&self) -> f32 {
+        self.look.view().row_height(two_lines(self.tab))
+    }
+
     pub(super) fn render_list(&self, cx: &mut Context<Self>) -> AnyElement {
         let look = &self.look;
         let (count, head): (usize, &[(&str, Option<f32>)]) = match self.tab {
             Tab::Issues => (
                 self.issue_rows.len(),
                 &[
-                    ("AGE", Some(32.)),
-                    ("SRC", Some(22.)),
-                    ("RUN", Some(30.)),
-                    ("TITLE", None),
-                    ("AUTHOR", Some(110.)),
+                    ("Age", Some(32.)),
+                    ("Src", Some(22.)),
+                    ("Run", Some(30.)),
+                    ("Title", None),
+                    ("Author", Some(110.)),
                     ("\u{1f4ac}", Some(34.)),
-                    ("STATE", Some(86.)),
+                    ("State", Some(86.)),
                 ],
             ),
             Tab::PullRequests => (
                 self.pull_request_rows.len(),
                 &[
                     ("PR", Some(44.)),
-                    ("RUN", Some(30.)),
-                    ("TITLE \u{00b7} AUTHOR \u{00b7} BRANCH", None),
-                    ("DIFF", Some(44.)),
-                    ("ACTIVITY", Some(70.)),
-                    ("STATE", Some(60.)),
+                    ("Run", Some(30.)),
+                    ("Title \u{00b7} author \u{00b7} branch", None),
+                    ("Diff", Some(44.)),
+                    ("Activity", Some(70.)),
+                    ("State", Some(60.)),
                     ("", Some(28.)),
                 ],
             ),
@@ -60,9 +72,12 @@ impl OrchestratorView {
             .track_scroll(&self.scroll)
             .flex_1()
             .min_h_0()
+            // Rows keep off the list's sides, as every list's do.
+            .px(look.view().at(LIST_INSET))
             .into_any_element()
         };
         div()
+            .debug_selector(|| "orchestrator-list".into())
             .flex_1()
             .min_w_0()
             .flex()
@@ -93,15 +108,9 @@ impl OrchestratorView {
         } else {
             format!("No {what} match \u{201c}{}\u{201d}", self.query.trim())
         };
-        div()
+        look.view()
+            .empty("orchestrator-empty", Some("icons/inbox.svg"), text)
             .flex_1()
-            .flex()
-            .flex_col()
-            .items_center()
-            .justify_center()
-            .gap_2()
-            .child(look.icon("icons/search.svg", 22., look.theme.muted))
-            .child(text)
             .when(!self.query.trim().is_empty(), |el| {
                 el.child(
                     look.button("orchestrator-clear", "Clear filter", false)
@@ -125,23 +134,15 @@ impl OrchestratorView {
         &self,
         id: (&'static str, usize),
         key: String,
-        height: f32,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let theme = &self.look.theme;
         let selected = self.selected.as_deref() == Some(key.as_str());
-        let hover = theme.surface;
-        div()
-            .id(id)
+        let id: ElementId = id.into();
+        let selector = id.to_string();
+        self.look
+            .view()
+            .row(id, selector, two_lines(self.tab), selected)
             .w_full()
-            .h(px(height))
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_4()
-            .cursor_pointer()
-            .hover(move |style| style.bg(rgb(hover)))
-            .when(selected, |el| el.bg(rgb(theme.primary_wash())))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |this, event: &MouseDownEvent, _, cx| {
@@ -156,7 +157,7 @@ impl OrchestratorView {
 
     fn render_issue_row(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
         let Some(row) = self.issue_rows.get(index) else {
-            return div().h(px(self.look.row(ISSUE_ROW))).into_any_element();
+            return div().h(px(self.row_height())).into_any_element();
         };
         let look = &self.look;
         let theme = &look.theme;
@@ -184,206 +185,197 @@ impl OrchestratorView {
                     }),
                 )
         });
-        self.row_shell(
-            ("orchestrator-issue", index),
-            key,
-            self.look.row(ISSUE_ROW),
-            cx,
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(32.))
-                .text_size(look.small())
-                .text_color(rgb(theme.muted))
-                .child(age(item.updated_at, now)),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(22.))
-                .child(source_mark(look, item.key.source.provider)),
-        )
-        .child(self.run_mark(row))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .flex()
-                .items_center()
-                .gap_2()
-                .pl(px(f32::from(row.depth) * 18.))
-                .child(div().flex_none().w(px(10.)).children(expander))
-                .child(
-                    look.mono(item.identifier.clone())
-                        .flex_none()
-                        .text_color(rgb(theme.muted)),
-                )
-                .when_some(item.priority, |el, priority| {
-                    el.child(look.badge(format!("P{priority}"), look.priority_hue(priority)))
-                })
-                .child(div().min_w_0().truncate().child(item.title.clone()))
-                .children(
-                    item.labels
-                        .iter()
-                        .take(2)
-                        .map(|label| look.chip(label.clone())),
-                )
-                .when(!item.blocked_by.is_empty(), |el| {
-                    el.child(look.icon("icons/lock.svg", 11., look.hue(YELLOW)))
-                }),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(110.))
-                .truncate()
-                .text_size(look.small())
-                .text_color(rgb(theme.subtext()))
-                .child(item.author.clone().unwrap_or_default()),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(34.))
-                .text_size(look.small())
-                .text_color(rgb(theme.muted))
-                .child(
-                    item.activity
-                        .and_then(|activity| activity.comments)
-                        .filter(|count| *count > 0)
-                        .map(|count| count.to_string())
-                        .unwrap_or_default(),
-                ),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(86.))
-                .flex()
-                .child(look.badge(item.state.replace('_', " "), look.state_hue(&item.state))),
-        )
-        .into_any_element()
+        self.row_shell(("orchestrator-issue", index), key, cx)
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(32.))
+                    .text_size(look.small())
+                    .text_color(rgb(theme.muted))
+                    .child(age(item.updated_at, now)),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(22.))
+                    .child(source_mark(look, item.key.source.provider)),
+            )
+            .child(self.run_mark(row))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .pl(px(f32::from(row.depth) * 18.))
+                    .child(div().flex_none().w(px(10.)).children(expander))
+                    .child(
+                        look.mono(item.identifier.clone())
+                            .flex_none()
+                            .text_color(rgb(theme.muted)),
+                    )
+                    .when_some(item.priority, |el, priority| {
+                        el.child(look.badge(format!("P{priority}"), look.priority_tone(priority)))
+                    })
+                    .child(div().min_w_0().truncate().child(item.title.clone()))
+                    .children(
+                        item.labels
+                            .iter()
+                            .take(2)
+                            .map(|label| look.chip(label.clone())),
+                    )
+                    .when(!item.blocked_by.is_empty(), |el| {
+                        el.child(look.icon("icons/lock.svg", 11., look.hue(YELLOW)))
+                    }),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(110.))
+                    .truncate()
+                    .text_size(look.small())
+                    .text_color(rgb(theme.subtext()))
+                    .child(item.author.clone().unwrap_or_default()),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(34.))
+                    .text_size(look.small())
+                    .text_color(rgb(theme.muted))
+                    .child(
+                        item.activity
+                            .and_then(|activity| activity.comments)
+                            .filter(|count| *count > 0)
+                            .map(|count| count.to_string())
+                            .unwrap_or_default(),
+                    ),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(86.))
+                    .flex()
+                    .child(look.badge(item.state.replace('_', " "), look.state_tone(&item.state))),
+            )
+            .into_any_element()
     }
 
     fn render_pull_request_row(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
         let Some(row) = self.pull_request_rows.get(index) else {
-            return div()
-                .h(px(self.look.row(PULL_REQUEST_ROW)))
-                .into_any_element();
+            return div().h(px(self.row_height())).into_any_element();
         };
         let look = &self.look;
         let theme = &look.theme;
         let item = &self.snapshot.items[row.item];
         let Some(pr) = &item.pull_request else {
-            return div()
-                .h(px(self.look.row(PULL_REQUEST_ROW)))
-                .into_any_element();
+            return div().h(px(self.row_height())).into_any_element();
         };
         let fork = pr
             .head_repository
             .as_deref()
             .is_some_and(|head| head != item.key.source.repository);
         let activity = item.activity.unwrap_or_default();
-        self.row_shell(
-            ("orchestrator-pr", index),
-            item.key.canonical(),
-            self.look.row(PULL_REQUEST_ROW),
-            cx,
-        )
-        .child(
-            look.mono(item.identifier.clone())
-                .flex_none()
-                .w(px(44.))
-                .text_color(rgb(theme.muted)),
-        )
-        .child(self.run_mark(row))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .flex()
-                .flex_col()
-                .child(div().truncate().child(item.title.clone()))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_1()
-                        .text_size(look.tiny())
-                        .text_color(rgb(theme.muted))
-                        .child(
-                            div()
-                                .flex_none()
-                                .text_color(rgb(theme.subtext()))
-                                .child(item.author.clone().unwrap_or_default()),
-                        )
-                        .child("\u{00b7}")
-                        .child(look.icon("icons/git-branch.svg", 10., theme.muted))
-                        .child(
-                            div()
-                                .min_w_0()
-                                .truncate()
-                                .text_font(&look.mono)
-                                .child(pr.head_ref.clone()),
-                        )
-                        .when(fork, |el| el.child(look.badge("fork", CYAN))),
-                ),
-        )
-        .child(diff_squares(look, pr.additions, pr.deletions))
-        .child(
-            div()
-                .flex_none()
-                .w(px(70.))
-                .text_size(look.tiny())
-                .text_color(rgb(theme.muted))
-                .child(format!(
-                    "\u{1f4ac}{} \u{2387}{}",
-                    activity.comments.unwrap_or(0),
-                    activity.commits.unwrap_or(0)
-                )),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(60.))
-                .flex()
-                .child(look.badge(item.state.clone(), look.state_hue(&item.state))),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(28.))
-                .text_size(look.small())
-                .text_color(rgb(theme.muted))
-                .child(age(item.updated_at, chrono::Utc::now())),
-        )
-        .into_any_element()
+        self.row_shell(("orchestrator-pr", index), item.key.canonical(), cx)
+            .child(
+                look.mono(item.identifier.clone())
+                    .flex_none()
+                    .w(px(44.))
+                    .text_color(rgb(theme.muted)),
+            )
+            .child(self.run_mark(row))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .child(div().truncate().child(item.title.clone()))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .text_size(look.tiny())
+                            .text_color(rgb(theme.muted))
+                            .child(
+                                div()
+                                    .flex_none()
+                                    .text_color(rgb(theme.subtext()))
+                                    .child(item.author.clone().unwrap_or_default()),
+                            )
+                            .child("\u{00b7}")
+                            .child(look.icon("icons/git-branch.svg", 10., theme.muted))
+                            .child(
+                                div()
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_font(&look.mono)
+                                    .child(pr.head_ref.clone()),
+                            )
+                            .when(fork, |el| el.child(look.badge("fork", Tone::Accent))),
+                    ),
+            )
+            .child(diff_squares(look, pr.additions, pr.deletions))
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(70.))
+                    .text_size(look.tiny())
+                    .text_color(rgb(theme.muted))
+                    .child(format!(
+                        "\u{1f4ac}{} \u{2387}{}",
+                        activity.comments.unwrap_or(0),
+                        activity.commits.unwrap_or(0)
+                    )),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(60.))
+                    .flex()
+                    .child(look.badge(item.state.clone(), look.state_tone(&item.state))),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(28.))
+                    .text_size(look.small())
+                    .text_color(rgb(theme.muted))
+                    .child(age(item.updated_at, chrono::Utc::now())),
+            )
+            .into_any_element()
     }
 
     fn render_run_line(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
         let look = &self.look;
         let theme = &look.theme;
         let Some(line) = self.run_lines.get(index) else {
-            return div().h(px(self.look.row(RUN_ROW))).into_any_element();
+            return div().h(px(self.row_height())).into_any_element();
         };
         let row = match line {
             RunLine::Group { group, count } => {
-                let hue = match group {
-                    Group::Attention => look.hue(YELLOW),
-                    Group::Working => look.hue(GREEN),
-                    Group::Idle => look.hue(BLUE),
-                    Group::Finished => look.hue(CYAN),
+                // Each group in the state its runs share, as the sidebar
+                // draws it: waiting red, working yellow, idle hollow green.
+                let status = match group {
+                    Group::Attention => AgentStatus::Blocked,
+                    Group::Working => AgentStatus::Working,
+                    Group::Idle => AgentStatus::Idle,
+                    Group::Finished => AgentStatus::Done,
                 };
+                let view = look.view();
                 return div()
                     .w_full()
-                    .h(px(self.look.row(RUN_ROW)))
+                    .h(px(self.row_height()))
                     .flex()
                     .items_end()
-                    .gap_2()
-                    .px_4()
-                    .pb_1()
-                    .child(look.dot(hue, 7.))
+                    .gap(view.at(8.))
+                    .px(view.at(10.))
+                    .pb(view.at(6.))
+                    .child(
+                        view.status_dot(look.indicators.color(status), status == AgentStatus::Idle),
+                    )
                     .child(look.label(group.label()))
                     .child(look.muted(count.to_string()))
                     .into_any_element();
@@ -392,7 +384,6 @@ impl OrchestratorView {
         };
         let run = &self.snapshot.runs[row.run];
         let item = self.item(&run.item_key);
-        let color = look.status_hue(row.status);
         let host: SharedString = run
             .workspace
             .as_ref()
@@ -400,105 +391,93 @@ impl OrchestratorView {
             .unwrap_or_else(|| "local".into())
             .into();
         let run_index = row.run;
-        self.row_shell(
-            ("orchestrator-run", index),
-            run.id.clone(),
-            self.look.row(RUN_ROW),
-            cx,
-        )
-        .child(look.icon(agent_icon(&run.agent), 15., theme.foreground))
-        .child(
-            look.mono(item.map_or_else(
-                || super::rows::key_label(&run.item_key),
-                |item| item.identifier.clone(),
-            ))
-            .flex_none()
-            .w(px(80.))
-            .text_color(rgb(theme.muted)),
-        )
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .when(item.is_none(), |el| el.text_color(rgb(theme.muted)))
-                .child(item.map_or_else(
-                    || "Not listed (closed or filtered)".to_owned(),
-                    |item| item.title.clone(),
-                )),
-        )
-        .child(
-            div()
-                .debug_selector(move || format!("orchestrator-run-host-column-{index}"))
+        self.row_shell(("orchestrator-run", index), run.id.clone(), cx)
+            .child(look.icon(agent_icon(&run.agent), 15., theme.foreground))
+            .child(
+                look.mono(item.map_or_else(
+                    || super::rows::key_label(&run.item_key),
+                    |item| item.identifier.clone(),
+                ))
                 .flex_none()
-                .w(px(100.))
-                .flex()
-                .child(
-                    look.chip(host.clone())
-                        .id(("orchestrator-run-host", index))
-                        .debug_selector(move || format!("orchestrator-run-host-{index}"))
-                        .max_w_full()
-                        .min_w_0()
-                        .truncate()
-                        .tooltip(look.view().menu().tooltip(host)),
-                ),
-        )
-        .child(
-            look.mono(
-                run.workspace
-                    .as_ref()
-                    .map(|workspace| workspace.branch.clone())
-                    .unwrap_or_default(),
+                .w(px(80.))
+                .text_color(rgb(theme.muted)),
             )
-            .debug_selector(move || format!("orchestrator-run-branch-{index}"))
-            .flex_none()
-            .w(px(220.))
-            .truncate()
-            .text_color(rgb(theme.subtext())),
-        )
-        .child(
-            div()
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .when(item.is_none(), |el| el.text_color(rgb(theme.muted)))
+                    .child(item.map_or_else(
+                        || "Not listed (closed or filtered)".to_owned(),
+                        |item| item.title.clone(),
+                    )),
+            )
+            .child(
+                div()
+                    .debug_selector(move || format!("orchestrator-run-host-column-{index}"))
+                    .flex_none()
+                    .w(px(100.))
+                    .flex()
+                    .child(
+                        look.chip(host.clone())
+                            .id(("orchestrator-run-host", index))
+                            .debug_selector(move || format!("orchestrator-run-host-{index}"))
+                            .max_w_full()
+                            .min_w_0()
+                            .truncate()
+                            .tooltip(look.view().menu().tooltip(host)),
+                    ),
+            )
+            .child(
+                look.mono(
+                    run.workspace
+                        .as_ref()
+                        .map(|workspace| workspace.branch.clone())
+                        .unwrap_or_default(),
+                )
+                .debug_selector(move || format!("orchestrator-run-branch-{index}"))
                 .flex_none()
-                .w(px(100.))
-                .flex()
-                .items_center()
-                .gap_1()
-                .child(look.dot(color, 7.))
-                .child(
-                    div()
-                        .text_size(look.small())
-                        .text_color(rgb(color))
-                        .child(row.status.label()),
-                ),
-        )
-        .child(
-            div()
-                .flex_none()
-                .w(px(36.))
-                .text_size(look.small())
-                .text_color(rgb(theme.muted))
-                .child(age(run.started(), chrono::Utc::now())),
-        )
-        .child(div().flex_none().w(px(100.)).flex().child(look.badge(
-            run.owner.as_str(),
-            if run.owner == Owner::HerdrGpui {
-                BLUE
-            } else {
-                CYAN
-            },
-        )))
-        .child(
-            look.icon_button(("orchestrator-run-open", index), "icons/arrow-right.svg")
-                .debug_selector(move || format!("orchestrator-run-open-{index}"))
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(move |this, _, _, cx| {
-                        cx.stop_propagation();
-                        this.open_run(run_index, cx);
-                    }),
-                ),
-        )
-        .into_any_element()
+                .w(px(220.))
+                .truncate()
+                .text_color(rgb(theme.subtext())),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(100.))
+                    .flex()
+                    .items_center()
+                    .child(look.badge(row.status.label(), look.status_tone(row.status))),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(px(36.))
+                    .text_size(look.small())
+                    .text_color(rgb(theme.muted))
+                    .child(age(run.started(), chrono::Utc::now())),
+            )
+            .child(div().flex_none().w(px(100.)).flex().child(look.badge(
+                run.owner.as_str(),
+                if run.owner == Owner::HerdrGpui {
+                    Tone::Accent
+                } else {
+                    Tone::Neutral
+                },
+            )))
+            .child(
+                look.icon_button(("orchestrator-run-open", index), "icons/arrow-right.svg")
+                    .debug_selector(move || format!("orchestrator-run-open-{index}"))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, _, _, cx| {
+                            cx.stop_propagation();
+                            this.open_run(run_index, cx);
+                        }),
+                    ),
+            )
+            .into_any_element()
     }
 
     /// The agent and status of an item's newest run.
@@ -523,24 +502,16 @@ pub(super) fn source_mark(look: &Look, provider: Provider) -> AnyElement {
         Provider::Github => look
             .icon("icons/github.svg", 13., look.theme.subtext())
             .into_any_element(),
-        Provider::Beads => look.badge("bd", MAGENTA).into_any_element(),
-        Provider::Gitlab => look.badge("gl", RED).into_any_element(),
+        Provider::Beads => look.badge("bd", Tone::Merged).into_any_element(),
+        Provider::Gitlab => look.badge("gl", Tone::Danger).into_any_element(),
     }
 }
 
+/// The list's column headings, in the lists' style, lined up with the
+/// rows' cells.
 fn column_head(look: &Look, cells: &[(&str, Option<f32>)]) -> Div {
-    let theme = &look.theme;
-    div()
-        .flex_none()
-        .flex()
-        .items_center()
-        .gap_2()
-        .h(px(24.))
-        .px_4()
-        .border_b_1()
-        .border_color(rgb(theme.active))
-        .text_size(look.tiny())
-        .text_color(rgb(theme.muted))
+    look.view()
+        .columns("orchestrator-columns")
         .children(cells.iter().map(|(text, width)| {
             match width {
                 Some(width) => div()
