@@ -36,7 +36,7 @@ impl HerdrWindow {
             )))
             .child(
                 look.footer("install-footer")
-                    .hint("Esc", "dismiss")
+                    .hint("Esc", "cancel")
                     .button(
                         look.button("menu-dismiss", "Dismiss", ButtonKind::Normal, true)
                             .on_click(cx.listener(|this, _, window, cx| {

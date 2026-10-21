@@ -485,6 +485,18 @@ impl DialogLook {
             .child(svg().path(icon).size(self.at(TILE_ICON)).text_color(colour))
     }
 
+    /// Rings the control the keys would press, outside its box so nothing
+    /// moves: the accent, as a focused field's ring.
+    pub(crate) fn ring<E: Styled>(&self, element: E) -> E {
+        element.shadow(vec![BoxShadow {
+            color: self.settings.accent().into(),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(2.),
+            inset: false,
+        }])
+    }
+
     /// Dresses the flash: the panel's fill and hairline, smaller corners,
     /// and a shorter shadow than a panel's.
     pub(crate) fn flash<E: Styled>(&self, element: E) -> E {

@@ -3,6 +3,7 @@ use super::*;
 use core::prelude::v1::test;
 use std::sync::Arc;
 
+mod look;
 mod pane_option;
 
 #[gpui::test]

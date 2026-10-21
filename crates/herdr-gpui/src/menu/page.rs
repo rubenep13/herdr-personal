@@ -165,7 +165,11 @@ impl Page {
             | Self::Tab
             | Self::Themes
             | Self::Workspace => Look::Menu,
-            Self::Dialog(_) | Self::Install => Look::Dialog,
+            Self::ConfirmClose
+            | Self::Dialog(_)
+            | Self::Install
+            | Self::OpenLink
+            | Self::WorktreeScript => Look::Dialog,
             _ => Look::Legacy,
         }
     }

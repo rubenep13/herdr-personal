@@ -20,7 +20,12 @@ pub(crate) use config::{Config, PATH as CONFIG_PATH, read as read_config};
 pub(crate) use launch::{Checkout, main_checkout};
 pub(crate) use trust::{Grant, Trust};
 
-use crate::{HerdrWindow, NavigationTarget, menu::Page, window::Flash};
+use crate::{
+    HerdrWindow, NavigationTarget,
+    design::{ButtonKind, Header, NoteTone},
+    menu::Page,
+    window::Flash,
+};
 use gpui::{prelude::*, *};
 use herdr_client::{Method, protocol::ClientPaneInputEvent};
 use std::sync::{
@@ -501,8 +506,6 @@ impl HerdrWindow {
     }
 
     pub(crate) fn render_worktree_script(&self, cx: &mut Context<Self>) -> Div {
-        use crate::fonts::StyledFont;
-        let theme = &self.theme;
         let Some(Job {
             launch,
             step: Step::Asking { config, .. },
@@ -511,36 +514,23 @@ impl HerdrWindow {
         else {
             return div();
         };
+        let look = self.dialog_look();
         let kind = launch.kind;
-        let button = |id: &'static str, label: &'static str, primary: bool| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .p(px(8.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .when(primary, |button| button.bg(rgb(theme.active)))
-                .when(!primary, |button| button.hover(|s| s.bg(rgb(theme.active))))
-                .cursor_pointer()
-                .child(label)
-        };
         let script_block = |kind: ScriptKind, script: &str| {
-            div()
-                .debug_selector(move || format!("worktree-script-{}", kind.name()))
-                .flex()
-                .flex_col()
-                .rounded(px(crate::config::corners::CONTROL))
-                .bg(rgb(theme.active))
-                .px(px(10.))
-                .py(px(6.))
-                .text_font(&self.config.terminal)
-                .children(script_lines(script).into_iter().map(|line| {
-                    // An empty line still takes its height.
-                    div().child(if line.is_empty() {
-                        " ".to_owned()
-                    } else {
-                        line
-                    })
-                }))
+            look.well(
+                format!("worktree-script-{}", kind.name()),
+                Some(&self.config.terminal),
+            )
+            .flex()
+            .flex_col()
+            .children(script_lines(script).into_iter().map(|line| {
+                // An empty line still takes its height.
+                div().child(if line.is_empty() {
+                    " ".to_owned()
+                } else {
+                    line
+                })
+            }))
         };
         let (title, skip) = match kind {
             ScriptKind::Setup => ("Run this worktree's setup script?", "Don't run"),
@@ -556,56 +546,87 @@ impl HerdrWindow {
             .filter_map(|other| Some((other, config.scripts.get(other)?)))
             .collect();
         let host = &self.endpoints[self.selected_endpoint].label;
+        // The icon the workspace menu gives the script's row.
+        let icon = match kind {
+            ScriptKind::Setup => "icons/refresh.svg",
+            ScriptKind::Run | ScriptKind::Archive => "icons/play.svg",
+        };
         // No key confirms: this page can open by itself while the user is
         // typing, and a stray Enter must not grant trust. Only a click does.
         div()
             .debug_selector(|| "worktree-script-trust".into())
-            .child(div().p(px(8.)).font_weight(FontWeight::SEMIBOLD).child(title))
-            .child(div().p(px(8.)).child(format!(
-                "{} asks to run this from {}, in a new \u{201c}{}\u{201d} tab of its checkout:",
-                launch.repo,
-                config::PATH,
-                kind.name()
-            )))
-            .when_some(config.scripts.get(kind), |page, script| {
-                page.child(div().px(px(8.)).child(script_block(kind, script)))
-            })
-            .when(!others.is_empty(), |page| {
-                page.child(
-                    div()
-                        .p(px(8.))
-                        .child("Trusting the file also trusts its other scripts:"),
-                )
-                .children(others.into_iter().map(|(other, script)| {
-                    div()
-                        .px(px(8.))
-                        .pb(px(8.))
-                        .child(div().text_color(rgb(theme.muted)).child(other.name()))
-                        .child(script_block(other, script))
-                }))
-            })
-            .child(div().p(px(8.)).text_color(rgb(theme.muted)).child(format!(
-                "Scripts run with sh on {host}, the daemon's host. Trust is remembered for {} there until the file changes.",
-                launch.repo
-            )))
+            .flex()
+            .flex_col()
+            .child(look.header(
+                Header {
+                    selector: "worktree-script-header",
+                    icon,
+                    title: ("worktree-script-title", title),
+                    sub: Some(("icons/folder.svg", "worktree-script-repo", &launch.repo)),
+                    danger: false,
+                },
+                look.menu()
+                    .close_button("worktree-script-dismiss")
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.dismiss_menu(window, cx);
+                    })),
+            ))
             .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .gap(px(8.))
-                    .p(px(8.))
-                    .child(button("worktree-script-trust-run", "Trust and run", true).on_click(
-                        cx.listener(|this, _, window, cx| {
+                look.body("worktree-script-body")
+                    .child(look.lead(
+                        "worktree-script-lead",
+                        format!(
+                            "{} asks to run this from {}, in a new \u{201c}{}\u{201d} tab of its checkout:",
+                            launch.repo,
+                            config::PATH,
+                            kind.name()
+                        ),
+                    ))
+                    .when_some(config.scripts.get(kind), |body, script| {
+                        body.child(script_block(kind, script))
+                    })
+                    .when(!others.is_empty(), |body| {
+                        body.child(look.lead(
+                            "worktree-script-others",
+                            "Trusting the file also trusts its other scripts:",
+                        ))
+                        .children(others.into_iter().map(|(other, script)| {
+                            look.label("worktree-script-other", other.name())
+                                .child(script_block(other, script))
+                        }))
+                    })
+                    .child(look.note(
+                        "worktree-script-host".into(),
+                        NoteTone::Info,
+                        format!(
+                            "Scripts run with sh on {host}, the daemon's host. Trust is remembered for {} there until the file changes.",
+                            launch.repo
+                        ),
+                    )),
+            )
+            .child(
+                look.footer("worktree-script-footer")
+                    .hint("Esc", "cancel")
+                    .button(
+                        look.button("worktree-script-skip", skip, ButtonKind::Normal, true)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                cx.stop_propagation();
+                                this.skip_worktree_script(window, cx);
+                            })),
+                    )
+                    .button(
+                        look.button(
+                            "worktree-script-trust-run",
+                            "Trust and run",
+                            ButtonKind::Primary,
+                            true,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| {
                             cx.stop_propagation();
                             this.trust_worktree_script(window, cx);
-                        }),
-                    ))
-                    .child(button("worktree-script-skip", skip, false).on_click(cx.listener(
-                        |this, _, window, cx| {
-                            cx.stop_propagation();
-                            this.skip_worktree_script(window, cx);
-                        },
-                    ))),
+                        })),
+                    ),
             )
     }
 }

@@ -5,6 +5,7 @@ use super::*;
 mod footer_menu;
 mod install;
 mod keybinds_look;
+mod open_link;
 mod redesigned;
 mod x_mark;
 // keep-sorted end
