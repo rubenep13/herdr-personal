@@ -30,6 +30,7 @@ fn height(frame: Option<Frame>, cx: &mut gpui::TestAppContext) -> Pixels {
             if let Some(frame) = frame {
                 input.set_frame(frame, cx);
             }
+            assert_eq!(input.frame(), frame.unwrap_or(Frame::Own));
         });
         window.draw(cx).clear(cx);
     });
