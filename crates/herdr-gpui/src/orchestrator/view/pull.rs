@@ -3,13 +3,9 @@
 //! and never retries it) and its checks, from the status the worker looked
 //! up by number.
 
-use super::{
-    OrchestratorView,
-    dispatch::Confirm,
-    look::{GREEN, MAGENTA, RED, YELLOW},
-};
+use super::{OrchestratorView, dispatch::Confirm};
 use crate::{
-    config::corners,
+    design::Tone,
     orchestrator::Item,
     pr_actions,
     pull_request::{MergeMethod, Outcome, PullRequest, State},
@@ -125,16 +121,16 @@ impl OrchestratorView {
 
     pub(super) fn render_checks(&self, item: &Item) -> AnyElement {
         let look = &self.look;
-        let theme = &look.theme;
+        let view = look.view();
         let mut column = div()
             .id("orchestrator-checks")
             .flex_1()
             .min_w_0()
             .overflow_y_scroll()
-            .p_4()
+            .p(view.at(16.))
             .flex()
             .flex_col()
-            .gap_1();
+            .gap(view.at(4.));
         let Some(pr) = self.open_pull_request() else {
             let text = match self.lookup_problem(item) {
                 _ if self.request.token.is_none() => {
@@ -146,31 +142,42 @@ impl OrchestratorView {
             return column.child(look.muted(text)).into_any_element();
         };
         column = column
-            .child(look.label(format!(
-                "CHECKS \u{00b7} {}",
-                pr.checks_summary.to_uppercase()
-            )))
-            .children(pr.check_list().enumerate().map(|(index, (name, outcome))| {
-                let (mark, hue) = outcome_mark(outcome);
-                div()
-                    .id(("orchestrator-check", index))
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .text_size(look.small())
-                    .child(div().w(px(14.)).text_color(rgb(look.hue(hue))).child(mark))
+            .child(look.label(format!("CHECKS \u{00b7} {}", pr.checks_summary)))
+            .child(view.list().px_0().children(pr.check_list().enumerate().map(
+                |(index, (name, outcome))| {
+                    let (icon, tone) = outcome_mark(outcome);
+                    let (ink, _) = view.settings().tone(tone);
+                    view.row(
+                        ("orchestrator-check", index),
+                        format!("orchestrator-check-{index}"),
+                        false,
+                        false,
+                    )
+                    .cursor_default()
+                    .child(
+                        svg()
+                            .path(icon)
+                            .size(view.at(14.))
+                            .flex_none()
+                            .text_color(ink),
+                    )
                     .child(div().flex_1().min_w_0().truncate().child(name.to_owned()))
                     .child(look.muted(outcome.to_string()))
-            }))
-            .child(div().h_3())
+                },
+            )))
+            .child(div().h(view.at(12.)))
             .child(look.label("REVIEW"))
-            .child(div().text_size(look.small()).child(pr.review()))
-            .child(div().h_3())
+            .child(
+                div()
+                    .text_size(px(view.scale().secondary))
+                    .child(pr.review()),
+            )
+            .child(div().h(view.at(12.)))
             .child(look.label("MERGE"))
             .child(
                 div()
-                    .text_size(look.small())
-                    .text_color(rgb(theme.subtext()))
+                    .text_size(px(view.scale().secondary))
+                    .text_color(view.text())
                     .child(format!("{} \u{00b7} {}", pr.lifecycle(), pr.merge_status())),
             );
         column.into_any_element()
@@ -197,36 +204,17 @@ impl OrchestratorView {
         }
         let pr = self.open_pull_request()?;
         let look = &self.look;
-        let theme = &look.theme;
+        let view = look.view();
         Some(
             deferred(
-                div()
+                view.menu_panel("orchestrator-merge-menu")
                     .absolute()
-                    .top(px(96.))
-                    .right(px(16.))
-                    .w(px(220.))
-                    .p_1()
-                    .flex()
-                    .flex_col()
-                    .rounded(px(corners::CONTROL))
-                    .bg(rgb(theme.surface))
-                    .border_1()
-                    .border_color(rgb(theme.active))
-                    .shadow_lg()
+                    .top(view.at(MERGE_TOP))
+                    .right(view.at(12.))
+                    .w(view.at(MERGE_WIDTH))
                     .children(pr.merge_methods.iter().copied().map(|method| {
-                        let hover = theme.active;
-                        div()
-                            .id(SharedString::from(format!(
-                                "orchestrator-merge-{}",
-                                method.graphql()
-                            )))
-                            .px_2()
-                            .h(px(28.))
-                            .flex()
-                            .items_center()
-                            .rounded(px(corners::SMALL))
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(rgb(hover)))
+                        let selector = format!("orchestrator-merge-{}", method.graphql());
+                        view.row(SharedString::from(selector.clone()), selector, false, false)
                             .child(method.action())
                             .on_click(cx.listener(move |this, _, _, cx| {
                                 this.merge_open = false;
@@ -253,11 +241,17 @@ impl OrchestratorView {
     }
 }
 
-fn outcome_mark(outcome: Outcome) -> (&'static str, usize) {
+/// A check's result as an icon in its tone: passed green, failed red,
+/// pending yellow, skipped grey.
+fn outcome_mark(outcome: Outcome) -> (&'static str, Tone) {
     match outcome {
-        Outcome::Passed => ("\u{2713}", GREEN),
-        Outcome::Failed => ("\u{2717}", RED),
-        Outcome::Pending => ("\u{25cf}", YELLOW),
-        Outcome::Skipped => ("\u{2013}", MAGENTA),
+        Outcome::Passed => ("icons/check.svg", Tone::Good),
+        Outcome::Failed => ("icons/close.svg", Tone::Danger),
+        Outcome::Pending => ("icons/clock.svg", Tone::Warn),
+        Outcome::Skipped => ("icons/chevron-right.svg", Tone::Neutral),
     }
 }
+
+/// The Merge menu sits under the bar, at the orchestrator's face of 12.
+const MERGE_TOP: f32 = 40.;
+const MERGE_WIDTH: f32 = 220.;

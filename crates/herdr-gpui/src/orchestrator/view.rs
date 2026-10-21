@@ -206,12 +206,15 @@ impl OrchestratorView {
         let message = cx.new(|cx| {
             let mut input = SearchInput::new(cx);
             input.set_placeholder("Send a message to the agent\u{2026}", cx);
+            // Its field draws the frame.
+            input.set_frameless(cx);
             input.set_appearance(look.ui.clone(), look.theme.clone(), cx);
             input
         });
         let comment = cx.new(|cx| {
             let mut input = SearchInput::new(cx);
             input.set_placeholder("Leave a comment\u{2026}", cx);
+            input.set_frameless(cx);
             input.set_appearance(look.ui.clone(), look.theme.clone(), cx);
             input
         });
