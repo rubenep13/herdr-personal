@@ -165,10 +165,16 @@ impl Page {
             | Self::Tab
             | Self::Themes
             | Self::Workspace => Look::Menu,
-            Self::ConfirmClose
+            Self::About
+            | Self::AgentSkill
+            | Self::AppUpdate
+            | Self::ConfirmClose
             | Self::Dialog(_)
             | Self::Install
             | Self::OpenLink
+            | Self::StartAgent
+            | Self::Update
+            | Self::VersionMismatch
             | Self::WorktreeScript => Look::Dialog,
             _ => Look::Legacy,
         }

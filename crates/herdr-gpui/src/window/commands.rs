@@ -640,46 +640,62 @@ impl HerdrWindow {
     }
 
     pub(crate) fn render_agent_skill_offer(&self, cx: &mut Context<Self>) -> gpui::Div {
+        use crate::design::{ButtonKind, Header, NoteTone};
         use gpui::{prelude::*, *};
-        let theme = &self.theme;
-        let button = |id: &'static str, label: &'static str, primary: bool| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .p(px(8.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .when(primary, |button| button.bg(rgb(theme.active)))
-                .when(!primary, |button| button.hover(|s| s.bg(rgb(theme.active))))
-                .cursor_pointer()
-                .child(label)
+        let look = self.dialog_look();
+        // Closing without an answer is a "not now", as the button says.
+        let decline = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+            this.dismiss_menu(window, cx);
         };
         div()
             .debug_selector(|| "agent-skill-offer".into())
-            .child(div().p(px(8.)).child("Let agents show you pages?"))
-            .child(div().p(px(8.)).child(
-                "Agents in your panes can open pages and HTML drafts in browser tabs here, and read the notes you pin on them. A skill teaches them how.",
-            ))
-            .child(div().p(px(8.)).text_color(rgb(theme.muted)).child(
-                "Install writes herdr-personal-dev-browser/SKILL.md into ~/.claude/skills and ~/.agents/skills, whichever exist, and keeps it up to date. A skill of that name you wrote yourself is left alone. Remove it any time in Settings.",
+            .flex()
+            .flex_col()
+            .child(look.header(
+                Header {
+                    selector: "agent-skill-header",
+                    icon: "icons/globe.svg",
+                    title: ("agent-skill-title", "Let agents show you pages?"),
+                    sub: None,
+                    danger: false,
+                },
+                look.menu()
+                    .close_button("agent-skill-dismiss")
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        cx.stop_propagation();
+                        decline(this, window, cx);
+                    })),
             ))
             .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .gap(px(8.))
-                    .p(px(8.))
-                    .child(button("agent-skill-install", "Install", true).on_click(cx.listener(
-                        |this, _, window, cx| {
-                            cx.stop_propagation();
-                            this.install_browser_skill(window, cx);
-                        },
-                    )))
-                    .child(button("agent-skill-decline", "Not now", false).on_click(cx.listener(
-                        |this, _, window, cx| {
-                            cx.stop_propagation();
-                            this.dismiss_menu(window, cx);
-                        },
-                    ))),
+                look.body("agent-skill-body")
+                    .child(look.lead(
+                        "agent-skill-text",
+                        "Agents in your panes can open pages and HTML drafts in browser tabs here, and read the notes you pin on them. A skill teaches them how.",
+                    ))
+                    .child(look.note(
+                        "agent-skill-where".into(),
+                        NoteTone::Info,
+                        "Install writes herdr-personal-dev-browser/SKILL.md into ~/.claude/skills and ~/.agents/skills, whichever exist, and keeps it up to date. A skill of that name you wrote yourself is left alone. Remove it any time in Settings.",
+                    )),
+            )
+            .child(
+                look.footer("agent-skill-footer")
+                    .hint("Esc", "cancel")
+                    .hint("↵", "install")
+                    .button(
+                        look.button("agent-skill-decline", "Not now", ButtonKind::Normal, true)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                cx.stop_propagation();
+                                decline(this, window, cx);
+                            })),
+                    )
+                    .button(
+                        look.button("agent-skill-install", "Install", ButtonKind::Primary, true)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                cx.stop_propagation();
+                                this.install_browser_skill(window, cx);
+                            })),
+                    ),
             )
     }
 }

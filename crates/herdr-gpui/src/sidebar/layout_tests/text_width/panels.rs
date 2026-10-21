@@ -483,7 +483,7 @@ pub(super) fn check_app_update(
             let close = cx
                 .debug_bounds("app-update-close")
                 .context("update close bounds")?;
-            assert_eq!(close.right(), header.right() - px(16.));
+            assert_eq!(close.right(), header.right() - px(10.));
             assert!(close.left() > header.center().x);
             assert!(close.top() >= header.top() && close.bottom() <= header.bottom());
             assert!(header.bottom() < action.top());

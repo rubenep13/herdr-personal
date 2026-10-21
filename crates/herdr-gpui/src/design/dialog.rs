@@ -417,6 +417,7 @@ impl DialogLook {
             look: *self,
             selector,
             compact: false,
+            wrap: false,
             hints: Vec::new(),
             buttons: Vec::new(),
         }
@@ -520,6 +521,9 @@ pub(crate) struct Footer {
     look: DialogLook,
     selector: &'static str,
     compact: bool,
+    /// Buttons that wrap onto a second row rather than overflow a narrow
+    /// window, for a footer with more than two.
+    wrap: bool,
     hints: Vec<(&'static str, &'static str)>,
     buttons: Vec<AnyElement>,
 }
@@ -538,6 +542,11 @@ impl Footer {
         self.buttons.push(button.into_any_element());
         self
     }
+
+    pub(crate) fn wrap(mut self) -> Self {
+        self.wrap = true;
+        self
+    }
 }
 
 impl IntoElement for Footer {
@@ -548,12 +557,22 @@ impl IntoElement for Footer {
             look,
             selector,
             compact,
+            wrap,
             hints,
             buttons,
         } = self;
-        let buttons = buttons
-            .into_iter()
-            .map(|button| div().flex_none().child(button));
+        let buttons = div()
+            .flex()
+            .items_center()
+            .justify_end()
+            .gap(look.at(if compact { FORM_FOOTER_GAP } else { FOOTER_GAP }))
+            .when(wrap, |row| row.flex_shrink_1().min_w_0().flex_wrap())
+            .when(!wrap, |row| row.flex_none())
+            .children(
+                buttons
+                    .into_iter()
+                    .map(|button| div().flex_none().child(button)),
+            );
         if compact {
             return div()
                 .debug_selector(move || selector.into())
@@ -568,7 +587,7 @@ impl IntoElement for Footer {
                 .pb(look.at(FORM_FOOTER_BOTTOM))
                 .border_t_1()
                 .border_color(look.line)
-                .children(buttons);
+                .child(buttons);
         }
         // The keys give way before the buttons: they shrink and clip, the
         // buttons never do.
@@ -608,7 +627,7 @@ impl IntoElement for Footer {
             .border_color(look.line)
             .bg(look.well)
             .child(hints)
-            .children(buttons)
+            .child(buttons)
     }
 }
 

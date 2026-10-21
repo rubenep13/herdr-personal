@@ -6,6 +6,7 @@
 use super::{DEADLINE, StartAgent, StartOutcome, agent_name, start_agent};
 use crate::{
     HerdrWindow, NavigationTarget,
+    design::{Header, ItemState, Leading, NoteTone},
     menu::Page,
     sidebar::tree::EndpointKey,
     teleport::{AgentKind, Host, host_for},
@@ -66,6 +67,8 @@ struct Running {
 #[derive(Debug, Default)]
 pub(crate) struct AgentStart {
     choosing: Option<Choosing>,
+    /// The agent row under the pointer, which the choice fills as menus do.
+    hovered: Option<usize>,
     running: Option<Running>,
 }
 
@@ -256,57 +259,86 @@ impl HerdrWindow {
 
     /// The agent choice: the host's installed agents, one button each.
     pub(crate) fn render_start_agent(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
         let Some(choosing) = &self.agent_start.choosing else {
             return div();
         };
-        let body = match &choosing.agents {
-            Agents::Looking => div()
-                .p(px(8.))
-                .text_color(rgb(theme.muted))
-                .child("Looking for agents on this host…"),
-            Agents::Failed(error) => div()
-                .p(px(8.))
-                .text_color(rgb(theme.muted))
-                .child(format!("Could not list the agents: {error}")),
-            Agents::Found(kinds) if kinds.is_empty() => div()
-                .p(px(8.))
-                .text_color(rgb(theme.muted))
-                .child("No agent Herdr can start is installed on this host."),
-            Agents::Found(kinds) => {
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .gap(px(8.))
-                    .p(px(8.))
-                    .children(kinds.iter().map(|&kind| {
-                        let id = SharedString::from(format!("start-agent-{}", kind.name()));
-                        div()
-                            .id(id.clone())
-                            .debug_selector(move || id.to_string())
-                            .p(px(8.))
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .cursor_pointer()
-                            .child(kind.name())
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.start_agent_kind(kind, window, cx);
-                            }))
+        let look = self.dialog_look();
+        let menu = look.menu();
+        let quiet =
+            |selector: &'static str, text: String| look.note(selector.into(), NoteTone::Info, text);
+        let agents = match &choosing.agents {
+            Agents::Looking => quiet(
+                "start-agent-status",
+                "Looking for agents on this host…".into(),
+            )
+            .into_any_element(),
+            Agents::Failed(error) => quiet(
+                "start-agent-status",
+                format!("Could not list the agents: {error}"),
+            )
+            .into_any_element(),
+            Agents::Found(kinds) if kinds.is_empty() => quiet(
+                "start-agent-status",
+                "No agent Herdr can start is installed on this host.".into(),
+            )
+            .into_any_element(),
+            Agents::Found(kinds) => div()
+                .flex()
+                .flex_col()
+                .children(kinds.iter().enumerate().map(|(index, &kind)| {
+                    let id = SharedString::from(format!("start-agent-{}", kind.name()));
+                    let icon = crate::icons::AgentIcon::from_identity(Some(kind.name())).path();
+                    let state = ItemState {
+                        selected: self.agent_start.hovered == Some(index),
+                        ..ItemState::default()
+                    };
+                    menu.row(
+                        id.clone(),
+                        id.to_string(),
+                        Leading::Icon(icon, format!("{id}-icon")),
+                        state,
+                    )
+                    .child(menu.label(format!("{id}-label"), kind.name()))
+                    .on_hover(cx.listener(move |this, hovered, _, cx| {
+                        if crate::design::menu_hover(&mut this.agent_start.hovered, index, *hovered)
+                        {
+                            cx.notify();
+                        }
                     }))
-            }
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.start_agent_kind(kind, window, cx);
+                    }))
+                }))
+                .into_any_element(),
         };
+        let title = format!("Start an agent in {}", choosing.target.label);
         div()
             .debug_selector(|| "start-agent".into())
-            .child(
-                div()
-                    .p(px(8.))
-                    .child(format!("Start an agent in {}", choosing.target.label)),
-            )
-            .child(div().p(px(8.)).text_color(rgb(theme.muted)).child(
-                "It opens in a new tab of this space, through Herdr's own agent start. Closing the app leaves it running.",
+            .flex()
+            .flex_col()
+            .child(look.header(
+                Header {
+                    selector: "start-agent-header",
+                    icon: "icons/play.svg",
+                    title: ("start-agent-title", &title),
+                    sub: None,
+                    danger: false,
+                },
+                menu.close_button("start-agent-dismiss")
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.dismiss_menu(window, cx);
+                    })),
             ))
-            .child(body)
+            .child(
+                look.body("start-agent-body")
+                    .child(look.lead(
+                        "start-agent-text",
+                        "It opens in a new tab of this space, through Herdr's own agent start. Closing the app leaves it running.",
+                    ))
+                    .child(agents),
+            )
     }
 }
 

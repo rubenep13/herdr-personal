@@ -3,7 +3,12 @@
 //! daemon may stop its sessions, so the user decides when.
 
 use super::Page;
-use crate::{HerdrWindow, fonts::StyledFont, notifications::safe_text, window::Flash};
+use crate::{
+    HerdrWindow,
+    design::{ButtonKind, Header},
+    notifications::safe_text,
+    window::Flash,
+};
 use gpui::{prelude::*, *};
 use herdr_client::{ConnectTarget, MIN_HERDR_VERSION, VersionMismatch};
 
@@ -112,77 +117,82 @@ impl HerdrWindow {
     }
 
     pub(super) fn render_version_mismatch(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
         let Some(notice) = &self.menu.version_notice else {
             return div();
         };
-        let button = |id: &'static str, label: &'static str, primary: bool| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .p(px(8.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .when(primary, |button| button.bg(rgb(theme.active)))
-                .when(!primary, |button| button.hover(|s| s.bg(rgb(theme.active))))
-                .cursor_pointer()
-                .child(label)
-        };
+        let look = self.dialog_look();
         let daemon = matches!(notice.mismatch, VersionMismatch::DaemonOutdated { .. });
+        let title = notice.title();
+        let close = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+            this.dismiss_menu(window, cx);
+        };
         div()
             .debug_selector(|| "version-mismatch".into())
+            .flex()
+            .flex_col()
             .child(
-                div()
-                    .debug_selector(|| "version-mismatch-title".into())
-                    .p(px(8.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(notice.title()),
+                look.header(
+                    Header {
+                        selector: "version-mismatch-header",
+                        icon: "icons/alert.svg",
+                        title: ("version-mismatch-title", title),
+                        sub: None,
+                        danger: false,
+                    },
+                    look.menu()
+                        .close_button("version-mismatch-cross")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            close(this, window, cx);
+                        })),
+                ),
             )
             .child(
-                div()
-                    .debug_selector(|| "version-mismatch-body".into())
-                    .p(px(8.))
-                    .child(notice.body()),
+                look.body("version-mismatch-sheet")
+                    .child(look.lead("version-mismatch-body", notice.body()))
+                    .when(daemon, |body| {
+                        body.child(
+                            look.well(
+                                "version-mismatch-command".into(),
+                                Some(&self.config.terminal),
+                            )
+                            .child(UPDATE_COMMAND),
+                        )
+                    }),
             )
-            .when(daemon, |notice| {
-                notice.child(
-                    div()
-                        .debug_selector(|| "version-mismatch-command".into())
-                        .mx(px(8.))
-                        .p(px(8.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .bg(rgb(theme.active))
-                        .text_font(&self.config.terminal)
-                        .child(UPDATE_COMMAND),
-                )
-            })
             .child(
-                div()
-                    .flex()
-                    .flex_wrap()
-                    .gap(px(8.))
-                    .p(px(8.))
-                    .child(
-                        button(
+                look.footer("version-mismatch-footer")
+                    .hint("Esc", "cancel")
+                    .hint("↵", if daemon { "copy" } else { "check" })
+                    .button(
+                        look.button(
+                            "version-mismatch-dismiss",
+                            "Dismiss",
+                            ButtonKind::Normal,
+                            true,
+                        )
+                        .on_click(cx.listener(
+                            move |this, _, window, cx| {
+                                cx.stop_propagation();
+                                close(this, window, cx);
+                            },
+                        )),
+                    )
+                    .button(
+                        look.button(
                             "version-mismatch-action",
                             if daemon {
                                 "Copy Command"
                             } else {
                                 "Check for Updates"
                             },
+                            ButtonKind::Primary,
                             true,
                         )
                         .on_click(cx.listener(|this, _, window, cx| {
                             cx.stop_propagation();
                             this.act_on_version_mismatch(window, cx);
                         })),
-                    )
-                    .child(
-                        button("version-mismatch-dismiss", "Dismiss", false).on_click(cx.listener(
-                            |this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.dismiss_menu(window, cx);
-                            },
-                        )),
                     ),
             )
     }

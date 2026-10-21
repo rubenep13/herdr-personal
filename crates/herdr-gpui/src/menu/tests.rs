@@ -2,6 +2,7 @@
 use super::*;
 
 // keep-sorted start
+mod app_dialogs;
 mod footer_menu;
 mod install;
 mod keybinds_look;

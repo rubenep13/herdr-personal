@@ -1,5 +1,6 @@
 use crate::{
     APP_VERSION, HerdrWindow,
+    design::{ButtonKind, Header},
     menu::Page,
     progress::{self, Progress},
     updater::State,
@@ -138,7 +139,7 @@ fn update_progress(state: &State, accent: Hsla, track: Hsla) -> Option<Div> {
     ))
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum UpdateAction {
     Check,
     Download,
@@ -185,6 +186,7 @@ impl HerdrWindow {
     }
 
     pub(super) fn render_app_update(&self, window: &Window, cx: &mut Context<Self>) -> Div {
+        let look = self.dialog_look();
         let font = &self.config.ui;
         let theme = &self.theme;
         let accent = crate::menu::accent(theme);
@@ -275,54 +277,21 @@ impl HerdrWindow {
             .min_h_0()
             .max_h((window.viewport_size().height - px(34.)).max(px(0.)))
             .overflow_hidden()
-            .child(
-                div()
-                    .debug_selector(|| "app-update-header".into())
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .gap(px(12.))
-                    .p(px(16.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        div()
-                            .flex_none()
-                            .w(px(3.))
-                            .h(px(font.size * 2.5))
-                            .rounded_full()
-                            .bg(accent),
-                    )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("App Updates"),
-                            )
-                            .child(div().text_color(rgb(theme.muted)).child("Updates from GitHub")),
-                    )
-                    .child(
-                        div()
-                            .id("app-update-close")
-                            .debug_selector(|| "app-update-close".into())
-                            .flex_none()
-                            .px_2()
-                            .py_1()
-                            .cursor_pointer()
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .text_color(rgb(theme.muted))
-                            .hover(|s| s.bg(rgb(theme.active)).text_color(rgb(theme.foreground)))
-                            .child("Close")
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.dismiss_menu(window, cx);
-                            })),
-                    ),
-            )
+            .child(look.header(
+                Header {
+                    selector: "app-update-header",
+                    icon: "icons/download.svg",
+                    title: ("app-update-title", "App Updates"),
+                    sub: Some(("icons/github.svg", "app-update-source", "Updates from GitHub")),
+                    danger: false,
+                },
+                look.menu()
+                    .close_button("app-update-close")
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.dismiss_menu(window, cx);
+                    })),
+            ))
             .child(
                 div()
                     .id("app-update-body")
@@ -381,46 +350,36 @@ impl HerdrWindow {
                         )
                     }),
             );
-        let mut buttons = div()
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .justify_end()
-            .gap(px(8.))
-            .child(
-                div()
-                    .id("app-update-releases")
-                    .debug_selector(|| "app-update-releases".into())
-                    .px(px(12.))
-                    .py(px(8.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .cursor_pointer()
-                    .text_color(rgb(theme.muted))
-                    .hover(|s| s.bg(rgb(theme.active)).text_color(rgb(theme.foreground)))
-                    .child("Manual Releases")
-                    .on_click(|_, _, cx| {
-                        cx.stop_propagation();
-                        cx.open_url(crate::updater::RELEASES_PAGE);
-                    }),
-            )
-            .when_some(notes_page, |buttons, url| {
-                buttons.child(
-                    div()
-                        .id("app-update-notes-page")
-                        .debug_selector(|| "app-update-notes-page".into())
-                        .px(px(12.))
-                        .py(px(8.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .cursor_pointer()
-                        .text_color(rgb(theme.muted))
-                        .hover(|s| s.bg(rgb(theme.active)).text_color(rgb(theme.foreground)))
-                        .child("Release Notes")
-                        .on_click(move |_, _, cx| {
-                            cx.stop_propagation();
-                            cx.open_url(&url);
-                        }),
+        let mut footer = look
+            .footer("app-update-footer")
+            .wrap()
+            .hint("Esc", "close")
+            .button(
+                look.button(
+                    "app-update-releases",
+                    "Manual Releases",
+                    ButtonKind::Normal,
+                    true,
                 )
-            });
+                .on_click(|_, _, cx| {
+                    cx.stop_propagation();
+                    cx.open_url(crate::updater::RELEASES_PAGE);
+                }),
+            );
+        if let Some(url) = notes_page {
+            footer = footer.button(
+                look.button(
+                    "app-update-notes-page",
+                    "Release Notes",
+                    ButtonKind::Normal,
+                    true,
+                )
+                .on_click(move |_, _, cx| {
+                    cx.stop_propagation();
+                    cx.open_url(&url);
+                }),
+            );
+        }
         if let Some(action) = action {
             let label = match action {
                 UpdateAction::Check if matches!(state, State::Error(_)) => "Retry",
@@ -431,16 +390,14 @@ impl HerdrWindow {
                 UpdateAction::Restart => "Restart",
                 UpdateAction::Cancel => "Cancel",
             };
-            buttons = buttons.child(
-                div()
-                    .id("app-update-action")
-                    .debug_selector(|| "app-update-action".into())
-                    .px(px(12.))
-                    .py(px(8.))
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(self.theme.active))
-                    .cursor_pointer()
-                    .child(label)
+            // Stopping work under way is the plain choice, not the lead.
+            let kind = if action == UpdateAction::Cancel {
+                ButtonKind::Normal
+            } else {
+                ButtonKind::Primary
+            };
+            footer = footer.button(
+                look.button("app-update-action", label, kind, true)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         cx.stop_propagation();
                         // Preview actions must never reach the service, including cancellation.
@@ -483,14 +440,6 @@ impl HerdrWindow {
                     })),
             );
         }
-        panel.child(
-            div()
-                .debug_selector(|| "app-update-footer".into())
-                .flex_none()
-                .p(px(16.))
-                .border_t_1()
-                .border_color(rgb(theme.active))
-                .child(buttons),
-        )
+        panel.child(footer)
     }
 }
