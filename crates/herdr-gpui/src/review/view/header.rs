@@ -12,51 +12,47 @@ impl HerdrWindow {
         review: &Review,
         cx: &mut Context<Self>,
     ) -> Div {
-        let theme = &self.theme;
+        let look = self.view_look();
         let destination = match &review.agent {
             Some(agent) => format!("Notes go to {}", agent.label),
             None => "No agent in this workspace; notes can be copied".into(),
         };
-        div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_3()
-            .py_2()
-            .border_b_1()
-            .border_color(rgb(theme.active))
+        let against = match review.loaded().and_then(|loaded| loaded.base.as_deref()) {
+            Some(base) if review.scope == Scope::Branch => {
+                format!("{} against {base}", review.checkout.branch)
+            }
+            _ => review.checkout.branch.clone(),
+        };
+        let quiet = |selector: &'static str| {
+            div()
+                .debug_selector(move || selector.into())
+                .min_w_0()
+                .truncate()
+                .text_size(px(look.scale().secondary))
+                .text_color(look.muted())
+        };
+        look.bar("review-bar")
             .child(self.render_review_panel_toggle(id, review, panels::Panel::Files, cx))
-            .child(
-                div()
-                    .flex_none()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Review changes"),
-            )
+            .child(look.bar_title(Some("icons/diff-unified.svg"), "Review changes", None))
             .child(self.render_review_scope(id, review.scope, cx))
+            // The branch is the bar's context: it gives way first.
             .child(
-                div()
-                    .debug_selector(|| "review-against".into())
+                quiet("review-against")
                     .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .text_color(rgb(theme.muted))
+                    .flex()
+                    .items_center()
+                    .gap(look.at(5.))
                     .child(
-                        match review.loaded().and_then(|loaded| loaded.base.as_deref()) {
-                            Some(base) if review.scope == Scope::Branch => {
-                                format!("{} against {base}", review.checkout.branch)
-                            }
-                            _ => review.checkout.branch.clone(),
-                        },
-                    ),
+                        svg()
+                            .path("icons/git-branch.svg")
+                            .size(look.at(11.))
+                            .flex_none()
+                            .text_color(look.muted()),
+                    )
+                    .child(div().min_w_0().truncate().child(against)),
             )
             .when(review.batch_out, |header| {
-                header.child(
-                    div()
-                        .debug_selector(|| "review-reading".into())
-                        .flex_none()
-                        .text_color(rgb(theme.muted))
-                        .child("Reading\u{2026}"),
-                )
+                header.child(quiet("review-reading").flex_none().child("Reading\u{2026}"))
             })
             .child(
                 self.review_icon_button(
@@ -83,17 +79,17 @@ impl HerdrWindow {
                 })),
             )
             .child(self.render_review_layout(id, review.layout, cx))
+            .child(look.bar_rule())
             .child(self.render_review_panel_toggle(id, review, panels::Panel::Notes, cx))
+            // Where notes go, last and quiet; it gives way before the buttons.
             .child(
-                div()
-                    .debug_selector(|| "review-destination".into())
-                    .flex_none()
-                    .text_color(rgb(theme.muted))
+                quiet("review-destination")
+                    .flex_shrink(1.)
                     .child(destination),
             )
     }
 
-    /// A square icon button of the header, lit when `on`.
+    /// A square icon button of the bar, lit when `on`.
     fn review_icon_button(
         &self,
         name: &'static str,
@@ -101,25 +97,9 @@ impl HerdrWindow {
         hint: &'static str,
         on: bool,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
-        div()
-            .id(name)
-            .debug_selector(move || name.into())
-            .flex_none()
-            .size(px(22.))
-            .flex()
-            .items_center()
-            .justify_center()
-            .rounded(px(crate::config::corners::CONTROL))
-            .cursor_pointer()
-            .when(on, |button| button.bg(rgb(theme.active)))
-            .hover(|button| button.bg(rgb(theme.active)))
-            .child(svg().path(icon).size(px(14.)).text_color(rgb(if on {
-                theme.foreground
-            } else {
-                theme.muted
-            })))
-            .tooltip(self.menu_look().tooltip(hint))
+        let look = self.view_look();
+        look.icon_button(name, name.into(), icon, on, true)
+            .tooltip(look.menu().tooltip(hint))
     }
 
     /// Shows the diff unified or side by side; notes and the place stay.
@@ -130,27 +110,37 @@ impl HerdrWindow {
         cx.notify();
     }
 
-    /// The two layout icons in the header.
+    /// The two layouts, as a segmented control of icons.
     fn render_review_layout(&self, id: TabId, current: Layout, cx: &mut Context<Self>) -> Div {
-        let button =
+        let look = self.view_look();
+        let segment =
             |name: &'static str, icon: &'static str, hint: &'static str, layout: Layout| {
-                self.review_icon_button(name, icon, hint, layout == current)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        cx.stop_propagation();
-                        this.set_review_layout(id, layout, cx);
-                    }))
+                let on = layout == current;
+                look.segment(
+                    name,
+                    name.into(),
+                    svg()
+                        .path(icon)
+                        .size(look.at(14.))
+                        .flex_none()
+                        .text_color(if on { look.title() } else { look.muted() }),
+                    on,
+                )
+                .px(look.at(5.))
+                .tooltip(look.menu().tooltip(hint))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.set_review_layout(id, layout, cx);
+                }))
             };
-        div()
-            .flex()
-            .flex_none()
-            .gap_1()
-            .child(button(
+        look.segments("review-layout".into())
+            .child(segment(
                 "review-layout-unified",
                 "icons/diff-unified.svg",
                 "Unified",
                 Layout::Unified,
             ))
-            .child(button(
+            .child(segment(
                 "review-layout-split",
                 "icons/diff-split.svg",
                 "Side by side",
@@ -159,35 +149,15 @@ impl HerdrWindow {
     }
 
     fn render_review_scope(&self, id: TabId, current: Scope, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = self.view_look();
         let segment = |name: &'static str, label: &'static str, scope: Scope| {
-            let chosen = scope == current;
-            div()
-                .id(name)
-                .debug_selector(move || name.into())
-                .px_2()
-                .rounded(px(crate::config::corners::CONTROL))
-                .cursor_pointer()
-                .when(chosen, |segment| {
-                    segment
-                        .bg(rgb(theme.active))
-                        .text_color(rgb(theme.foreground))
-                })
-                .when(!chosen, |segment| {
-                    segment
-                        .text_color(rgb(theme.muted))
-                        .hover(|segment| segment.text_color(rgb(theme.foreground)))
-                })
-                .child(label)
+            look.segment(name, name.into(), label, scope == current)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     cx.stop_propagation();
                     this.set_review_scope(id, scope, cx);
                 }))
         };
-        div()
-            .flex()
-            .flex_none()
-            .gap_1()
+        look.segments("review-scope".into())
             .child(segment(
                 "review-scope-uncommitted",
                 "Uncommitted",

@@ -4,6 +4,7 @@
 //! file to show one. A query with no capitals ignores ASCII case. Files not
 //! read yet are not searched until they are.
 use super::Review;
+use crate::fonts::StyledFont;
 use crate::{
     HerdrWindow,
     browser::TabId,
@@ -237,12 +238,13 @@ impl HerdrWindow {
         &self,
         id: TabId,
         review: &Review,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> Option<Stateful<Div>> {
         if !review.search.open {
             return None;
         }
-        let theme = &self.theme;
+        let look = self.view_look();
         let search = &review.search;
         let status = match (search.matches.len(), search.current) {
             _ if search.query.is_empty() => String::new(),
@@ -254,31 +256,24 @@ impl HerdrWindow {
             ),
         };
         let button = |name: &'static str, icon: &'static str| {
-            div()
-                .id(name)
-                .debug_selector(move || name.into())
-                .flex_none()
-                .size(px(20.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .cursor_pointer()
-                .rounded(px(crate::config::corners::CONTROL))
-                .hover(|button| button.bg(rgb(theme.active)))
-                .child(svg().path(icon).size(px(12.)).text_color(rgb(theme.muted)))
+            look.icon_button(name, name.into(), icon, false, true)
         };
+        let focused = search.input.read(cx).focus.is_focused(window);
         Some(
             div()
                 .id("review-search")
                 .debug_selector(|| "review-search".into())
                 .flex_none()
+                .h(look.at(BAND_HEIGHT))
+                .px(look.at(BAND_PADDING))
                 .flex()
                 .items_center()
-                .gap_1()
-                .px_2()
-                .py_1()
+                .gap(look.at(BAND_GAP))
+                .bg(look.background())
                 .border_b_1()
-                .border_color(rgb(theme.active))
+                .border_color(look.line())
+                .text_font(&self.config.ui)
+                .text_size(px(look.scale().name))
                 .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
                     let composing = this
                         .reviews
@@ -295,13 +290,23 @@ impl HerdrWindow {
                     cx.stop_propagation();
                 }))
                 .child(
-                    svg()
-                        .path("icons/search.svg")
-                        .size(px(12.))
-                        .text_color(rgb(theme.muted)),
+                    look.field(
+                        "review-search-field".into(),
+                        focused,
+                        Some("icons/search.svg"),
+                    )
+                    .flex_1()
+                    .flex_shrink(1.)
+                    .child(div().flex_1().min_w_0().child(search.input.clone()))
+                    .child(
+                        div()
+                            .debug_selector(|| "review-search-count".into())
+                            .flex_none()
+                            .text_size(px(look.scale().secondary))
+                            .text_color(look.muted())
+                            .child(status),
+                    ),
                 )
-                .child(div().flex_1().min_w_0().child(search.input.clone()))
-                .child(div().flex_none().text_color(rgb(theme.muted)).child(status))
                 .child(
                     button("review-search-previous", "icons/chevron-up.svg").on_click(
                         cx.listener(move |this, _, _, cx| this.step_review_search(id, true, cx)),
@@ -320,6 +325,11 @@ impl HerdrWindow {
         )
     }
 }
+
+/// The search band under the bar, at `[ui] size = 12`.
+const BAND_HEIGHT: f32 = 44.;
+const BAND_PADDING: f32 = 12.;
+const BAND_GAP: f32 = 6.;
 
 impl Review {
     /// Brings the current match into view, opening its file if folded.

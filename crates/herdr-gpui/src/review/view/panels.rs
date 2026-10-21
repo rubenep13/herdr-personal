@@ -84,7 +84,6 @@ impl HerdrWindow {
         panel: Panel,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
         let shown = review.shows(panel);
         let (name, icon, hint) = match panel {
             Panel::Files => (
@@ -100,36 +99,20 @@ impl HerdrWindow {
                 .filter(|&count| count > 0),
             _ => None,
         };
-        div()
-            .id(name)
-            .debug_selector(move || name.into())
-            .flex_none()
-            .h(px(22.))
-            .px_1()
-            .flex()
-            .items_center()
-            .gap_1()
-            .rounded(px(crate::config::corners::CONTROL))
-            .cursor_pointer()
-            .when(shown, |button| button.bg(rgb(theme.active)))
-            .hover(|button| button.bg(rgb(theme.active)))
-            .child(svg().path(icon).size(px(14.)).text_color(rgb(if shown {
-                theme.foreground
-            } else {
-                theme.muted
-            })))
+        let look = self.view_look();
+        look.icon_button(name, name.into(), icon, shown, true)
             .when_some(count, |button, count| {
-                button.child(
-                    div()
-                        .px_1()
-                        .rounded_full()
-                        .bg(rgb(theme.palette[3]))
-                        .text_color(rgb(theme.text_on(theme.palette[3])))
-                        .text_size(px(10.))
-                        .child(count.to_string()),
-                )
+                button
+                    .w_auto()
+                    .px(look.at(6.))
+                    .gap(look.at(4.))
+                    .child(look.settings().chip(
+                        format!("{name}-count"),
+                        count.to_string(),
+                        crate::design::Tone::Warn,
+                    ))
             })
-            .tooltip(self.menu_look().tooltip(hint))
+            .tooltip(look.menu().tooltip(hint))
             .on_click(cx.listener(move |this, _, _, cx| {
                 cx.stop_propagation();
                 this.toggle_review_panel(id, panel, cx);

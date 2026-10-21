@@ -5,8 +5,17 @@ use super::{Review, rows::mark_slot};
 use crate::{
     HerdrWindow,
     browser::TabId,
+    design::{ButtonKind, NoteTone},
+    fonts::StyledFont,
     review::diff::{BINARY_NOTE, Body, FileDiff, RowId, Status},
 };
+
+/// A file's header, its fold button and the Viewed box, and how far a
+/// placeholder's note sits in, at `[ui] size = 12`.
+const HEADER: f32 = 36.;
+const FOLD: f32 = 22.;
+const CHECKBOX: f32 = 16.;
+const PLACEHOLDER_INDENT: f32 = 40.;
 use gpui::{prelude::*, *};
 
 /// Counts as a header shows them: `+3 −1`, or nothing unknown.
@@ -41,45 +50,43 @@ impl HerdrWindow {
             }
             _ => entry.path.clone(),
         };
-        let fold = div()
-            .id(("review-fold", file))
-            .debug_selector(move || format!("review-fold-{file}"))
-            .flex_none()
-            .size(px(line_height))
-            .flex()
-            .items_center()
-            .justify_center()
-            .cursor_pointer()
-            .rounded(px(crate::config::corners::CONTROL))
-            .hover(|button| button.bg(rgb(theme.surface)))
-            .child(
-                svg()
-                    .path(if entry.folded {
-                        "icons/chevron-right.svg"
-                    } else {
-                        "icons/chevron-down.svg"
-                    })
-                    .size(px(12.))
-                    .text_color(rgb(theme.muted)),
+        let look = self.view_look();
+        let fold = look
+            .icon_button(
+                ("review-fold", file),
+                format!("review-fold-{file}"),
+                if entry.folded {
+                    "icons/chevron-right.svg"
+                } else {
+                    "icons/chevron-down.svg"
+                },
+                false,
+                true,
             )
+            .size(look.at(FOLD))
             .on_click(cx.listener(move |this, _, _, cx| {
                 cx.stop_propagation();
                 this.toggle_review_fold(id, file, cx);
             }));
+        let (box_colours, ring) = (crate::toggles::colors(theme, true), theme.muted);
         let check = div()
             .id(("review-viewed", file))
             .debug_selector(move || format!("review-viewed-{file}"))
             .flex_none()
             .flex()
             .items_center()
-            .gap_1()
-            .px_1()
+            .gap(look.at(8.))
             .cursor_pointer()
-            .rounded(px(crate::config::corners::CONTROL))
-            .hover(|button| button.bg(rgb(theme.surface)))
-            .text_color(rgb(theme.muted))
+            .text_font(&self.config.ui)
+            .text_size(px(look.scale().name - 0.5))
+            .text_color(look.text())
             .font_weight(FontWeight::NORMAL)
-            .child(crate::toggles::checkbox(theme, 12., viewed))
+            .child(crate::toggles::checkbox_in(
+                box_colours,
+                ring,
+                f32::from(look.at(CHECKBOX)),
+                viewed,
+            ))
             .child("Viewed")
             .on_click(cx.listener(move |this, _, _, cx| {
                 cx.stop_propagation();
@@ -89,7 +96,7 @@ impl HerdrWindow {
             div()
                 .flex_none()
                 .flex()
-                .gap_1()
+                .gap(look.at(6.))
                 .font_weight(FontWeight::NORMAL)
                 .child(
                     div()
@@ -106,18 +113,18 @@ impl HerdrWindow {
             .id(("review-header", file))
             .debug_selector(move || format!("review-header-{file}"))
             .w_full()
-            .min_h(px(line_height))
+            .min_h(look.at(HEADER).max(px(line_height)))
             .line_height(px(line_height))
             .flex()
-            .items_start()
-            .gap_1()
-            .pr_2()
-            .bg(rgb(theme.active))
-            .when(review.draft == Some(row), |header| {
-                header.bg(rgb(theme.surface))
-            })
-            .font_weight(FontWeight::SEMIBOLD)
-            .text_color(rgb(theme.foreground))
+            .items_center()
+            .gap(look.at(8.))
+            .pr(look.at(12.))
+            .bg(look.background())
+            .border_t_1()
+            .border_b_1()
+            .border_color(look.line())
+            .when(review.draft == Some(row), |header| header.bg(look.hover()))
+            .text_color(look.title())
             .cursor_pointer()
             .on_click(cx.listener(move |this, _, window, cx| {
                 cx.stop_propagation();
@@ -125,13 +132,17 @@ impl HerdrWindow {
             }))
             .child(mark_slot(theme, review.marks.get(&row).copied()).h(px(line_height)))
             .child(fold)
+            .child(look.settings().chip(
+                format!("review-status-{file}"),
+                entry.status.letter(),
+                super::files::status_tone(entry.status),
+            ))
             .child(div().flex_1().min_w_0().child(name))
             .when(!entry.status.label().is_empty(), |header| {
                 header.child(
                     div()
                         .flex_none()
-                        .font_weight(FontWeight::NORMAL)
-                        .text_color(rgb(theme.muted))
+                        .text_color(look.muted())
                         .child(entry.status.label()),
                 )
             })
@@ -158,7 +169,6 @@ impl HerdrWindow {
         line_height: f32,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let theme = &self.theme;
         let Some(entry) = review
             .loaded()
             .and_then(|loaded| loaded.diff.files.get(file))
@@ -185,34 +195,39 @@ impl HerdrWindow {
             }
             Body::Loaded(_) => ("No changes to show".to_owned(), None),
         };
+        let look = self.view_look();
+        let selector = format!("review-placeholder-{file}-note");
+        let note = match &entry.body {
+            Body::Failed(_) if !reading => look.dialog().error(selector, text),
+            _ => look.dialog().note(selector, NoteTone::Info, text),
+        };
         div()
             .id(("review-placeholder", file))
             .debug_selector(move || format!("review-placeholder-{file}"))
             .w_full()
             .min_h(px(line_height))
-            .line_height(px(line_height))
+            .py(look.at(6.))
+            .pl(look.at(PLACEHOLDER_INDENT))
+            .pr(look.at(12.))
             .flex()
             .items_center()
-            .gap_2()
-            .pl(px(40.))
-            .text_color(rgb(theme.muted))
-            .child(text)
+            .gap(look.at(10.))
+            .text_font(&self.config.ui)
+            .child(note.flex_shrink(1.))
             .when_some(action, |row, action| {
                 row.child(
-                    div()
-                        .id(("review-load", file))
-                        .debug_selector(move || format!("review-load-{file}"))
-                        .px_2()
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .cursor_pointer()
-                        .bg(rgb(theme.active))
-                        .text_color(rgb(theme.foreground))
-                        .hover(|button| button.bg(rgb(theme.surface)))
-                        .child(action)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.load_review_file(id, file, cx);
-                        })),
+                    look.button(
+                        ("review-load", file),
+                        format!("review-load-{file}"),
+                        None,
+                        action,
+                        ButtonKind::Normal,
+                        true,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        cx.stop_propagation();
+                        this.load_review_file(id, file, cx);
+                    })),
                 )
             })
             .into_any_element()

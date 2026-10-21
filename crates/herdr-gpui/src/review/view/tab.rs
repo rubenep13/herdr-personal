@@ -9,7 +9,7 @@ use crate::{
     HerdrWindow,
     browser::{Location, ReviewCheckout, Slot, Store, Tab, TabId},
     pull_request::Input,
-    search_input::{self, SearchInput},
+    search_input::{self, Frame, SearchInput},
     window::Flash,
 };
 use gpui::{prelude::*, *};
@@ -154,6 +154,7 @@ impl HerdrWindow {
         &self,
         slot: Slot,
         tab: &Tab,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = tab.id;
@@ -211,7 +212,7 @@ impl HerdrWindow {
                     this.review_key(id, &crate::actions::edit_key("a"), window, cx);
                 }),
             )
-            .child(self.render_review(id, cx))
+            .child(self.render_review(id, window, cx))
             .into_any_element()
     }
 }
@@ -238,6 +239,11 @@ impl HerdrWindow {
         let input = field("Describe the change\u{2026}", cx);
         let filter = field("Filter files\u{2026}", cx);
         let search = field("Find in changes\u{2026}", cx);
+        // Their fields draw the frames; the note's input wears Settings'.
+        for frameless in [&filter, &search] {
+            frameless.update(cx, |input, cx| input.set_frameless(cx));
+        }
+        input.update(cx, |input, cx| input.set_frame(Frame::Field, cx));
         let subscriptions = vec![
             cx.subscribe(&filter, move |this, _, _: &search_input::Changed, cx| {
                 this.review_filter_changed(id, cx);
