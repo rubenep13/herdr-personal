@@ -5,6 +5,7 @@
 mod dispatch;
 pub(super) mod popover;
 mod render;
+pub(super) use render::submit_kind;
 mod requests;
 mod scripts;
 

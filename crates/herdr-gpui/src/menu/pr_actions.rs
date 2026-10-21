@@ -430,7 +430,7 @@ impl HerdrWindow {
             )
     }
 
-    pub(super) fn render_pr_comment(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn render_pr_comment(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
         let armed = self
             .menu
@@ -449,7 +449,7 @@ impl HerdrWindow {
                     .child("Posts to the pull request's conversation as your GitHub account."),
             );
         if self.menu.input.is_some() {
-            body = body.child(self.render_dialog_input(cx));
+            body = body.child(self.render_dialog_input(window, cx));
         }
         if let Some(error) = self.pr_dialog_error() {
             body = body.child(error);

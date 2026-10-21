@@ -192,18 +192,19 @@ fn byte_offset(text: &str, offset: usize) -> usize {
 }
 
 impl HerdrWindow {
-    pub(super) fn render_dialog_input(&self, cx: &mut Context<Self>) -> Stateful<Div> {
+    /// A dialog's text field in the frame Settings' fields wear: its ring
+    /// takes the accent while the dialog holds the keyboard.
+    pub(super) fn render_dialog_input(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         let entity = cx.entity();
         let focus = self.menu.focus.clone();
-        div()
+        let look = self.dialog_look().settings();
+        look.field("dialog-input".into(), focus.is_focused(window))
             .id("dialog-input")
-            .debug_selector(|| "dialog-input".into())
             .w_full()
-            .h(px(self.config.ui.line_height() + 10.))
-            .px(px(6.))
-            .py(px(5.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .bg(rgb(self.theme.active))
             .overflow_hidden()
             .on_mouse_down(
                 MouseButton::Left,
@@ -246,7 +247,7 @@ impl HerdrWindow {
                             };
                             let line = window.text_system().shape_line(
                                 input.text.clone().into(),
-                                px(this.config.ui.size),
+                                px(crate::design::TypeScale::of(&this.config.ui).name),
                                 &[run],
                                 None,
                             );
@@ -308,7 +309,8 @@ impl HerdrWindow {
                         });
                     },
                 )
-                .size_full(),
+                .flex_1()
+                .h(px(self.config.ui.line_height())),
             )
     }
 }

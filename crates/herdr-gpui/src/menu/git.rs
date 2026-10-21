@@ -586,7 +586,7 @@ impl HerdrWindow {
     /// The commit dialog wears the workspace dialogs' chrome: a titled header
     /// naming the branch, the body, then right-aligned actions. Its primary
     /// action stays unarmed until there is a message to commit.
-    pub(super) fn render_git_commit(&self, cx: &mut Context<Self>) -> Div {
+    pub(super) fn render_git_commit(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let theme = &self.theme;
         let font = &self.config.ui;
         let armed = self
@@ -615,7 +615,7 @@ impl HerdrWindow {
                     .child(summary(self.git.status())),
             );
         if self.menu.input.is_some() {
-            body = body.child(self.render_dialog_input(cx));
+            body = body.child(self.render_dialog_input(window, cx));
         }
         if let Some(error) = &self.menu.error {
             body = body.child(

@@ -485,10 +485,7 @@ impl HerdrWindow {
                     panel
                         .when(!settled && !lists, |panel| panel.overflow_y_scroll())
                         .when(lists, |panel| panel.overflow_hidden())
-                        .when(
-                            !matches!(page, Page::Dialog(_)) && page.look() != Look::Dialog,
-                            |panel| panel.p(px(6.)),
-                        )
+                        .when(page.look() != Look::Dialog, |panel| panel.p(px(6.)))
                 },
             )
             .when(
@@ -636,7 +633,7 @@ impl HerdrWindow {
                 cx,
             ));
         } else if let Page::Dialog(action) = page {
-            panel = panel.child(self.render_workspace_dialog(action, cx));
+            panel = panel.child(self.render_workspace_dialog(action, window, cx));
         } else if page == Page::CarryPane {
             panel = panel.child(self.render_carry(cx));
         } else if page == Page::Teleport {
@@ -644,15 +641,15 @@ impl HerdrWindow {
         } else if page == Page::Checkpoints {
             panel = panel.child(self.render_checkpoints(cx));
         } else if page == Page::FanOut {
-            panel = panel.child(self.render_fan_out(cx));
+            panel = panel.child(self.render_fan_out(window, cx));
         } else if page == Page::Git {
             panel = panel.child(self.render_git_menu(cx));
         } else if page == Page::GitCommit {
-            panel = panel.child(self.render_git_commit(cx));
+            panel = panel.child(self.render_git_commit(window, cx));
         } else if page == Page::PrReview {
             panel = panel.child(self.render_pr_review(cx));
         } else if page == Page::PrComment {
-            panel = panel.child(self.render_pr_comment(cx));
+            panel = panel.child(self.render_pr_comment(window, cx));
         } else if page == Page::PrMerge {
             panel = panel.child(self.render_pr_merge(cx));
         } else if matches!(

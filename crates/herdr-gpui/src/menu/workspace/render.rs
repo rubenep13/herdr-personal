@@ -3,7 +3,8 @@
 
 use crate::{
     HerdrWindow,
-    menu::{WorkspaceAction, WorkspaceMenuAction, danger, workspace_close::CHECKING},
+    design::{ButtonKind, Header, NoteTone},
+    menu::{WorkspaceAction, WorkspaceMenuAction, workspace_close::CHECKING},
 };
 use gpui::{prelude::*, *};
 
@@ -38,6 +39,7 @@ impl HerdrWindow {
     pub(in crate::menu) fn render_workspace_dialog(
         &self,
         action: WorkspaceAction,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> Div {
         let Some(target) = &self.menu.target else {
@@ -45,7 +47,6 @@ impl HerdrWindow {
         };
         let theme = &self.theme;
         let font = &self.config.ui;
-        let danger = danger(theme);
         let deletion = self.menu.deletion.as_ref();
         let force = deletion.is_some_and(|deletion| deletion.force);
         let removing = action == WorkspaceAction::DeleteWorktree
@@ -103,164 +104,145 @@ impl HerdrWindow {
             }
             WorkspaceAction::DeleteWorktree => ("Delete worktree checkout?", "Remove".into()),
         };
-        let mut body = div().flex().flex_col().gap(px(10.)).px(px(16.)).py(px(12.));
+        let look = self.dialog_look();
+        let terminal = &self.config.terminal;
+        let mut body = look.body("dialog-body");
         body = match action {
             WorkspaceAction::OpenWorktree => body,
-            WorkspaceAction::Rename => {
-                body.child(div().text_color(rgb(theme.subtext())).child("Edit the workspace label."))
-            }
-            WorkspaceAction::Note => body.child(div().text_color(rgb(theme.subtext())).child(
+            WorkspaceAction::Rename => body.child(look.lead("dialog-lead", "Edit the workspace label.")),
+            WorkspaceAction::Note => body.child(look.lead(
+                "dialog-lead",
                 "A reminder kept only in this app, on this checkout and branch. Save it empty to remove it.",
             )),
-            WorkspaceAction::NewTab => body.child(
-                div()
-                    .text_color(rgb(theme.subtext()))
-                    .child("Name the tab, or leave the suggestion for Herdr to number it."),
-            ),
+            WorkspaceAction::NewTab => body.child(look.lead(
+                "dialog-lead",
+                "Name the tab, or leave the suggestion for Herdr to number it.",
+            )),
             WorkspaceAction::NewWorkspace => body
-                .child(
-                    div()
-                        .text_color(rgb(theme.subtext()))
-                        .child("Name the workspace, or leave the suggestion for Herdr to name it."),
-                )
+                .child(look.lead(
+                    "dialog-lead",
+                    "Name the workspace, or leave the suggestion for Herdr to name it.",
+                ))
                 .children(self.menu.dispatch.as_ref().map(|picker| {
                     let caption = |caption: &'static str, field: AnyElement| {
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(px(10.))
-                            .child(div().flex_none().text_color(rgb(theme.muted)).child(caption))
-                            .child(div().flex_1().min_w_0().child(field))
+                        look.captions("dialog-host", [(caption, field)])
                     };
                     self.render_host_picker(picker, caption, cx)
                 }))
                 .children(dispatched.map(|host| {
-                    div().text_color(rgb(theme.subtext())).child(format!(
-                        "Opens the repository's main checkout on {}{}.",
-                        host.label,
-                        clone_note(host)
-                    ))
+                    look.note(
+                        "dialog-dispatch".into(),
+                        NoteTone::Info,
+                        format!(
+                            "Opens the repository's main checkout on {}{}.",
+                            host.label,
+                            clone_note(host)
+                        ),
+                    )
                 })),
-            WorkspaceAction::Close => body.child(div().text_color(rgb(theme.subtext())).child(format!(
-                "Closes {} workspace(s) and terminates their running terminals. Checkout files and branches are not deleted.",
-                target.close_members.len()
-            ))),
+            WorkspaceAction::Close => body.child(look.lead(
+                "dialog-lead",
+                format!(
+                    "Closes {} workspace(s) and terminates their running terminals. Checkout files and branches are not deleted.",
+                    target.close_members.len()
+                ),
+            )),
             WorkspaceAction::NewWorktree => {
-                // Captions share a column so both fields start at the same edge.
-                let row = |caption: &'static str, field: AnyElement| {
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(px(10.))
-                        .child(
-                            div()
-                                .flex_none()
-                                .w(px(font.size * 4.5))
-                                .text_color(rgb(theme.muted))
-                                .child(caption),
-                        )
-                        .child(div().flex_1().min_w_0().child(field))
-                };
-                body.children(self.menu.worktree.as_ref().map(|source| {
-                    row(
+                let mut rows = Vec::new();
+                if let Some(source) = self.menu.worktree.as_ref() {
+                    rows.push((
                         "Name",
                         div()
                             .debug_selector(|| "worktree-name".into())
+                            .min_w_0()
+                            .truncate()
+                            .text_color(rgb(theme.foreground))
                             .child(source.name.clone())
                             .into_any_element(),
-                    )
-                }))
-                .child(row("Branch", self.render_dialog_input(cx).into_any_element()))
-                .children(
-                    self.menu
-                        .dispatch
-                        .as_ref()
-                        .map(|picker| self.render_host_picker(picker, row, cx)),
-                )
-                .child(match dispatched {
-                    Some(host) => format!(
-                        "Creates a worktree from {} on {}{}, without granting repository trust:",
-                        target.base_label(),
-                        host.label,
-                        clone_note(host)
-                    ),
-                    None => format!(
-                        "Creates this folder from {}, without granting repository trust:",
-                        target.base_label()
-                    ),
-                })
-                .child(
-                    div()
-                        .debug_selector(|| "dialog-checkout".into())
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .bg(rgb(theme.active))
-                        .px(px(10.))
-                        .py(px(6.))
-                        .child(match dispatched {
+                    ));
+                }
+                rows.push(("Branch", self.render_dialog_input(window, cx).into_any_element()));
+                body.child(look.captions("dialog-fields", rows))
+                    .children(self.menu.dispatch.as_ref().map(|picker| {
+                        let caption = |caption: &'static str, field: AnyElement| {
+                            look.captions("dialog-host", [(caption, field)])
+                        };
+                        self.render_host_picker(picker, caption, cx)
+                    }))
+                    .child(look.lead(
+                        "dialog-checkout-lead",
+                        match dispatched {
+                            Some(host) => format!(
+                                "Creates a worktree from {} on {}{}, without granting repository trust:",
+                                target.base_label(),
+                                host.label,
+                                clone_note(host)
+                            ),
+                            None => format!(
+                                "Creates this folder from {}, without granting repository trust:",
+                                target.base_label()
+                            ),
+                        },
+                    ))
+                    .child(look.well("dialog-checkout".into(), Some(terminal)).child(
+                        match dispatched {
                             Some(host) => format!("{}'s daemon chooses the checkout.", host.label),
                             None => self.checkout_preview(),
-                        }),
-                )
+                        },
+                    ))
             }
             WorkspaceAction::DeleteWorktree => body
                 .children(deletion.and_then(|deletion| deletion.merged).map(|number| {
-                    div()
-                        .debug_selector(|| "dialog-merged-pr".into())
-                        .child(format!("Pull request #{number} was merged."))
+                    look.note(
+                        "dialog-merged-pr".into(),
+                        NoteTone::Done,
+                        format!("Pull request #{number} was merged."),
+                    )
                 }))
-                .child(if force {
-                    "This force removes the checkout folder:"
-                } else {
-                    "This removes the checkout folder:"
-                })
+                .child(look.lead(
+                    "dialog-path-lead",
+                    if force {
+                        "This force removes the checkout folder:"
+                    } else {
+                        "This removes the checkout folder:"
+                    },
+                ))
                 .child(
-                    div()
-                        .debug_selector(|| "dialog-path".into())
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .bg(rgb(theme.active))
-                        .px(px(10.))
-                        .py(px(6.))
-                        .child(
-                            deletion
-                                .and_then(|deletion| deletion.path.as_deref())
-                                .unwrap_or("Waiting for the daemon to name the checkout...")
-                                .to_owned(),
-                        ),
+                    look.well("dialog-path".into(), Some(terminal)).child(
+                        deletion
+                            .and_then(|deletion| deletion.path.as_deref())
+                            .unwrap_or("Waiting for the daemon to name the checkout...")
+                            .to_owned(),
+                    ),
                 )
-                .child(div().text_color(rgb(theme.subtext())).child(if force {
-                    "Modified and untracked files, including submodule contents, are discarded. The branch is not deleted. The Herdr workspace will close."
-                } else {
-                    "The branch is not deleted. The Herdr workspace will close."
-                }))
+                .child(look.note(
+                    "dialog-branch-note".into(),
+                    NoteTone::Info,
+                    if force {
+                        "Modified and untracked files, including submodule contents, are discarded. The branch is not deleted. The Herdr workspace will close."
+                    } else {
+                        "The branch is not deleted. The Herdr workspace will close."
+                    },
+                ))
                 .children(deletion.and_then(|deletion| {
                     self.archive_note(target, deletion, cx)
                 })),
         };
         if action == WorkspaceAction::Close {
-            body = body.child(
-                div()
-                    .debug_selector(|| "close-git-status".into())
-                    .text_color(danger)
-                    .child(self.menu.close_check.as_ref().map_or_else(
-                        || CHECKING.to_owned(),
-                        |check| check.status(self.config.confirm_close_workspace),
-                    )),
-            );
+            body = body.child(look.note(
+                "close-git-status".into(),
+                NoteTone::Warning,
+                self.menu.close_check.as_ref().map_or_else(
+                    || CHECKING.to_owned(),
+                    |check| check.status(self.config.confirm_close_workspace),
+                ),
+            ));
         }
         if self.menu.input.is_some() && action != WorkspaceAction::NewWorktree {
-            body = body.child(self.render_dialog_input(cx));
+            body = body.child(self.render_dialog_input(window, cx));
         }
         if let Some(error) = &self.menu.error {
-            body = body.child(
-                div()
-                    .debug_selector(|| "dialog-error".into())
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .bg(rgb(theme.active))
-                    .px(px(10.))
-                    .py(px(6.))
-                    .text_color(danger)
-                    .child(error.clone()),
-            );
+            body = body.child(look.error("dialog-error".into(), error.clone()));
         }
         if creating || removing {
             // Dismissing only closes the panel; the daemon keeps the queued work.
@@ -268,26 +250,68 @@ impl HerdrWindow {
                 Some(job) => format!("{} Dismissing does not cancel it.", job.status()),
                 None => "Waiting for the daemon. Dismissing does not cancel it.".to_owned(),
             };
-            body = body.child(
-                div()
-                    .debug_selector(|| "dialog-waiting".into())
-                    .text_color(rgb(theme.subtext()))
-                    .child(waiting),
-            );
+            body = body.child(look.note("dialog-waiting".into(), NoteTone::Info, waiting));
         }
-        let button = |id: &'static str| {
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px(px(12.))
-                .py(px(6.))
-                .rounded(px(crate::config::corners::CONTROL))
-                .border_1()
-                .cursor_pointer()
-        };
         // A picker owns the panel's height, so its list scrolls inside the
         // dialog instead of growing it past the window.
         let listing = action == WorkspaceAction::OpenWorktree || self.worktree_listing();
+        let close = look
+            .menu()
+            .close_button(if action == WorkspaceAction::OpenWorktree {
+                "open-worktree-escape"
+            } else {
+                "dialog-dismiss"
+            })
+            .on_click(cx.listener(|this, _, window, cx| {
+                cx.stop_propagation();
+                this.dismiss_menu(window, cx);
+            }));
+        let header = look.header(
+            Header {
+                selector: "dialog-header",
+                icon: WorkspaceMenuAction::Dialog(action)
+                    .icon()
+                    .unwrap_or("icons/folder.svg"),
+                title: ("dialog-title", title),
+                sub: Some(("icons/folder.svg", "dialog-target", &target.label)),
+                danger: destructive,
+            },
+            close,
+        );
+        let submit_label = if creating {
+            "Waiting...".into()
+        } else {
+            submit
+        };
+        // GitHub rows create their own checkouts without a submit button.
+        let submits = !listing || action == WorkspaceAction::OpenWorktree;
+        let mut footer = look.footer("dialog-footer").hint("Esc", "cancel");
+        if submits {
+            footer = footer.hint("↵", submit_word(action));
+        }
+        footer = footer.button(
+            look.button("dialog-cancel", "Cancel", ButtonKind::Normal, true)
+                .on_click(cx.listener(|this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.dismiss_menu(window, cx);
+                })),
+        );
+        if submits {
+            footer = footer.button(
+                look.button("dialog-submit", submit_label, submit_kind(action), armed)
+                    // Inert until there is something to submit, so it never
+                    // reads as pressable.
+                    .when(!armed, |button| {
+                        button.cursor(CursorStyle::OperationNotAllowed)
+                    })
+                    .when(armed, |button| {
+                        button.on_click(cx.listener(|this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.submit_workspace_dialog(window, cx);
+                        }))
+                    }),
+            );
+        }
         div()
             .flex()
             .flex_col()
@@ -295,75 +319,7 @@ impl HerdrWindow {
                 listing || action == WorkspaceAction::NewWorktree,
                 |dialog| dialog.size_full().min_h_0(),
             )
-            .child(
-                div()
-                    .debug_selector(|| "dialog-header".into())
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .when_some(
-                        WorkspaceMenuAction::Dialog(action).icon(),
-                        |header, icon| {
-                            header.child(svg().path(icon).size(px(16.)).flex_none().text_color(
-                                if destructive {
-                                    danger
-                                } else {
-                                    rgb(theme.muted)
-                                },
-                            ))
-                        },
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                div()
-                                    .debug_selector(|| "dialog-title".into())
-                                    .when(action == WorkspaceAction::OpenWorktree, |title| {
-                                        title.truncate()
-                                    })
-                                    .text_size(px(font.size * 1.35))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(title),
-                            )
-                            .child(
-                                div()
-                                    .truncate()
-                                    .text_color(rgb(theme.muted))
-                                    .child(target.label.clone()),
-                            ),
-                    )
-                    .when(action == WorkspaceAction::OpenWorktree, |header| {
-                        header.child(
-                            div()
-                                .id("open-worktree-escape")
-                                .debug_selector(|| "open-worktree-escape".into())
-                                .flex_none()
-                                .px_2()
-                                .py_1()
-                                .rounded(px(crate::config::corners::CONTROL))
-                                .cursor_pointer()
-                                .text_color(rgb(theme.muted))
-                                .hover(|button| {
-                                    button
-                                        .bg(rgb(theme.active))
-                                        .text_color(rgb(theme.foreground))
-                                })
-                                .child("ESC")
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    this.dismiss_menu(window, cx);
-                                })),
-                        )
-                    }),
-            )
+            .child(header)
             .when(action == WorkspaceAction::NewWorktree, |dialog| {
                 dialog.child(self.render_worktree_tabs(cx))
             })
@@ -399,71 +355,21 @@ impl HerdrWindow {
             } else {
                 body.into_any_element()
             })
-            .child(
-                div()
-                    .debug_selector(|| "dialog-footer".into())
-                    .flex()
-                    .justify_end()
-                    .gap(px(8.))
-                    .px(px(16.))
-                    .py(px(12.))
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        button("dialog-cancel")
-                            .border_color(rgb(theme.active))
-                            .hover(|button| button.bg(rgb(theme.active)))
-                            .child("Cancel")
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.dismiss_menu(window, cx);
-                            })),
-                    )
-                    // GitHub rows create their own checkouts without a submit button.
-                    .when(
-                        !listing || action == WorkspaceAction::OpenWorktree,
-                        |footer| {
-                            footer.child(
-                                button("dialog-submit")
-                                    // The primary action carries the fill; a
-                                    // destructive one also carries the warning hue.
-                                    .border_color(if !armed {
-                                        rgb(theme.active)
-                                    } else if destructive {
-                                        danger
-                                    } else {
-                                        rgb(theme.foreground)
-                                    })
-                                    .when(armed, |button| button.bg(rgb(theme.active)))
-                                    .text_color(if !armed {
-                                        rgb(theme.muted)
-                                    } else if destructive {
-                                        danger
-                                    } else {
-                                        rgb(theme.foreground)
-                                    })
-                                    .child(if creating {
-                                        "Waiting...".into()
-                                    } else {
-                                        submit
-                                    })
-                                    // Faded and inert until there is something
-                                    // to submit, so it never reads as pressable.
-                                    .when(!armed, |button| {
-                                        button.opacity(0.4).cursor(CursorStyle::OperationNotAllowed)
-                                    })
-                                    .when(armed, |button| {
-                                        button
-                                            .hover(|button| button.bg(rgb(theme.active)))
-                                            .on_click(cx.listener(|this, _, window, cx| {
-                                                cx.stop_propagation();
-                                                this.submit_workspace_dialog(window, cx);
-                                            }))
-                                    }),
-                            )
-                        },
-                    ),
-            )
+            .child(footer)
+    }
+}
+
+/// What Enter does, as the footer names it beside its key.
+fn submit_word(action: WorkspaceAction) -> &'static str {
+    match action {
+        WorkspaceAction::Rename => "rename",
+        WorkspaceAction::Close => "close",
+        WorkspaceAction::NewWorktree | WorkspaceAction::NewTab | WorkspaceAction::NewWorkspace => {
+            "create"
+        }
+        WorkspaceAction::OpenWorktree => "open",
+        WorkspaceAction::Note => "save",
+        WorkspaceAction::DeleteWorktree => "remove",
     }
 }
 
@@ -481,5 +387,19 @@ fn clone_note(host: &crate::dispatch::Candidate) -> &'static str {
         ", cloning the repository there first"
     } else {
         ""
+    }
+}
+
+/// The submit button's kind: closing workspaces and removing a checkout
+/// destroy something, so they take the danger red.
+pub(in crate::menu) fn submit_kind(action: WorkspaceAction) -> ButtonKind {
+    match action {
+        WorkspaceAction::Close | WorkspaceAction::DeleteWorktree => ButtonKind::Danger,
+        WorkspaceAction::Rename
+        | WorkspaceAction::NewWorktree
+        | WorkspaceAction::OpenWorktree
+        | WorkspaceAction::NewTab
+        | WorkspaceAction::NewWorkspace
+        | WorkspaceAction::Note => ButtonKind::Primary,
     }
 }

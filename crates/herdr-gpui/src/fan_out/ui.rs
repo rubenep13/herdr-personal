@@ -169,7 +169,7 @@ impl HerdrWindow {
         self.teleport_follow = Some(follow);
     }
 
-    pub(crate) fn render_fan_out(&self, cx: &mut Context<Self>) -> Div {
+    pub(crate) fn render_fan_out(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let Some(fan_out) = &self.fan_out else {
             return div();
         };
@@ -211,7 +211,7 @@ impl HerdrWindow {
                     .text_color(muted),
                 );
                 if self.menu.input.is_some() {
-                    body = body.child(self.render_dialog_input(cx));
+                    body = body.child(self.render_dialog_input(window, cx));
                 }
                 match installed {
                     None => {

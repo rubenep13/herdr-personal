@@ -1,4 +1,3 @@
-use super::*;
 use gpui::{Modifiers, TestAppContext, px, size};
 
 #[gpui::test]

@@ -138,7 +138,7 @@ fn open_worktree_rows_fill_the_list_and_header_escape_dismisses(cx: &mut TestApp
         let title = cx.debug_bounds("dialog-title").unwrap();
         let escape = cx.debug_bounds("open-worktree-escape").unwrap();
         assert!(title.right() <= escape.left());
-        assert_eq!(escape.right(), header.right() - px(16.));
+        assert_eq!(escape.right(), header.right() - px(10.));
         assert!(header.contains(&escape.origin) && escape.bottom() <= header.bottom());
         assert!(cx.debug_bounds("dialog-cancel").is_some());
         assert!(cx.debug_bounds("dialog-submit").is_some());
