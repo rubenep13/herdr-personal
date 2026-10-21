@@ -46,17 +46,21 @@ const SHARED_PERCENT: u32 = 14;
 const LOCAL_PERCENT: u32 = 70;
 /// A status chip's wash of its own colour.
 const TONE_PERCENT: u32 = 13;
+/// A lit button's wash of the accent, as a lit pill's, and hovered.
+const LIT_PERCENT: u32 = 15;
+const LIT_HOVER_PERCENT: u32 = 22;
 /// A hovered button leans this far toward the text.
 const BUTTON_HOVER_PERCENT: u32 = 10;
 const PRIMARY_HOVER_PERCENT: u32 = 15;
 
-/// A button's weight: the page's plain action, the one it leads with, or
-/// one that destroys something.
+/// A button's weight: the page's plain action, the one it leads with, one
+/// that destroys something, or a plain one lit while what it toggles is on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ButtonKind {
     Normal,
     Primary,
     Danger,
+    Lit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,6 +108,8 @@ pub(crate) struct SettingsLook {
     accent_ink: Rgba,
     accent_hover: Rgba,
     on_accent: Rgba,
+    lit: Rgba,
+    lit_hover: Rgba,
     shared_fill: Rgba,
     local_fill: Rgba,
     danger: Rgba,
@@ -156,6 +162,8 @@ impl SettingsLook {
                 PRIMARY_HOVER_PERCENT,
             )),
             on_accent: rgb(crate::toggles::ink_on(theme, theme.primary())),
+            lit: rgb(mix(theme.background, theme.primary(), LIT_PERCENT)),
+            lit_hover: rgb(mix(theme.background, theme.primary(), LIT_HOVER_PERCENT)),
             shared_fill: rgb(mix(theme.background, theme.primary(), SHARED_PERCENT)),
             local_fill: rgb(mix(theme.background, theme.active, LOCAL_PERCENT)),
             danger: rgb(danger),
@@ -351,9 +359,10 @@ impl SettingsLook {
             .text_color(ink)
             .text_size(px(text))
             .whitespace_nowrap()
-            .when(kind != ButtonKind::Normal, |button| {
-                button.font_weight(FontWeight::MEDIUM)
-            })
+            .when(
+                matches!(kind, ButtonKind::Primary | ButtonKind::Danger),
+                |button| button.font_weight(FontWeight::MEDIUM),
+            )
             .child(label)
             .when(enabled, |button| {
                 button
@@ -372,6 +381,7 @@ impl SettingsLook {
             ButtonKind::Normal => (self.line, self.button_hover, self.title),
             ButtonKind::Primary => (self.accent, self.accent_hover, self.on_accent),
             ButtonKind::Danger => (self.danger, self.danger_hover, self.on_danger),
+            ButtonKind::Lit => (self.lit, self.lit_hover, self.accent_ink),
         }
     }
 
