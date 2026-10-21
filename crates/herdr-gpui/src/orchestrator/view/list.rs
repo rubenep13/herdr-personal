@@ -200,7 +200,7 @@ impl OrchestratorView {
                     .w(px(22.))
                     .child(source_mark(look, item.key.source.provider)),
             )
-            .child(self.run_mark(row))
+            .child(self.run_mark(row, format!("orchestrator-issue-{index}")))
             .child(
                 div()
                     .flex_1()
@@ -284,7 +284,7 @@ impl OrchestratorView {
                     .w(px(44.))
                     .text_color(rgb(theme.muted)),
             )
-            .child(self.run_mark(row))
+            .child(self.run_mark(row, format!("orchestrator-pr-{index}")))
             .child(
                 div()
                     .flex_1()
@@ -480,9 +480,13 @@ impl OrchestratorView {
             .into_any_element()
     }
 
-    /// The agent and status of an item's newest run.
-    fn run_mark(&self, row: &ItemRow) -> Div {
+    /// The agent and status of an item's newest run: a dot in its status
+    /// colour, hollow at rest as the sidebar's, or for a failure the alert
+    /// mark in red, so it never reads as an agent waiting. `row` names the
+    /// row it sits in.
+    fn run_mark(&self, row: &ItemRow, selector: String) -> Div {
         let look = &self.look;
+        let view = look.view();
         div()
             .flex_none()
             .w(px(30.))
@@ -491,8 +495,26 @@ impl OrchestratorView {
             .gap_1()
             .when_some(row.run, |el, run| {
                 let agent = &self.snapshot.runs[run.run].agent;
+                let mark = if run.status == super::rows::Status::Failed {
+                    let failed = format!("{selector}-failed");
+                    svg()
+                        .debug_selector(move || failed)
+                        .path("icons/alert.svg")
+                        .size(view.at(11.))
+                        .flex_none()
+                        .text_color(view.settings().danger())
+                        .into_any_element()
+                } else {
+                    let status = format!("{selector}-status");
+                    view.status_dot(
+                        look.status_hue(run.status),
+                        run.status == super::rows::Status::Idle,
+                    )
+                    .debug_selector(move || status)
+                    .into_any_element()
+                };
                 el.child(look.icon(agent_icon(agent), 13., look.theme.foreground))
-                    .child(look.dot(look.status_hue(run.status), 7.))
+                    .child(mark)
             })
     }
 }

@@ -204,12 +204,13 @@ fn open_at(host: Host, folder: &Path) -> Repo {
 
 fn look() -> super::view::GraphLook {
     let config = crate::config::Config::default();
-    super::view::GraphLook {
-        theme: crate::config::Theme::default(),
-        ui: config.ui.clone(),
-        mono: config.terminal.clone(),
-        light: false,
-    }
+    super::view::GraphLook::new(
+        crate::config::Theme::default(),
+        config.ui.clone(),
+        config.terminal.clone(),
+        false,
+        &config.ui,
+    )
 }
 
 fn draw(cx: &mut gpui::VisualTestContext) {

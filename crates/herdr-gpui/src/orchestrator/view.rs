@@ -381,11 +381,16 @@ impl OrchestratorView {
     }
 
     pub(crate) fn set_look(&mut self, look: Look, cx: &mut Context<Self>) {
+        // Herdr's own settings, and so the status colours, can arrive after
+        // the tab is built with the theme unchanged.
         if look.theme == self.look.theme
             && look.ui.family == self.look.ui.family
             && look.ui.size == self.look.ui.size
             && look.mono.family == self.look.mono.family
             && look.mono.size == self.look.mono.size
+            && look.indicators == self.look.indicators
+            && look.light == self.look.light
+            && look.view() == self.look.view()
         {
             return;
         }

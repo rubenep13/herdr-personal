@@ -30,13 +30,14 @@ fn opened(
     };
     let config = crate::config::Config::default();
     let theme = crate::config::Theme::default();
-    let look = Look {
-        indicators: crate::sidebar::Indicators::new(None, None, false, &theme),
+    let look = Look::new(
+        crate::sidebar::Indicators::new(None, None, false, &theme),
         theme,
-        ui: config.ui.clone(),
-        mono: config.terminal.clone(),
-        light: false,
-    };
+        config.ui.clone(),
+        config.terminal.clone(),
+        false,
+        &config.ui,
+    );
     let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
     cx.simulate_resize(size(px(1200.), px(800.)));
     view.update(cx, |view, cx| {

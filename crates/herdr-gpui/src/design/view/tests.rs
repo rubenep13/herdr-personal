@@ -47,6 +47,7 @@ fn tones_read_on_their_wash() {
         let working =
             crate::sidebar::Indicators::new(None, None, light, &theme).color(AgentStatus::Working);
         for tone in [
+            Tone::Neutral,
             Tone::Good,
             Tone::Warn,
             Tone::Danger,

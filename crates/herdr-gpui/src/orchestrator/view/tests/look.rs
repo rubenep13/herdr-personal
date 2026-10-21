@@ -40,13 +40,14 @@ fn inbox(
     };
     let config = crate::config::Config::default();
     let theme = crate::config::Theme::default();
-    let look = Look {
-        indicators: crate::sidebar::Indicators::new(None, None, false, &theme),
+    let look = Look::new(
+        crate::sidebar::Indicators::new(None, None, false, &theme),
         theme,
-        ui: config.ui.clone(),
-        mono: config.terminal.clone(),
-        light: false,
-    };
+        config.ui.clone(),
+        config.terminal.clone(),
+        false,
+        &config.ui,
+    );
     let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
     cx.simulate_resize(size(px(1200.), px(700.)));
     view.update(cx, |view, cx| {
@@ -163,8 +164,17 @@ fn thousands_of_issues_paint_a_screenful(cx: &mut TestAppContext) {
 fn a_narrow_inbox_keeps_its_buttons(cx: &mut TestAppContext) {
     let (_dir, view, cx) = inbox(cx, issues(3));
     view.update(cx, |view, cx| {
-        view.look.ui.size = 18.;
-        cx.notify();
+        let mut ui = view.look.ui.clone();
+        ui.size = 18.;
+        let large = Look::new(
+            view.look.indicators,
+            view.look.theme.clone(),
+            ui.clone(),
+            view.look.mono.clone(),
+            false,
+            &ui,
+        );
+        view.set_look(large, cx);
     });
     cx.simulate_resize(size(px(680.), px(560.)));
     cx.run_until_parked();
@@ -175,4 +185,66 @@ fn a_narrow_inbox_keeps_its_buttons(cx: &mut TestAppContext) {
     let filters = bounds(cx, "orchestrator-filters");
     let sort = bounds(cx, "orchestrator-sort");
     assert!(sort.right() <= filters.right(), "{sort:?} in {filters:?}");
+}
+
+/// A failed run's mark in the lists is not the dot that says an agent
+/// waits, which is red too.
+#[gpui::test]
+fn a_failed_run_is_marked_apart_from_a_waiting_one(cx: &mut TestAppContext) {
+    let issue = issues(1).remove(0);
+    let failed = run("r1", &issue, RunState::Failed, "2026-10-04T01:00:00Z");
+    let (_dir, view, cx) = inbox(cx, vec![issue]);
+    view.update(cx, |view, cx| {
+        view.recorded_runs = Arc::new(vec![failed]);
+        view.refresh_rows();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("orchestrator-issue-0-failed").is_some());
+    assert!(cx.debug_bounds("orchestrator-issue-0-status").is_none());
+}
+
+/// With two synced sources in a narrow window at large type, their chips
+/// give way rather than the bar's buttons.
+#[gpui::test]
+fn sources_give_way_to_the_bars_buttons(cx: &mut TestAppContext) {
+    let (_dir, view, cx) = inbox(cx, issues(3));
+    view.update(cx, |view, cx| {
+        let at = Utc::now();
+        view.snapshot.sources = vec![
+            SourceStatus {
+                key: source(Provider::Github),
+                state: SyncState::Synced { at, count: 1234 },
+            },
+            SourceStatus {
+                key: source(Provider::Beads),
+                state: SyncState::Synced { at, count: 56 },
+            },
+        ];
+        let mut ui = view.look.ui.clone();
+        ui.size = 18.;
+        let large = Look::new(
+            view.look.indicators,
+            view.look.theme.clone(),
+            ui.clone(),
+            view.look.mono.clone(),
+            false,
+            &ui,
+        );
+        view.set_look(large, cx);
+    });
+    cx.simulate_resize(size(px(680.), px(560.)));
+    cx.run_until_parked();
+    let bar = bounds(cx, "orchestrator-bar");
+    for selector in [
+        "orchestrator-refresh",
+        "orchestrator-preview",
+        "orchestrator-dispatch",
+    ] {
+        let control = bounds(cx, selector);
+        assert!(
+            control.right() <= bar.right(),
+            "{selector}: {control:?} in {bar:?}"
+        );
+    }
 }

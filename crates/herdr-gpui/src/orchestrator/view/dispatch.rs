@@ -448,6 +448,8 @@ impl OrchestratorView {
         let verb_id = format!("orchestrator-confirm-{verb}");
         div()
             .w(view.at(CONFIRM_WIDTH))
+            // Never wider than the view, whatever the type's size.
+            .max_w_full()
             .flex()
             .flex_col()
             .child(dialog.header(
@@ -655,6 +657,7 @@ impl OrchestratorView {
         rows.push(("Branch", dialog.branch.clone().into_any_element()));
         div()
             .w(view.at(DIALOG_WIDTH))
+            .max_w_full()
             .flex()
             .flex_col()
             .child(parts.header(

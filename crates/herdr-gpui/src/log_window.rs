@@ -114,6 +114,9 @@ fn open_deferred(cx: &mut App) {
 
 struct LogWindow {
     appearance: Appearance,
+    /// The redesigned views' pieces for `appearance`, built when it changes
+    /// rather than for every line drawn.
+    look: crate::design::ViewLook,
     _appearance: Subscription,
     focus: FocusHandle,
     search: Entity<SearchInput>,
@@ -227,6 +230,7 @@ impl LogWindow {
                 this.scroll.scroll_to(offset);
             }
             this.appearance = cx.global::<Appearance>().clone();
+            this.look = view::look(&this.appearance);
             this.search.update(cx, |input, cx| {
                 input.set_appearance(
                     this.appearance.config.ui.clone(),
@@ -327,7 +331,9 @@ impl LogWindow {
                     .await;
             }
         });
+        let look = view::look(&appearance);
         Self {
+            look,
             appearance,
             _appearance: appearance_subscription,
             focus: cx.focus_handle(),

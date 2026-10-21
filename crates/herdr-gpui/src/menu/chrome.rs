@@ -91,6 +91,16 @@ impl HerdrWindow {
         crate::design::ViewLook::of(&self.theme, &self.config.ui, self.theme_light)
     }
 
+    /// The `[ui]` face grown as Cmd-+ grows the terminal's, for the chrome
+    /// of the views that follow the terminal's size (the orchestrator and
+    /// the Git graph): as tall as every other view's at the configured
+    /// sizes.
+    pub(crate) fn chrome_font(&self) -> crate::config::FontConfig {
+        let mut font = self.config.ui.clone();
+        font.size *= self.config.terminal.size / self.configured_terminal_size.max(1.);
+        font
+    }
+
     pub(crate) fn menu_target_current(&self) -> bool {
         self.menu.endpoint_target
             == (

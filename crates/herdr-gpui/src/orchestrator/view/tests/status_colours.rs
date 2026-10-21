@@ -10,13 +10,14 @@ use crate::{
 fn look(settings: Option<&crate::herdr_settings::Settings>) -> Look {
     let config = Config::default();
     let theme = Theme::default();
-    Look {
-        indicators: Indicators::new(settings, None, false, &theme),
+    Look::new(
+        Indicators::new(settings, None, false, &theme),
         theme,
-        ui: config.ui.clone(),
-        mono: config.terminal.clone(),
-        light: false,
-    }
+        config.ui.clone(),
+        config.terminal.clone(),
+        false,
+        &config.ui,
+    )
 }
 
 #[test]
@@ -88,4 +89,43 @@ fn states_and_priorities_take_their_tones() {
     ] {
         assert_eq!(look.priority_tone(priority), tone, "P{priority}");
     }
+}
+
+/// Herdr's settings load after the tab is built: their colours reach the
+/// view even when the theme stays the same.
+#[gpui::test]
+fn colours_that_arrive_later_reach_the_runs(cx: &mut gpui::TestAppContext) {
+    use crate::orchestrator::{Request, Timing, view::OrchestratorView};
+    let dir = tempfile::tempdir().unwrap();
+    let request = Request {
+        target: herdr_client::ConnectTarget::Local,
+        checkout: dir.path().to_string_lossy().into_owned(),
+        workspace_id: "w1".into(),
+        token: None,
+        data_root: Some(dir.path().join("data")),
+        timing: Timing::default(),
+    };
+    let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look(None), cx));
+    let settings =
+        crate::herdr_settings::Settings::parse_text("[theme.custom]\nred='#ff00aa'\n").unwrap();
+    let mine = look(Some(&settings));
+    view.update(cx, |view, cx| view.set_look(mine.clone(), cx));
+    view.read_with(cx, |view, _| {
+        assert_eq!(
+            view.look.status_hue(Status::NeedsInput),
+            mine.status_hue(Status::NeedsInput)
+        );
+    });
+}
+
+/// The inbox's bar is as tall as every other view's at the default sizes,
+/// and grows as the terminal's font grows.
+#[gpui::test]
+fn the_inbox_chrome_matches_the_other_views(cx: &mut gpui::TestAppContext) {
+    let (view, cx) = cx.add_window_view(crate::sidebar::layout_tests::fixture_window);
+    view.update(cx, |view, _| {
+        assert_eq!(view.look().view().at(40.), gpui::px(40.));
+        view.config.terminal.size = view.configured_terminal_size + 7.;
+        assert!(view.look().view().at(40.) > gpui::px(40.));
+    });
 }

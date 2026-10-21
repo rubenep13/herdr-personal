@@ -60,14 +60,34 @@ pub(crate) struct GraphLook {
     pub(crate) theme: Theme,
     pub(crate) ui: FontConfig,
     pub(crate) mono: FontConfig,
-    /// Whether the theme is light, which softens the panels' shadows.
-    pub(crate) light: bool,
+    /// The redesigned views' pieces, built once with the look; a light
+    /// theme softens their shadows.
+    view: crate::design::ViewLook,
 }
 
 impl GraphLook {
-    /// The redesigned views' pieces, at the graph's face.
+    /// The look for `theme`, its rows in `ui` and `mono`, and its chrome
+    /// (bar, headings, menus, panels) at `chrome`, the `[ui]` face every
+    /// view's chrome shares.
+    pub(crate) fn new(
+        theme: Theme,
+        ui: FontConfig,
+        mono: FontConfig,
+        light: bool,
+        chrome: &FontConfig,
+    ) -> Self {
+        let view = crate::design::ViewLook::of(&theme, chrome, light);
+        Self {
+            theme,
+            ui,
+            mono,
+            view,
+        }
+    }
+
+    /// The redesigned views' pieces, at the chrome's face.
     pub(crate) fn view(&self) -> crate::design::ViewLook {
-        crate::design::ViewLook::of(&self.theme, &self.ui, self.light)
+        self.view
     }
 }
 
@@ -564,6 +584,7 @@ impl GitGraphView {
             && look.ui.size == self.look.ui.size
             && look.mono.family == self.look.mono.family
             && look.mono.size == self.look.mono.size
+            && look.view() == self.look.view()
         {
             return;
         }

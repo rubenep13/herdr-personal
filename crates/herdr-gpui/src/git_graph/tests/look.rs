@@ -13,8 +13,16 @@ fn sized(
     &mut gpui::VisualTestContext,
 ) {
     let checkout = crate::git_graph::GraphCheckout::new("/repo".into()).unwrap();
-    let mut graph = look();
-    graph.ui.size = font;
+    let config = crate::config::Config::default();
+    let mut ui = config.ui.clone();
+    ui.size = font;
+    let graph = crate::git_graph::view::GraphLook::new(
+        crate::config::Theme::default(),
+        ui.clone(),
+        config.terminal.clone(),
+        false,
+        &ui,
+    );
     let (view, cx) = cx.add_window_view(|_, cx| {
         crate::git_graph::view::GitGraphView::new(
             Err(crate::git_graph::Error::WorkerStopped),
@@ -69,4 +77,16 @@ fn the_column_menu_is_a_menu(cx: &mut TestAppContext) {
         assert_eq!(row.size.height, px(32.), "{key}");
         assert!(row.top() >= section.bottom());
     }
+}
+
+/// The graph's bar is as tall as every other view's at the default sizes,
+/// and grows as the terminal's font grows.
+#[gpui::test]
+fn the_graph_chrome_matches_the_other_views(cx: &mut TestAppContext) {
+    let (view, cx) = cx.add_window_view(crate::sidebar::layout_tests::fixture_window);
+    view.update(cx, |view, _| {
+        assert_eq!(view.graph_look().view().at(40.), px(40.));
+        view.config.terminal.size = view.configured_terminal_size + 7.;
+        assert!(view.graph_look().view().at(40.) > px(40.));
+    });
 }

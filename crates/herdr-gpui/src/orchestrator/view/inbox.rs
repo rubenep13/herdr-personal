@@ -106,6 +106,10 @@ impl OrchestratorView {
                         format!("{provider} \u{00b7} {text}"),
                         tone,
                     )
+                    // In a narrow bar the sources give way before its buttons.
+                    .flex_shrink(1.)
+                    .min_w_0()
+                    .truncate()
                     .id(("orchestrator-source", index))
                     .when(sign_in, |el| {
                         el.cursor_pointer()

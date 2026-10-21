@@ -18,18 +18,14 @@ fn destination_inventory_reconciles_selection_and_ignores_other_hosts(cx: &mut T
         timing: Timing::default(),
     };
     let config = crate::config::Config::default();
-    let look = Look {
-        indicators: crate::sidebar::Indicators::new(
-            None,
-            None,
-            false,
-            &crate::config::Theme::default(),
-        ),
-        theme: crate::config::Theme::default(),
-        ui: config.ui,
-        mono: config.terminal,
-        light: false,
-    };
+    let look = Look::new(
+        crate::sidebar::Indicators::new(None, None, false, &crate::config::Theme::default()),
+        crate::config::Theme::default(),
+        config.ui.clone(),
+        config.terminal,
+        false,
+        &config.ui,
+    );
     let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {

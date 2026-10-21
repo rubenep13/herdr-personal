@@ -6,7 +6,7 @@
 use super::rows::Status;
 use crate::{
     config::{FontConfig, Theme},
-    design::{ButtonKind, Tone},
+    design::{ButtonKind, Tone, ViewLook},
     fonts::StyledFont,
     sidebar::Indicators,
 };
@@ -30,6 +30,8 @@ pub(crate) struct Look {
     pub(crate) light: bool,
     /// Herdr's status colours, the user's own included, for runs' states.
     pub(crate) indicators: Indicators,
+    /// The redesigned views' pieces, built once with the look.
+    view: ViewLook,
 }
 
 /// `label` with only its first letter capital, as the redesign's section
@@ -43,9 +45,31 @@ pub(crate) fn sentence(label: &str) -> String {
 }
 
 impl Look {
-    /// The redesigned views' pieces, at the orchestrator's face.
-    pub(crate) fn view(&self) -> crate::design::ViewLook {
-        crate::design::ViewLook::of(&self.theme, &self.ui, self.light)
+    /// The look for `theme`, its text in `ui` and `mono`, and its chrome
+    /// (bars, rows, panels) at `chrome`, the `[ui]` face every view's
+    /// chrome shares.
+    pub(crate) fn new(
+        indicators: Indicators,
+        theme: Theme,
+        ui: FontConfig,
+        mono: FontConfig,
+        light: bool,
+        chrome: &FontConfig,
+    ) -> Self {
+        let view = ViewLook::of(&theme, chrome, light);
+        Self {
+            theme,
+            ui,
+            mono,
+            light,
+            indicators,
+            view,
+        }
+    }
+
+    /// The redesigned views' pieces, at the chrome's face.
+    pub(crate) fn view(&self) -> ViewLook {
+        self.view
     }
 
     pub(crate) fn hue(&self, index: usize) -> u32 {
@@ -93,14 +117,6 @@ impl Look {
             .size(px(size))
             .path(path)
             .text_color(rgb(color))
-    }
-
-    pub(crate) fn dot(&self, color: u32, size: f32) -> Div {
-        div()
-            .flex_none()
-            .size(px(size))
-            .rounded_full()
-            .bg(rgb(color))
     }
 
     /// A short coloured word, such as a state or priority, in its tone.

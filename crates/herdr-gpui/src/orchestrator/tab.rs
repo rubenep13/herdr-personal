@@ -162,21 +162,22 @@ impl HerdrWindow {
 
     /// The orchestrator's look: the UI font's family at the terminal font's
     /// size, so Cmd-+ and Cmd-- scale it with the terminals.
-    fn look(&self) -> Look {
+    pub(super) fn look(&self) -> Look {
         let mut ui = self.config.ui.clone();
         ui.size = self.config.terminal.size;
-        Look {
-            indicators: crate::sidebar::Indicators::new(
+        Look::new(
+            crate::sidebar::Indicators::new(
                 self.settings.shared.as_ref(),
                 self.config.status_icons,
                 self.theme_light,
                 &self.theme,
             ),
-            theme: self.theme.clone(),
+            self.theme.clone(),
             ui,
-            mono: self.config.terminal.clone(),
-            light: self.theme_light,
-        }
+            self.config.terminal.clone(),
+            self.theme_light,
+            &self.chrome_font(),
+        )
     }
 
     /// The GitHub account a view on `target` reads and writes with: the SSH

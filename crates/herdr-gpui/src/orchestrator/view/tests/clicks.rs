@@ -19,18 +19,14 @@ fn the_run_arrow_asks_to_open_the_run(cx: &mut TestAppContext) {
         timing: Timing::default(),
     };
     let config = crate::config::Config::default();
-    let look = Look {
-        indicators: crate::sidebar::Indicators::new(
-            None,
-            None,
-            false,
-            &crate::config::Theme::default(),
-        ),
-        theme: crate::config::Theme::default(),
-        ui: config.ui.clone(),
-        mono: config.terminal.clone(),
-        light: false,
-    };
+    let look = Look::new(
+        crate::sidebar::Indicators::new(None, None, false, &crate::config::Theme::default()),
+        crate::config::Theme::default(),
+        config.ui.clone(),
+        config.terminal.clone(),
+        false,
+        &config.ui,
+    );
     let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
     let events: Rc<RefCell<Vec<Event>>> = Rc::default();
     let seen = events.clone();

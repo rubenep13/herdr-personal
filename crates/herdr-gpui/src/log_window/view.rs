@@ -31,9 +31,12 @@ const LEVEL_MENU_WIDTH: f32 = 180.;
 /// bar cannot wrap as the old header did.
 const COMPACT_BELOW: f32 = 760.;
 
-/// Whether the console's theme is light, which the menus' shadow follows.
-fn light(theme: &Theme) -> bool {
-    crate::contrast::luminance(theme.background) > 0.5
+/// The redesigned views' pieces for the console's appearance. Its theme
+/// counts as light by its background, which the menus' shadow follows.
+pub(super) fn look(appearance: &Appearance) -> ViewLook {
+    let theme = &appearance.theme;
+    let light = crate::contrast::luminance(theme.background) > 0.5;
+    ViewLook::of(theme, &appearance.config.ui, light)
 }
 
 fn styled_body(record: &Record, theme: &Theme) -> StyledText {
@@ -302,7 +305,7 @@ impl Render for LogWindow {
             window.remove_window();
         });
         let Appearance { config, theme } = &self.appearance;
-        let look = ViewLook::of(theme, &config.ui, light(theme));
+        let look = self.look;
         let root = div()
             .key_context("LogWindow")
             .track_focus(&self.focus)
@@ -348,8 +351,7 @@ impl Render for LogWindow {
                             list(
                                 self.scroll.clone(),
                                 cx.processor(|this, index: usize, _, cx| {
-                                    let Appearance { config, theme } = &this.appearance;
-                                    let look = ViewLook::of(theme, &config.ui, light(theme));
+                                    let look = this.look;
                                     this.render_line(&look, index, cx)
                                 }),
                             )

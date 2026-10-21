@@ -388,7 +388,9 @@ impl SettingsLook {
     /// A tone's text and the wash behind it.
     pub(crate) fn tone(&self, tone: Tone) -> (Rgba, Rgba) {
         match tone {
-            Tone::Neutral => (self.muted, self.well),
+            // The secondary text, not the quiet one, which reads below 3:1
+            // on the well in light themes.
+            Tone::Neutral => (self.text, self.well),
             Tone::Good => (self.good, self.good_fill),
             Tone::Warn => (self.warn, self.warn_fill),
             Tone::Danger => (self.danger, self.danger_fill),

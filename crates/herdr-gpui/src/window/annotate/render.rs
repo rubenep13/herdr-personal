@@ -4,6 +4,12 @@ use crate::{
     fonts::StyledFont,
 };
 
+/// The note's size at `[ui] size = 12`: heading 52, padding 12 above and
+/// below, field 30, gap 10 and buttons 26; and its three hairlines.
+const NOTE_WIDTH: f32 = 410.;
+const NOTE_HEIGHT: f32 = 52. + 2. * 12. + 30. + 10. + 26.;
+const NOTE_LINES: f32 = 3.;
+
 /// Prefer just below the selection, flip above it at the bottom edge, and
 /// clamp to the pane. Both the pill and composer use these same coordinates.
 fn placement(
@@ -88,8 +94,11 @@ impl HerdrWindow {
         let mut font = self.config.ui.clone();
         font.size = font.size.max(14.);
         let desired = if composer.is_some() {
-            // 14px padding, two 12px gaps, 24px header, padded input, 32px footer.
-            size(px(410.), px(132. + font.line_height()))
+            // The pieces it is drawn from, which grow with `[ui]`: the
+            // dialog heading, the body's padding, the field, the gap and the
+            // buttons' row, and the panel's and heading's hairlines.
+            let look = self.view_look();
+            size(look.at(NOTE_WIDTH), look.at(NOTE_HEIGHT) + px(NOTE_LINES))
         } else {
             size(px(font.size * 6. + 48.), px(font.line_height() + 12.))
         };
