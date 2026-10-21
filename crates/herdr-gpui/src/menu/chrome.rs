@@ -561,20 +561,9 @@ impl HerdrWindow {
                 panel.w((viewport.width - px(24.)).max(px(0.)).min(px(340.)))
             })
             .map(|panel| {
-                // Every page wears the redesigned panel but those whose turn
-                // has not come.
-                if page.look() != Look::Legacy {
-                    let look = self.menu_look();
-                    look.panel(panel)
-                        .text_color(look.ink(crate::design::ItemState::default()))
-                } else {
-                    panel
-                        .rounded(px(crate::config::corners::PANEL))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .bg(rgb(theme.surface))
-                        .text_color(rgb(theme.foreground))
-                }
+                let look = self.menu_look();
+                look.panel(panel)
+                    .text_color(look.ink(crate::design::ItemState::default()))
             })
             .text_font(font)
             .text_size(px(font.size))
