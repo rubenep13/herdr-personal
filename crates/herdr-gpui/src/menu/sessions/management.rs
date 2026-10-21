@@ -1,6 +1,9 @@
 //! Picker forms capture device identity and host, never a mutable row ordinal.
 use super::*;
-use crate::search_input::SearchInput;
+use crate::{
+    design::{ButtonKind, Header},
+    search_input::SearchInput,
+};
 use herdr_client::RemoteHost;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -149,6 +152,8 @@ impl HerdrWindow {
             let mut input = SearchInput::new(cx);
             input.set_placeholder("Session name", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            // The dialog's field frame draws the frame.
+            input.set_frameless(cx);
             input
         });
         window.focus(&input.read(cx).focus.clone(), cx);
@@ -329,16 +334,15 @@ impl HerdrWindow {
         }
     }
 
-    pub(super) fn render_session_edit(&self, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
-        let mut view = div()
-            .debug_selector(|| "session-modal".into())
-            .flex()
-            .flex_col()
-            .gap(px(12.))
-            .p(px(12.));
-        match &self.menu.session_edit {
-            Some(Edit::Create { input, target }) => {
+    pub(super) fn render_session_edit(&self, window: &Window, cx: &mut Context<Self>) -> Div {
+        let Some(edit) = &self.menu.session_edit else {
+            return div();
+        };
+        let look = self.dialog_look();
+        let create = matches!(edit, Edit::Create { .. });
+        let mut body = look.body("session-edit-body");
+        let (title, sub, icon) = match edit {
+            Edit::Create { input, target } => {
                 let destination = match target {
                     Target::Local => "this machine".to_owned(),
                     Target::Device {
@@ -350,86 +354,98 @@ impl HerdrWindow {
                         ..
                     } => format!("WSL {distro}"),
                 };
-                view = view.child(div().text_size(px(self.config.ui.size * 1.35))
-                    .font_weight(FontWeight::SEMIBOLD).child("Add session"))
-                    .child(div().text_color(rgb(theme.muted)).child(format!("On {destination}")))
-                    .child(input.clone())
-                    .child(div().text_color(rgb(theme.subtext())).child("Creates and connects to a headless session. An existing name connects to that session."));
-            }
-            Some(Edit::Delete { row, .. }) => {
-                let name = match row {
-                    Row::Local(name) | Row::Device { session: name, .. } => name.as_str(),
-                    Row::Add(_) => "",
-                };
-                view = view
+                body = body
                     .child(
-                        div()
-                            .text_size(px(self.config.ui.size * 1.35))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Delete session?"),
+                        look.settings()
+                            .field(
+                                "session-edit-field".into(),
+                                input.read(cx).focus.is_focused(window),
+                            )
+                            .w_full()
+                            .child(div().flex_1().min_w_0().child(input.clone())),
                     )
-                    .child(div().min_w_0().truncate().child(name.to_owned()))
-                    .child(div().text_color(rgb(theme.subtext())).child(
-                        "Herdr will stop this session, terminate its running processes, and remove its saved state. If you are using it, this window switches to default. This cannot be undone.",
+                    .child(look.lead(
+                        "session-edit-text",
+                        "Creates and connects to a headless session. An existing name connects to that session.",
                     ));
+                ("Add session", format!("On {destination}"), "icons/plus.svg")
             }
-            None => return view,
-        }
+            Edit::Delete { row, .. } => {
+                let name = match row {
+                    Row::Local(name) | Row::Device { session: name, .. } => name.clone(),
+                    Row::Add(_) => String::new(),
+                };
+                body = body.child(look.lead(
+                    "session-edit-text",
+                    "Herdr will stop this session, terminate its running processes, and remove its saved state. If you are using it, this window switches to default. This cannot be undone.",
+                ));
+                ("Delete session?", name, "icons/trash.svg")
+            }
+        };
         if let Some(error) = &self.menu.error {
-            view = view.child(
-                div()
-                    .text_color(colors::danger(&self.theme))
-                    .child(error.clone()),
-            );
+            body = body.child(look.error("sessions-error".into(), error.clone()));
         }
-        view.child(
-            div()
-                .flex()
-                .justify_end()
-                .gap(px(8.))
-                .child(
-                    div()
-                        .id("session-edit-cancel")
-                        .debug_selector(|| "session-edit-cancel".into())
-                        .px(px(12.))
-                        .py(px(6.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .hover(|s| s.bg(rgb(theme.active)))
-                        .cursor_pointer()
-                        .child("Cancel")
-                        .on_click(
-                            cx.listener(|this, _, window, cx| this.cancel_session_edit(window, cx)),
-                        ),
-                )
-                .child(
-                    div()
-                        .id("session-edit-submit")
-                        .debug_selector(|| "session-edit-submit".into())
-                        .px(px(12.))
-                        .py(px(6.))
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .bg(rgb(theme.active))
-                        .when(
-                            matches!(self.menu.session_edit, Some(Edit::Delete { .. })),
-                            |s| s.text_color(colors::danger(theme)),
-                        )
-                        .cursor_pointer()
-                        .child(
-                            if matches!(self.menu.session_edit, Some(Edit::Create { .. })) {
+        // Cancelling returns to the list the form came from, as Esc does.
+        let cancel = |this: &mut Self, window: &mut Window, cx: &mut Context<Self>| {
+            this.cancel_session_edit(window, cx)
+        };
+        div()
+            .debug_selector(|| "session-modal".into())
+            .flex()
+            .flex_col()
+            .child(
+                look.header(
+                    Header {
+                        selector: "session-edit-header",
+                        icon,
+                        title: ("session-edit-title", title),
+                        sub: (!sub.is_empty()).then_some((
+                            "icons/sessions.svg",
+                            "session-edit-target",
+                            sub.as_str(),
+                        )),
+                        danger: !create,
+                    },
+                    look.menu()
+                        .close_button("sessions-dismiss")
+                        .on_click(cx.listener(move |this, _, window, cx| cancel(this, window, cx))),
+                ),
+            )
+            .child(body)
+            .child(
+                look.footer("session-edit-footer")
+                    .hint("Esc", "cancel")
+                    .hint("↵", if create { "create" } else { "delete" })
+                    .button(
+                        look.button("session-edit-cancel", "Cancel", ButtonKind::Normal, true)
+                            .on_click(
+                                cx.listener(move |this, _, window, cx| cancel(this, window, cx)),
+                            ),
+                    )
+                    .button(
+                        look.button(
+                            "session-edit-submit",
+                            if create {
                                 "Create and connect"
                             } else {
                                 "Delete permanently"
                             },
+                            edit_kind(edit),
+                            true,
                         )
                         .on_click(
                             cx.listener(|this, _, window, cx| this.submit_session_edit(window, cx)),
                         ),
-                ),
-        )
+                    ),
+            )
+    }
+}
+
+/// The form's submit: deleting a session destroys it, so it is red.
+pub(in crate::menu) fn edit_kind(edit: &Edit) -> ButtonKind {
+    match edit {
+        Edit::Create { .. } => ButtonKind::Primary,
+        Edit::Delete { .. } => ButtonKind::Danger,
     }
 }
 

@@ -485,7 +485,9 @@ impl HerdrWindow {
                     panel
                         .when(!settled && !lists, |panel| panel.overflow_y_scroll())
                         .when(lists, |panel| panel.overflow_hidden())
-                        .when(page.look() != Look::Dialog, |panel| panel.p(px(6.)))
+                        .when(page.look() != Look::Dialog && !session_modal, |panel| {
+                            panel.p(px(6.))
+                        })
                 },
             )
             .when(
@@ -550,9 +552,8 @@ impl HerdrWindow {
             })
             .map(|panel| {
                 // Every page wears the redesigned panel but those whose turn
-                // has not come; a session's create or delete form is a dialog
-                // and keeps the old one until then.
-                if page.look() != Look::Legacy && !session_modal {
+                // has not come.
+                if page.look() != Look::Legacy {
                     let look = self.menu_look();
                     look.panel(panel)
                         .text_color(look.ink(crate::design::ItemState::default()))
@@ -612,7 +613,7 @@ impl HerdrWindow {
         } else if page == Page::Devices {
             panel = panel.child(self.render_devices(cx));
         } else if page == Page::Sessions {
-            panel = panel.child(self.render_sessions(cx));
+            panel = panel.child(self.render_sessions(window, cx));
         } else if let Page::Usage(provider) = page {
             panel = panel.child(self.render_usage_panel(provider, cx));
         } else if page == Page::AddDevice {
