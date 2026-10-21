@@ -45,7 +45,6 @@ impl HerdrWindow {
         let Some(target) = &self.menu.target else {
             return div();
         };
-        let theme = &self.theme;
         let font = &self.config.ui;
         let deletion = self.menu.deletion.as_ref();
         let force = deletion.is_some_and(|deletion| deletion.force);
@@ -150,14 +149,13 @@ impl HerdrWindow {
             WorkspaceAction::NewWorktree => {
                 let mut rows = Vec::new();
                 if let Some(source) = self.menu.worktree.as_ref() {
+                    let focused = source.name.read(cx).focus.is_focused(window);
                     rows.push((
                         "Name",
-                        div()
-                            .debug_selector(|| "worktree-name".into())
-                            .min_w_0()
-                            .truncate()
-                            .text_color(rgb(theme.foreground))
-                            .child(source.name.clone())
+                        look.settings()
+                            .field("worktree-name".into(), focused)
+                            .w_full()
+                            .child(div().flex_1().min_w_0().child(source.name.clone()))
                             .into_any_element(),
                     ));
                 }

@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 
 mod fences;
 mod listing;
+mod look;
 mod picker;
 mod search;
 

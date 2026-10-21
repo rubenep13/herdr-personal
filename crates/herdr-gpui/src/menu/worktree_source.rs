@@ -334,6 +334,8 @@ impl HerdrWindow {
         search.update(cx, |input, cx| {
             input.set_placeholder("Search checkouts, branches, pull requests, issues...", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            // The query row draws the frame.
+            input.set_frameless(cx);
         });
         let subscription = cx.subscribe_in(
             &search,
@@ -347,6 +349,8 @@ impl HerdrWindow {
         name.update(cx, |input, cx| {
             input.set_placeholder("Default name", cx);
             input.set_appearance(self.config.ui.clone(), self.theme.clone(), cx);
+            // The dialog's field frame draws the frame.
+            input.set_frameless(cx);
         });
         let naming = cx.subscribe_in(
             &name,

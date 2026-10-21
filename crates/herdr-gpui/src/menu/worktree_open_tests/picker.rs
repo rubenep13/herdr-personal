@@ -125,9 +125,10 @@ fn open_worktree_rows_fill_the_list_and_header_escape_dismisses(cx: &mut TestApp
         ] {
             let row = cx.debug_bounds(row).unwrap();
             let status = cx.debug_bounds(status).unwrap();
-            assert_eq!(row.left(), list.left());
-            assert_eq!(row.size.width, list.size.width);
-            assert_eq!(status.right(), row.right() - px(16.));
+            // Menu rows: inset 6 from the list's sides, their text 10 in.
+            assert_eq!(row.left(), list.left() + px(6.));
+            assert_eq!(row.size.width, list.size.width - px(12.));
+            assert_eq!(status.right(), row.right() - px(10.));
             assert!(row.contains(&status.origin) && status.bottom() <= row.bottom());
             if let Some(right) = status_right {
                 assert_eq!(status.right(), right);

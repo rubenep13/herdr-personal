@@ -280,7 +280,9 @@ impl MenuLook {
         self.frame(id, selector, self.list_row_height(), state)
     }
 
-    fn leading(&self, leading: Leading, state: ItemState) -> Div {
+    /// A row's leading slot: the icon, check or strip that opens it, in the
+    /// colour its state gives. Two-line rows start with it too.
+    pub(crate) fn leading(&self, leading: Leading, state: ItemState) -> Div {
         let size = self.at(ICON);
         let color = if state.danger || state.disabled {
             self.ink(state)

@@ -120,12 +120,8 @@ fn local_branches_without_a_checkout_are_one_line_rows(cx: &mut gpui::TestAppCon
     };
     let checkout = row_height(Tab::Existing, cx);
     let branch = row_height(Tab::Branches, cx);
-    let line = cx.update(|_, cx| gpui::px(view.read(cx).config.ui.line_height()));
-    // Layout rounds to device pixels, so allow a pixel either way.
-    assert!(
-        (checkout - branch - line).abs() <= gpui::px(1.),
-        "{checkout:?} {branch:?} {line:?}"
-    );
+    // A list's two-line row and a menu's one-line row.
+    assert_eq!((checkout, branch), (gpui::px(44.), gpui::px(32.)));
     assert!(cx.debug_bounds("worktree-row-1").is_some());
     cx.update(|_, cx| {
         let view = view.read(cx);
