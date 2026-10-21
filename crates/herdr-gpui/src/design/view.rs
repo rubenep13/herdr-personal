@@ -7,8 +7,8 @@
 //! paint, so no view draws a bar or a row of its own again.
 
 use super::{
-    DialogLook, ICON_BUTTON, ICON_BUTTON_RADIUS, MenuLook, SELECTION_RADIUS, SettingsLook, Tone,
-    TypeScale,
+    ButtonKind, ButtonSize, DialogLook, ICON_BUTTON, ICON_BUTTON_RADIUS, ItemState, Leading,
+    MenuLook, SELECTION_RADIUS, SettingsLook, Tone, TypeScale,
 };
 use crate::config::{FontConfig, Theme, mix};
 use gpui::{
@@ -26,6 +26,10 @@ const BAR_ICON: f32 = 15.;
 /// Between the view's icon, its title and its context.
 const TITLE_GAP: f32 = 8.;
 const CONTEXT_GAP: f32 = 2.;
+/// How readily a bar's title gives way next to the fields and the context
+/// beside it: barely, so they narrow first and the title only once they
+/// cannot.
+const TITLE_SHRINK: f32 = 0.01;
 /// The thin upright line between groups of a bar's controls.
 const BAR_RULE: f32 = 18.;
 const BAR_RULE_MARGIN: f32 = 4.;
@@ -41,6 +45,12 @@ const SEGMENT_PADDING: f32 = 9.;
 const SEGMENT_RADIUS: f32 = 6.;
 const SEGMENT_INSET: f32 = 2.;
 const PILL_MARK: f32 = 12.;
+/// A small button's icon, before its label.
+const BUTTON_ICON: f32 = 14.;
+const BUTTON_ICON_GAP: f32 = 6.;
+/// A view's own menu: its padding, and its least width.
+const MENU_PADDING: f32 = 6.;
+const MENU_CHECK: f32 = 16.;
 const DROPDOWN_PADDING_RIGHT: f32 = 8.;
 const DROPDOWN_ICON: f32 = 13.;
 /// The row of a list's search and filters.
@@ -227,6 +237,8 @@ impl ViewLook {
     ) -> Div {
         div()
             .min_w_0()
+            .flex_shrink(TITLE_SHRINK)
+            .overflow_hidden()
             .flex()
             .items_center()
             .gap(self.at(TITLE_GAP))
@@ -241,7 +253,9 @@ impl ViewLook {
             })
             .child(
                 div()
-                    .flex_none()
+                    .min_w_0()
+                    .flex_shrink(TITLE_SHRINK)
+                    .truncate()
                     .text_size(px(self.scale.name))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(self.title)
@@ -305,6 +319,91 @@ impl ViewLook {
                     .flex_none()
                     .text_color(if on { self.title } else { self.muted }),
             )
+    }
+
+    /// A small button of a bar, a panel or a card, its icon before its
+    /// label in the label's colour. The caller adds its click.
+    pub(crate) fn button(
+        &self,
+        id: impl Into<ElementId>,
+        selector: String,
+        icon: Option<&'static str>,
+        label: impl Into<SharedString>,
+        kind: ButtonKind,
+        enabled: bool,
+    ) -> Stateful<Div> {
+        let settings = self.settings();
+        let (_, _, ink) = settings.button_colours(kind);
+        settings.button(
+            id,
+            selector,
+            div()
+                .flex()
+                .items_center()
+                .gap(self.at(BUTTON_ICON_GAP))
+                .when_some(icon, |label, icon| {
+                    label.child(
+                        svg()
+                            .path(icon)
+                            .size(self.at(BUTTON_ICON))
+                            .flex_none()
+                            .text_color(ink),
+                    )
+                })
+                .child(label.into()),
+            kind,
+            ButtonSize::Small,
+            enabled,
+        )
+    }
+
+    /// A view's own menu, in the menus' panel. The caller adds its rows
+    /// and places it.
+    pub(crate) fn menu_panel(&self, id: &'static str) -> Stateful<Div> {
+        self.menu().panel(
+            div()
+                .id(id)
+                .debug_selector(move || id.into())
+                .p(self.at(MENU_PADDING))
+                .flex()
+                .flex_col(),
+        )
+    }
+
+    /// A row of a view's own menu that picks one value: highlighted under the
+    /// pointer or the keys, with the check at its end on the value chosen.
+    /// The caller adds its handlers.
+    pub(crate) fn choice(
+        &self,
+        id: impl Into<ElementId>,
+        selector: String,
+        label: impl Into<SharedString>,
+        highlighted: bool,
+        chosen: bool,
+    ) -> Stateful<Div> {
+        let menu = self.menu();
+        let check = format!("{selector}-check");
+        let label_selector = format!("{selector}-label");
+        menu.row(
+            id,
+            selector,
+            Leading::Empty,
+            ItemState {
+                selected: highlighted,
+                ..ItemState::default()
+            },
+        )
+        .child(menu.label(label_selector, label.into()))
+        .when(chosen, |row| {
+            row.child(
+                svg()
+                    .debug_selector(move || check)
+                    .path("icons/check.svg")
+                    .size(self.at(MENU_CHECK))
+                    .flex_none()
+                    .text_color(self.accent_ink),
+            )
+        })
     }
 
     /// A segmented control's box; its segments are [`Self::segment`].
