@@ -5,6 +5,7 @@ use crate::fonts::StyledFont;
 use crate::{
     HerdrWindow,
     browser::{Slot, Tab, TabId},
+    design::{ButtonKind, ButtonSize, Edge, Tone},
 };
 use gpui::{prelude::*, *};
 use std::{cell::Cell, rc::Rc};
@@ -29,6 +30,16 @@ fn measure(width: Rc<Cell<f32>>) -> impl IntoElement {
     )
     .absolute()
     .inset_0()
+}
+
+/// A shown path as the bar's title and context: the file's name, and the
+/// folder it sits in when there is one.
+pub(super) fn split_path(path: &str) -> (&str, Option<&str>) {
+    match path.rsplit_once('/') {
+        Some(("", name)) => (name, Some("/")),
+        Some((folder, name)) => (name, Some(folder)),
+        None => (path, None),
+    }
 }
 
 impl HerdrWindow {
@@ -83,149 +94,140 @@ impl HerdrWindow {
     }
 
     fn code_outline(&self, id: TabId, text: &Text, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
-        div()
-            .flex_none()
+        let look = self.view_look();
+        look.side_panel("code-outline", Edge::Right)
             .w(px(OUTLINE_WIDTH))
-            .border_l_1()
-            .border_color(rgb(theme.active))
-            .flex()
-            .flex_col()
-            .child(
-                div()
-                    .flex_none()
-                    .px(px(10.))
-                    .py(px(6.))
-                    .text_color(rgb(theme.muted))
-                    .child(format!("Outline \u{00b7} {}", text.outline.len())),
-            )
+            .text_font(&self.config.ui)
+            .child(look.side_header("code-outline-header", "Outline", Some(text.outline.len())))
             .child(
                 uniform_list(
                     "code-outline",
                     text.outline.len(),
                     cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
-                        let Some(text) = this.code_views.get(&id).and_then(CodeView::text) else {
+                        let Some(view) = this.code_views.get(&id) else {
                             return Vec::new();
                         };
-                        let text = text.clone();
+                        let Some(text) = view.text() else {
+                            return Vec::new();
+                        };
+                        let look = this.view_look();
+                        let marked = view.marked;
                         range
                             .filter_map(|index| {
                                 let entry = text.outline.get(index)?;
                                 let line = entry.line;
                                 Some(
-                                    div()
-                                        .id(index)
-                                        .debug_selector(move || format!("code-outline-{index}"))
-                                        .px(px(10.))
-                                        .py(px(2.))
-                                        .flex()
-                                        .gap(px(8.))
-                                        .cursor_pointer()
-                                        .hover(|row| row.bg(rgb(this.theme.active)))
-                                        .child(
-                                            div()
-                                                .flex_1()
-                                                .min_w_0()
-                                                .truncate()
-                                                .child(entry.name.clone()),
-                                        )
-                                        .child(
-                                            div()
-                                                .flex_none()
-                                                .text_color(rgb(this.theme.muted))
-                                                .child(entry.kind.label()),
-                                        )
-                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                    look.row(
+                                        index,
+                                        format!("code-outline-{index}"),
+                                        false,
+                                        marked == Some(line),
+                                    )
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .truncate()
+                                            .child(entry.name.clone()),
+                                    )
+                                    .child(look.settings().chip(
+                                        format!("code-outline-{index}-kind"),
+                                        entry.kind.label(),
+                                        Tone::Merged,
+                                    ))
+                                    .on_click(cx.listener(
+                                        move |this, _, _, cx| {
                                             if let Some(view) = this.code_views.get_mut(&id) {
                                                 view.go_to(line);
                                                 cx.notify();
                                             }
-                                        })),
+                                        },
+                                    )),
                                 )
                             })
                             .collect()
                     }),
                 )
                 .flex_1()
-                .min_h_0(),
+                .min_h_0()
+                .px(look.at(8.)),
             )
     }
 
     fn code_header(&self, id: TabId, tab: &Tab, view: &CodeView, cx: &mut Context<Self>) -> Div {
-        let theme = &self.theme;
+        let look = self.view_look();
+        let settings = look.settings();
         let path = tab
             .location
             .as_ref()
             .map(crate::browser::Location::display)
             .unwrap_or_default();
-        let button = |label: &'static str, selector: &'static str| {
-            div()
-                .id(selector)
-                .debug_selector(move || selector.into())
-                .flex_none()
-                .px_2()
-                .py_1()
-                .rounded(px(crate::config::corners::CONTROL))
-                .cursor_pointer()
-                .hover(|button| button.bg(rgb(theme.active)))
-                .child(label)
-        };
-        div()
-            .flex_none()
-            .px(px(10.))
-            .py(px(6.))
-            .flex()
-            .items_center()
-            .gap(px(8.))
-            .border_b_1()
-            .border_color(rgb(theme.active))
+        let (name, folder) = split_path(&path);
+        look.bar("code-bar")
+            .child(look.bar_title(
+                Some("icons/file.svg"),
+                name.to_owned(),
+                folder.map(|folder| SharedString::from(folder.to_owned())),
+            ))
+            .child(div().flex_1())
             .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .text_color(rgb(theme.muted))
-                    .child(path),
+                settings
+                    .button(
+                        "code-outline-toggle",
+                        "code-outline-toggle".into(),
+                        if view.outline {
+                            "Hide Outline"
+                        } else {
+                            "Outline"
+                        },
+                        if view.outline {
+                            ButtonKind::Lit
+                        } else {
+                            ButtonKind::Normal
+                        },
+                        ButtonSize::Small,
+                        true,
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if let Some(view) = this.code_views.get_mut(&id) {
+                            view.outline = !view.outline;
+                            cx.notify();
+                        }
+                    })),
             )
             .child(
-                button(
-                    if view.outline {
-                        "Hide Outline"
-                    } else {
-                        "Outline"
-                    },
-                    "code-outline-toggle",
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    if let Some(view) = this.code_views.get_mut(&id) {
-                        view.outline = !view.outline;
-                        cx.notify();
-                    }
-                })),
-            )
-            .child(
-                button("Open in Editor", "code-open-editor").on_click(
-                    cx.listener(move |this, _, _, cx| this.open_code_view_in_editor(id, cx)),
-                ),
+                settings
+                    .button(
+                        "code-open-editor",
+                        "code-open-editor".into(),
+                        "Open in Editor",
+                        ButtonKind::Normal,
+                        ButtonSize::Small,
+                        true,
+                    )
+                    .on_click(
+                        cx.listener(move |this, _, _, cx| this.open_code_view_in_editor(id, cx)),
+                    ),
             )
     }
 
     fn render_code(&self, id: TabId, tab: &Tab, cx: &mut Context<Self>) -> AnyElement {
-        let theme = &self.theme;
+        let look = self.view_look();
         let Some(view) = self.code_views.get(&id) else {
             return div().into_any_element();
         };
         let body = match &view.state {
-            State::Loading => div()
-                .p_3()
-                .text_color(rgb(theme.muted))
-                .child("Reading file\u{2026}")
+            State::Loading => look
+                .empty(
+                    "code-reading",
+                    Some("icons/file.svg"),
+                    "Reading file\u{2026}",
+                )
+                .flex_1()
                 .into_any_element(),
             State::Failed(error) => div()
-                .debug_selector(|| "code-error".into())
-                .p_3()
-                .text_color(crate::menu::danger(theme))
-                .child(error.clone())
+                .p(look.at(14.))
+                .child(look.dialog().error("code-error".into(), error.clone()))
                 .into_any_element(),
             State::Loaded(text) => {
                 let digits = text.lines.len().max(1).ilog10() + 1;

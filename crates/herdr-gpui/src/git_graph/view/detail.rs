@@ -4,7 +4,8 @@
 
 use super::{GitGraphView, header::ColumnDrag};
 use crate::{
-    config::{Theme, mix},
+    config::Theme,
+    design::{ButtonKind, Edge, Tone},
     fonts::StyledFont,
     git_graph::{
         detail::{CommitDetail, FileChange, file_counts, file_label},
@@ -26,6 +27,17 @@ const JUMP_PAGES: usize = 10;
 /// The share of the tab the panel may take.
 const PANEL_SHARE: f32 = 0.75;
 const DIFF_LINE_H: f32 = 18.;
+/// The panel's measures at the graph's `[ui]`-sized face of 12: its resize
+/// edge, padding and line height, the captions' column, the subject's size
+/// over the face's names, a hash's text and the author's avatar.
+const RESIZE_EDGE: f32 = 5.;
+const PADDING: f32 = 14.;
+const LINE: f32 = 20.;
+const TERM_WIDTH: f32 = 76.;
+const TITLE_OVER: f32 = 3.;
+const MONO: f32 = 12.;
+const AVATAR: f32 = 22.;
+const AVATAR_TEXT: f32 = 9.;
 
 /// The colour a diff line is tinted with: the theme's green for an added
 /// line, its red for a removed one, its blue for a hunk header.
@@ -336,7 +348,7 @@ impl GitGraphView {
 
     pub(super) fn render_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let panel = self.panel.as_ref()?;
-        let theme = &self.look.theme;
+        let view = self.look.view();
         let edge = div()
             .id("graph-detail-resize")
             .debug_selector(|| "graph-detail-resize".to_owned())
@@ -344,26 +356,27 @@ impl GitGraphView {
             .top_0()
             .left_0()
             .h_full()
-            .w(px(5.))
+            .w(view.at(RESIZE_EDGE))
             .cursor(CursorStyle::ResizeLeftRight)
             .hover(|style| style.bg(rgba(RESIZE_HOVER)))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_drag(ColumnDrag::Panel, |_, _, _, cx| cx.new(|_| EmptyView));
-        let close = div()
-            .id("graph-detail-close")
-            .debug_selector(|| "graph-detail-close".to_owned())
-            .size(px(26.))
-            .rounded(px(4.))
-            .flex()
-            .items_center()
-            .justify_center()
-            .cursor_pointer()
-            .text_color(rgb(theme.subtext()))
-            .hover(|style| style.bg(rgb(theme.active)))
-            .child("\u{00d7}")
+        let close = view
+            .icon_button(
+                "graph-detail-close",
+                "graph-detail-close".to_owned(),
+                "icons/close.svg",
+                false,
+                true,
+            )
             .on_click(cx.listener(|this, _, _, cx| {
                 this.close_detail(cx);
             }));
+        let title = if panel.oid == WORKTREE_OID {
+            "Uncommitted changes"
+        } else {
+            "Commit"
+        };
         let body = match (&panel.detail, &panel.error) {
             _ if panel.oid == WORKTREE_OID => match (&panel.worktree, &panel.error) {
                 (Some(status), _) => self.render_worktree(panel, status, cx),
@@ -381,26 +394,14 @@ impl GitGraphView {
             (None, None) => self.panel_note("Loading commit\u{2026}"),
         };
         Some(
-            div()
+            view.side_panel("graph-detail", Edge::Right)
                 .id("graph-detail")
-                .debug_selector(|| "graph-detail".to_owned())
                 .relative()
-                .flex_none()
                 .w(px(self.panel_width()))
                 .h_full()
-                .flex()
-                .flex_col()
-                .bg(rgb(theme.surface))
-                .border_l_1()
-                .border_color(rgb(theme.active))
-                .line_height(px(20.))
+                .line_height(view.at(LINE))
                 .child(
-                    div()
-                        .flex_none()
-                        .flex()
-                        .justify_end()
-                        .px_2()
-                        .pt_1()
+                    view.side_header("graph-detail-header", title, None)
                         .child(close),
                 )
                 .child(body)
@@ -410,10 +411,11 @@ impl GitGraphView {
     }
 
     pub(super) fn panel_note(&self, text: &str) -> AnyElement {
+        let view = self.look.view();
         div()
-            .px_4()
-            .py_3()
-            .text_color(rgb(self.look.theme.muted))
+            .px(view.at(PADDING))
+            .py(view.at(12.))
+            .text_color(view.muted())
             .child(text.to_owned())
             .into_any_element()
     }
@@ -425,6 +427,7 @@ impl GitGraphView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = &self.look.theme;
+        let view = self.look.view();
         let commit = &detail.commit;
         let now = chrono::Utc::now().timestamp();
         let key = if commit.email.is_empty() {
@@ -435,8 +438,9 @@ impl GitGraphView {
         let term = |label: &str| {
             div()
                 .flex_none()
-                .w(px(76.))
-                .text_color(rgb(theme.muted))
+                .w(view.at(TERM_WIDTH))
+                .text_size(px(view.scale().secondary))
+                .text_color(view.muted())
                 .child(label.to_owned())
         };
         let row = |label: &str, value: AnyElement| {
@@ -449,16 +453,15 @@ impl GitGraphView {
                 .child(div().flex_1().min_w_0().child(value))
         };
         let oid = commit.oid.clone();
-        let copy = div()
-            .id("graph-detail-copy")
-            .px(px(8.))
-            .h(px(20.))
-            .rounded(px(4.))
-            .border_1()
-            .border_color(rgb(theme.active))
-            .cursor_pointer()
-            .text_size(px(11.5))
-            .child("Copy")
+        let copy = view
+            .button(
+                "graph-detail-copy",
+                "graph-detail-copy".to_owned(),
+                Some("icons/copy.svg"),
+                "Copy",
+                ButtonKind::Normal,
+                true,
+            )
             .on_click(move |_, _, cx| {
                 cx.write_to_clipboard(ClipboardItem::new_string(oid.clone()))
             });
@@ -527,16 +530,13 @@ impl GitGraphView {
         let files = div()
             .flex()
             .flex_col()
-            .rounded(px(4.))
-            .overflow_hidden()
-            .bg(rgb(theme.background))
             .children(detail.files.iter().enumerate().map(|(index, file)| {
                 self.render_file(index, file, panel.file == Some(index), true, cx)
             }));
         let info = div()
             .id("graph-detail-info")
-            .px_4()
-            .pb_3()
+            .px(view.at(PADDING))
+            .pb(view.at(12.))
             .flex()
             .flex_col()
             .gap_2()
@@ -546,19 +546,15 @@ impl GitGraphView {
             .when(panel.diff.is_none(), |el| el.flex_1())
             .child(
                 div()
-                    .text_size(px(16.))
+                    .text_size(px(view.scale().name + TITLE_OVER))
                     .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(theme.foreground))
+                    .text_color(view.title())
                     .child(commit.subject.clone()),
             )
             .when(!detail.body.is_empty(), |el| {
                 el.child(
-                    div()
-                        .p_2()
-                        .rounded(px(4.))
-                        .bg(rgb(theme.background))
-                        .text_font(&self.look.mono)
-                        .text_size(px(12.))
+                    view.dialog()
+                        .well("graph-detail-body".to_owned(), Some(&self.look.mono))
                         .whitespace_normal()
                         .child(detail.body.clone()),
                 )
@@ -573,7 +569,7 @@ impl GitGraphView {
                     .child(
                         div()
                             .text_font(&self.look.mono)
-                            .text_size(px(12.))
+                            .text_size(view.at(MONO))
                             .child(commit.oid.clone()),
                     )
                     .child(copy)
@@ -588,14 +584,14 @@ impl GitGraphView {
                     .child(
                         div()
                             .flex_none()
-                            .size(px(22.))
+                            .size(view.at(AVATAR))
                             .rounded_full()
                             .bg(author_colour(key))
                             .flex()
                             .items_center()
                             .justify_center()
                             .text_color(white())
-                            .text_size(px(9.))
+                            .text_size(view.at(AVATAR_TEXT))
                             .font_weight(FontWeight::BOLD)
                             .child(initials(&commit.author)),
                     )
@@ -635,27 +631,30 @@ impl GitGraphView {
                     div()
                         .flex()
                         .flex_wrap()
-                        .gap_1()
-                        .children(labels.into_iter().map(|label| {
-                            div()
-                                .px(px(7.))
-                                .rounded(px(3.))
-                                .bg(rgb(theme.active))
-                                .text_size(px(11.5))
-                                .child(label)
+                        .gap(view.at(4.))
+                        .children(labels.into_iter().enumerate().map(|(index, label)| {
+                            view.settings().chip(
+                                format!("graph-detail-ref-{index}"),
+                                label,
+                                Tone::Neutral,
+                            )
                         }))
                         .into_any_element(),
                 ))
             })
             .child(
                 div()
-                    .mt_2()
+                    .mt(view.at(8.))
                     .flex()
-                    .gap_3()
-                    .text_size(px(11.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(theme.subtext()))
-                    .child(format!("{} FILES", detail.files.len()))
+                    .gap(view.at(10.))
+                    .text_size(px(view.scale().detail))
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(view.muted())
+                    .child(if detail.files.len() == 1 {
+                        "1 file".to_owned()
+                    } else {
+                        format!("{} files", detail.files.len())
+                    })
                     .child(
                         div()
                             .text_color(rgb(theme.ink(theme.palette[2])))
@@ -669,7 +668,7 @@ impl GitGraphView {
             )
             .child(if detail.files.is_empty() {
                 div()
-                    .text_color(rgb(theme.muted))
+                    .text_color(view.muted())
                     .child("This commit changes no files.")
                     .into_any_element()
             } else {
@@ -707,40 +706,37 @@ impl GitGraphView {
             'R' | 'C' => theme.ink(theme.palette[4]),
             _ => theme.ink(theme.palette[3]),
         };
-        div()
-            .id(("graph-file", index))
-            .debug_selector(move || format!("graph-file-{index}"))
-            .h(px(26.))
-            .px_2()
-            .flex()
-            .items_center()
-            .gap_2()
-            .cursor_pointer()
-            .when(chosen, |el| el.bg(rgb(theme.active)))
-            .hover(|style| style.bg(rgb(mix(theme.background, theme.foreground, 6))))
-            .child(
+        let view = self.look.view();
+        view.row(
+            ("graph-file", index),
+            format!("graph-file-{index}"),
+            false,
+            chosen,
+        )
+        .w_full()
+        .child(
+            div()
+                .flex_none()
+                .w(view.at(14.))
+                .text_font(&self.look.mono)
+                .font_weight(FontWeight::BOLD)
+                .text_size(view.at(11.))
+                .text_color(rgb(letter_colour))
+                .child(file.kind.to_string()),
+        )
+        .child(div().flex_1().min_w_0().truncate().child(file_label(file)))
+        .when(counts, |el| {
+            el.child(
                 div()
                     .flex_none()
-                    .w(px(14.))
                     .text_font(&self.look.mono)
-                    .font_weight(FontWeight::BOLD)
-                    .text_size(px(11.))
-                    .text_color(rgb(letter_colour))
-                    .child(file.kind.to_string()),
+                    .text_size(view.at(11.))
+                    .text_color(view.muted())
+                    .child(file_counts(file)),
             )
-            .child(div().flex_1().min_w_0().truncate().child(file_label(file)))
-            .when(counts, |el| {
-                el.child(
-                    div()
-                        .flex_none()
-                        .text_font(&self.look.mono)
-                        .text_size(px(11.))
-                        .text_color(rgb(theme.muted))
-                        .child(file_counts(file)),
-                )
-            })
-            .on_click(cx.listener(move |this, _, _, cx| this.choose_file(index, cx)))
-            .into_any_element()
+        })
+        .on_click(cx.listener(move |this, _, _, cx| this.choose_file(index, cx)))
+        .into_any_element()
     }
 
     pub(super) fn render_diff(

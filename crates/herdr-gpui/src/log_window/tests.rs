@@ -2,6 +2,7 @@ use super::*;
 use core::prelude::v1::test;
 
 mod line_height;
+mod look;
 mod window_commands;
 
 fn records() -> Vec<Arc<Record>> {
@@ -169,14 +170,15 @@ fn narrow_layout_renders_search_and_virtualized_rows(cx: &mut TestAppContext) {
     cx.run_until_parked();
     cx.update(|window, cx| window.draw(cx).clear(cx));
     let search = cx.debug_bounds("theme-search").unwrap();
-    assert!(search.size.width > px(500.));
+    // The field shares the bar with the level and the buttons.
+    assert!(search.size.width > px(200.));
     assert!(search.size.height > px(0.));
     assert!(search.left() >= px(0.) && search.right() <= px(620.));
     let first = cx.debug_bounds("log-row-0").unwrap();
     let tenth = cx.debug_bounds("log-row-10").unwrap();
-    assert_eq!(first.size.height, px(22.));
+    assert_eq!(first.size.height, px(24.));
     assert!(first.top() >= search.bottom());
-    assert_eq!(tenth.top() - first.top(), px(220.));
+    assert_eq!(tenth.top() - first.top(), px(240.));
     assert!(tenth.bottom() < px(650.));
     assert!(cx.debug_bounds("log-row-4999").is_none());
     for selector in ["minimum-level", "follow", "copy", "export"] {

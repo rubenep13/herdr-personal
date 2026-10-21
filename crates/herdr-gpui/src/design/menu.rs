@@ -7,8 +7,8 @@
 use super::{ICON_BUTTON, ICON_BUTTON_RADIUS, SELECTION_RADIUS, TypeScale};
 use crate::config::{FontConfig, Theme, corners};
 use gpui::{
-    BoxShadow, Div, ElementId, FontFeatures, FontWeight, IntoElement, Pixels, Rgba, SharedString,
-    Stateful, Svg, div, hsla, point, prelude::*, px, rgb, svg,
+    AnyView, App, BoxShadow, Div, ElementId, FontFeatures, FontWeight, IntoElement, Pixels, Rgba,
+    SharedString, Stateful, Svg, Window, div, hsla, point, prelude::*, px, rgb, svg,
 };
 
 /// The `[ui]` size the measures below are given at; they grow with the face.
@@ -519,6 +519,26 @@ impl MenuLook {
                     .flex_none()
                     .text_color(self.muted),
             )
+    }
+
+    /// A tooltip saying `text`, for `.tooltip(…)`. It takes the look by
+    /// value, so the closure keeps nothing borrowed.
+    pub(crate) fn tooltip(
+        self,
+        text: impl Into<SharedString>,
+    ) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
+        let tooltip = self.tooltip_card(text);
+        move |_, cx| cx.new(|_| tooltip.clone()).into()
+    }
+
+    pub(super) fn tooltip_card(&self, text: impl Into<SharedString>) -> super::Tooltip {
+        super::Tooltip::new(
+            text.into(),
+            (self.panel, self.line, self.text),
+            self.shadow,
+            self.scale.secondary,
+            self.zoom,
+        )
     }
 
     /// A heading's icon: grey, or the danger red over a destructive action.

@@ -4,7 +4,7 @@ use super::*;
 /// 2), dialogs and the forms a menu turns into theirs (phase 4). Only the
 /// status bar's usage panel keeps the old one, until phase 5.
 #[test]
-fn only_the_usage_panel_keeps_the_old_one() {
+fn no_page_keeps_the_old_panel() {
     let menus = [
         Page::Application,
         Page::CodeSearch,
@@ -84,6 +84,6 @@ fn only_the_usage_panel_keeps_the_old_one() {
         assert_eq!(page.look(), Look::Dialog, "{page:?}");
     }
     for provider in crate::usage::all_providers() {
-        assert_eq!(Page::Usage(provider).look(), Look::Legacy);
+        assert_eq!(Page::Usage(provider).look(), Look::Menu, "{provider:?}");
     }
 }

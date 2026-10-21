@@ -244,6 +244,7 @@ mod find_again;
 mod keys;
 mod layout;
 mod loading;
+mod look;
 mod origin;
 mod panel_editing;
 mod pending_send;

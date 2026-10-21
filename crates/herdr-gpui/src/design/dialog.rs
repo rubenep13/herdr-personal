@@ -359,7 +359,18 @@ impl DialogLook {
 
     /// What went wrong, in full, in a box washed with the danger red.
     pub(crate) fn error(&self, selector: String, text: impl Into<SharedString>) -> Div {
-        let mark = self.mark(format!("{selector}-icon"), "icons/alert.svg", self.danger);
+        self.boxed(selector, text, self.danger, self.error_fill())
+    }
+
+    /// Something that may get in the way, in full, in the same box washed
+    /// with the warning yellow.
+    pub(crate) fn warning(&self, selector: String, text: impl Into<SharedString>) -> Div {
+        let (ink, fill) = self.settings.tone(super::Tone::Warn);
+        self.boxed(selector, text, ink, fill)
+    }
+
+    fn boxed(&self, selector: String, text: impl Into<SharedString>, ink: Rgba, fill: Rgba) -> Div {
+        let mark = self.mark(format!("{selector}-icon"), "icons/alert.svg", ink);
         div()
             .debug_selector(move || selector)
             .min_w_0()
@@ -369,9 +380,9 @@ impl DialogLook {
             .px(self.at(ERROR_PADDING_X))
             .py(self.at(ERROR_PADDING_Y))
             .rounded(self.at(RADIUS))
-            .bg(self.error_fill())
+            .bg(fill)
             .text_size(px(self.scale.name - 0.5))
-            .text_color(self.danger)
+            .text_color(ink)
             .child(mark)
             .child(div().flex_1().min_w_0().child(text.into()))
     }

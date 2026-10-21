@@ -21,11 +21,13 @@ use std::{
 
 fn look() -> GraphLook {
     let config = crate::config::Config::default();
-    GraphLook {
-        theme: Default::default(),
-        ui: config.ui.clone(),
-        mono: config.terminal.clone(),
-    }
+    GraphLook::new(
+        Default::default(),
+        config.ui.clone(),
+        config.terminal.clone(),
+        false,
+        &config.ui,
+    )
 }
 
 fn local() -> Result<Host, Error> {

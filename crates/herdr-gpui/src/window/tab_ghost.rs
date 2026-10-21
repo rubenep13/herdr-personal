@@ -9,6 +9,7 @@ use super::HerdrWindow;
 use crate::{
     browser::{GroupId, Pick},
     config::FontConfig,
+    design::MenuLook,
     fonts::StyledFont,
 };
 use gpui::{prelude::*, *};
@@ -37,31 +38,29 @@ pub(super) struct Ghost {
 #[derive(Clone)]
 pub(super) struct Card {
     label: SharedString,
-    background: u32,
-    text: u32,
-    border: u32,
+    /// The menus' look, whose panel the card wears.
+    look: MenuLook,
     font: FontConfig,
-    hint_size: f32,
     /// Whether to say a drop opens a new window.
     pub(super) outside: bool,
 }
 
 impl Card {
     pub(super) fn render(&self) -> Div {
-        div()
+        let look = self.look;
+        look.panel(div())
             .debug_selector(|| "tab-ghost".into())
             .flex()
             .flex_col()
-            .gap(px(2.))
+            .gap(look.at(2.))
             .max_w(px(MAX_WIDTH))
-            .px(px(12.))
-            .py(px(6.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .bg(rgb(self.background))
-            .border_1()
-            .border_color(rgb(self.border))
-            .shadow_lg()
-            .text_color(rgb(self.text))
+            .px(look.at(12.))
+            .py(look.at(6.))
+            .rounded(look.at(crate::window::find::SMALL_PANEL_RADIUS))
+            .text_color(look.ink(crate::design::ItemState {
+                selected: true,
+                ..Default::default()
+            }))
             .text_font(&self.font)
             .text_size(px(self.font.size))
             .child(div().truncate().child(self.label.clone()))
@@ -69,8 +68,8 @@ impl Card {
                 card.child(
                     div()
                         .debug_selector(|| "tab-ghost-new-window".into())
-                        .text_size(px(self.hint_size))
-                        .opacity(0.8)
+                        .text_size(px(look.scale().detail))
+                        .text_color(look.muted())
                         .child("Release to open in a new window"),
                 )
             })
@@ -117,14 +116,10 @@ impl HerdrWindow {
                 .into_iter()
                 .find_map(|(page, label)| (page == ghost.pick).then_some(label)),
         }?;
-        let (background, text) = self.tab_colors(true, ghost.group);
         Some(Card {
             label,
-            background,
-            text,
-            border: self.theme.active,
+            look: self.menu_look(),
             font: self.config.tabs.clone(),
-            hint_size: self.config.ui.size * 0.85,
             outside: ghost.outside,
         })
     }

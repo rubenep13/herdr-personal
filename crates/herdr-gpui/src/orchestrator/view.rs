@@ -206,12 +206,15 @@ impl OrchestratorView {
         let message = cx.new(|cx| {
             let mut input = SearchInput::new(cx);
             input.set_placeholder("Send a message to the agent\u{2026}", cx);
+            // Its field draws the frame.
+            input.set_frameless(cx);
             input.set_appearance(look.ui.clone(), look.theme.clone(), cx);
             input
         });
         let comment = cx.new(|cx| {
             let mut input = SearchInput::new(cx);
             input.set_placeholder("Leave a comment\u{2026}", cx);
+            input.set_frameless(cx);
             input.set_appearance(look.ui.clone(), look.theme.clone(), cx);
             input
         });
@@ -378,11 +381,16 @@ impl OrchestratorView {
     }
 
     pub(crate) fn set_look(&mut self, look: Look, cx: &mut Context<Self>) {
+        // Herdr's own settings, and so the status colours, can arrive after
+        // the tab is built with the theme unchanged.
         if look.theme == self.look.theme
             && look.ui.family == self.look.ui.family
             && look.ui.size == self.look.ui.size
             && look.mono.family == self.look.mono.family
             && look.mono.size == self.look.mono.size
+            && look.indicators == self.look.indicators
+            && look.light == self.look.light
+            && look.view() == self.look.view()
         {
             return;
         }

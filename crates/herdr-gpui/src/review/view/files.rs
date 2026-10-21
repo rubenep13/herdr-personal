@@ -10,11 +10,27 @@ use crate::browser::TabId;
 use crate::{
     HerdrWindow,
     config::Theme,
+    design::{Edge, Tone},
     panel_resize::PanelDrag,
     review::diff::{Anchor, Body, FileDiff, RowId, Status},
 };
 use gpui::{prelude::*, *};
 use std::collections::HashMap;
+
+/// A file's change as a chip says it: edited in yellow, new in green, gone
+/// in red and moved in the accent.
+pub(super) fn status_tone(status: Status) -> Tone {
+    match status {
+        Status::Modified => Tone::Warn,
+        Status::Added | Status::Untracked => Tone::Good,
+        Status::Deleted => Tone::Danger,
+        Status::Renamed => Tone::Accent,
+    }
+}
+
+/// A row's padding, and how far each folder level indents it.
+const ROW_PADDING: f32 = 10.;
+const DEPTH_INDENT: f32 = 12.;
 
 /// The letter a file's change shows as, and its colour.
 fn status(theme: &Theme, status: Status) -> (&'static str, u32) {
@@ -188,10 +204,10 @@ impl HerdrWindow {
         &self,
         id: TabId,
         review: &Review,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
-        let line_height = self.config.ui.line_height() + 8.;
+        let look = self.view_look();
         let count = review.shown.len();
         let files = review.loaded().map_or(0, |loaded| loaded.diff.files.len());
         // Keeps the file at the top of the diff in view in the list.
@@ -207,21 +223,9 @@ impl HerdrWindow {
                     .scroll_to_item(line, ScrollStrategy::Nearest);
             }
         }
-        let hide = div()
-            .id("review-hide-viewed")
-            .debug_selector(|| "review-hide-viewed".into())
-            .flex_none()
-            .px_1()
-            .rounded(px(crate::config::corners::CONTROL))
-            .cursor_pointer()
-            .text_color(rgb(if review.hide_viewed {
-                theme.foreground
-            } else {
-                theme.muted
-            }))
-            .when(review.hide_viewed, |button| button.bg(rgb(theme.active)))
-            .hover(|button| button.bg(rgb(theme.active)))
-            .child("Hide viewed")
+        let hide = look
+            .dialog()
+            .checkbox("review-hide-viewed", "Hide viewed", review.hide_viewed)
             .on_click(cx.listener(move |this, _, _, cx| {
                 if let Some(review) = this.reviews.get_mut(&id) {
                     review.hide_viewed = !review.hide_viewed;
@@ -229,16 +233,12 @@ impl HerdrWindow {
                 }
                 cx.notify();
             }));
-        let panel = div()
+        let filtering = review.filter.read(cx).focus.is_focused(window);
+        let panel = look
+            .side_panel("review-files", Edge::Left)
             .id("review-files")
-            .debug_selector(|| "review-files".into())
             .track_focus(&review.files_focus)
-            .flex_none()
             .h_full()
-            .flex()
-            .flex_col()
-            .border_r_1()
-            .border_color(rgb(theme.active))
             .on_key_down(cx.listener(move |this, event: &KeyDownEvent, window, cx| {
                 let Some(filter) = this.reviews.get(&id).map(|review| review.filter.read(cx))
                 else {
@@ -251,54 +251,32 @@ impl HerdrWindow {
                     cx.stop_propagation();
                 }
             }))
+            .child(look.side_header("review-files-header", "Changed files", Some(files)))
             .child(
                 div()
+                    .px(look.at(8.))
+                    .pb(look.at(8.))
                     .flex()
-                    .items_center()
-                    .gap_1()
-                    .px_2()
-                    .py_1()
-                    .text_color(rgb(theme.muted))
-                    .child(div().flex_1().min_w_0().truncate().child(if files == 1 {
-                        "1 file changed".to_owned()
-                    } else {
-                        format!("{files} files changed")
-                    }))
-                    .child(hide),
-            )
-            .child(
-                div()
-                    .id("review-filter")
-                    .debug_selector(|| "review-filter".into())
-                    .mx_2()
-                    .mb_1()
-                    .px_1()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .border_1()
-                    .border_color(rgb(theme.active))
+                    .flex_col()
+                    .gap(look.at(8.))
                     .child(
-                        svg()
-                            .path("icons/search.svg")
-                            .flex_none()
-                            .size(px(12.))
-                            .text_color(rgb(theme.muted)),
+                        look.field("review-filter".into(), filtering, Some("icons/search.svg"))
+                            .child(div().flex_1().min_w_0().child(review.filter.clone())),
                     )
-                    .child(div().flex_1().min_w_0().child(review.filter.clone())),
+                    .child(hide.pl(look.at(4.))),
             )
             .child(
                 uniform_list(
                     "review-file-list",
                     count,
                     cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
-                        this.review_file_rows(id, range, line_height, cx)
+                        this.review_file_rows(id, range, cx)
                     }),
                 )
                 .track_scroll(&review.files_scroll)
                 .flex_1()
-                .min_h_0(),
+                .min_h_0()
+                .px(look.at(8.)),
             );
         self.resizable_panel(
             panel,
@@ -313,7 +291,6 @@ impl HerdrWindow {
         &mut self,
         id: TabId,
         range: std::ops::Range<usize>,
-        line_height: f32,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         let theme = &self.theme;
@@ -329,51 +306,56 @@ impl HerdrWindow {
             let (Anchor::File { path } | Anchor::Line { path, .. }) = &note.anchor;
             *notes.entry(path.as_str()).or_default() += 1;
         }
+        let look = self.view_look();
         range
             .filter_map(|line| {
                 let node_index = *review.shown.get(line)?;
                 let node = review.tree.nodes.get(node_index)?;
-                // Each line spans the list, so the current file's band does.
-                let row = div()
-                    .w_full()
-                    .h(px(line_height))
-                    .pr_2()
-                    .pl(px(8. + 12. * node.depth() as f32))
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .whitespace_nowrap()
-                    .overflow_hidden()
-                    .cursor_pointer()
-                    .rounded(px(crate::config::corners::CONTROL))
-                    .when(review.picked == Some(line), |row| {
-                        row.border_1().border_color(rgb(theme.muted))
-                    })
-                    .hover(|row| row.bg(rgb(theme.active)));
+                let indent = look.at(ROW_PADDING + DEPTH_INDENT * node.depth() as f32);
+                // The line the keys picked keeps a ring, whatever its fill.
+                let picked = |row: Stateful<Div>| {
+                    row.pl(indent)
+                        .w_full()
+                        .when(review.picked == Some(line), |row| {
+                            row.border_1().border_color(rgb(theme.muted))
+                        })
+                };
                 Some(match node {
                     Node::Folder { path, label, .. } => {
                         let closed = review.closed.contains(path);
-                        row.id(("review-folder", node_index))
-                            .debug_selector(move || format!("review-folder-{node_index}"))
-                            .text_color(rgb(theme.muted))
-                            .child(
-                                svg()
-                                    .path(if closed {
-                                        "icons/chevron-right.svg"
-                                    } else {
-                                        "icons/chevron-down.svg"
-                                    })
-                                    .flex_none()
-                                    .size(px(10.))
-                                    .text_color(rgb(theme.muted)),
-                            )
-                            .child(div().min_w_0().truncate().child(label.clone()))
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.pick_review_file(id, line, window, cx);
-                                this.toggle_review_folder(id, node_index, cx);
-                            }))
-                            .into_any_element()
+                        picked(look.row(
+                            ("review-folder", node_index),
+                            format!("review-folder-{node_index}"),
+                            false,
+                            false,
+                        ))
+                        .gap(look.at(6.))
+                        .text_color(look.muted())
+                        .child(
+                            svg()
+                                .path(if closed {
+                                    "icons/chevron-right.svg"
+                                } else {
+                                    "icons/chevron-down.svg"
+                                })
+                                .flex_none()
+                                .size(look.at(12.))
+                                .text_color(look.muted()),
+                        )
+                        .child(
+                            svg()
+                                .path("icons/folder.svg")
+                                .flex_none()
+                                .size(look.at(14.))
+                                .text_color(look.muted()),
+                        )
+                        .child(div().min_w_0().truncate().child(label.clone()))
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.pick_review_file(id, line, window, cx);
+                            this.toggle_review_folder(id, node_index, cx);
+                        }))
+                        .into_any_element()
                     }
                     Node::File { file, .. } => {
                         let file = *file;
@@ -388,46 +370,45 @@ impl HerdrWindow {
                         let noted = notes.get(entry.path.as_str()).copied().unwrap_or(0);
                         let viewed = review.is_viewed(file);
                         let dim = viewed || entry.body == Body::Binary;
-                        row.id(("review-file", file))
-                            .debug_selector(move || format!("review-file-{file}"))
-                            .when(current == Some(file), |row| row.bg(rgb(theme.active)))
-                            .text_color(rgb(if dim { theme.muted } else { theme.foreground }))
-                            .child(
-                                div()
+                        picked(look.row(
+                            ("review-file", file),
+                            format!("review-file-{file}"),
+                            false,
+                            current == Some(file),
+                        ))
+                        .gap(look.at(6.))
+                        .when(dim, |row| row.text_color(look.muted()))
+                        .child(
+                            div()
+                                .flex_none()
+                                .w(look.at(12.))
+                                .text_color(rgb(colour))
+                                .child(letter),
+                        )
+                        .child(div().flex_1().min_w_0().truncate().child(name))
+                        .when(noted > 0, |row| {
+                            row.child(look.settings().chip(
+                                format!("review-file-{file}-notes"),
+                                noted.to_string(),
+                                Tone::Warn,
+                            ))
+                        })
+                        .when(viewed, |row| {
+                            row.child(
+                                svg()
+                                    .path("icons/check.svg")
                                     .flex_none()
-                                    .w(px(12.))
-                                    .text_color(rgb(colour))
-                                    .child(letter),
+                                    .size(look.at(12.))
+                                    .text_color(look.muted()),
                             )
-                            .child(div().flex_1().min_w_0().truncate().child(name))
-                            .when(noted > 0, |row| {
-                                row.child(
-                                    div()
-                                        .flex_none()
-                                        .px_1()
-                                        .rounded_full()
-                                        .bg(rgb(theme.palette[3]))
-                                        .text_color(rgb(theme.text_on(theme.palette[3])))
-                                        .text_size(px(10.))
-                                        .child(noted.to_string()),
-                                )
-                            })
-                            .when(viewed, |row| {
-                                row.child(
-                                    svg()
-                                        .path("icons/check.svg")
-                                        .flex_none()
-                                        .size(px(10.))
-                                        .text_color(rgb(theme.muted)),
-                                )
-                            })
-                            .child(counts(theme, entry))
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                cx.stop_propagation();
-                                this.pick_review_file(id, line, window, cx);
-                                this.jump_to_review_file(id, file, cx);
-                            }))
-                            .into_any_element()
+                        })
+                        .child(counts(theme, entry))
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.pick_review_file(id, line, window, cx);
+                            this.jump_to_review_file(id, file, cx);
+                        }))
+                        .into_any_element()
                     }
                 })
             })

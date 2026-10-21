@@ -691,12 +691,14 @@ impl Render for HerdrWindow {
                             self.render_code_tab(slot, &tab, cx)
                         }
                         Some(crate::browser::Location::Devices) => {
-                            self.render_devices_tab(slot, &tab, cx)
+                            self.render_devices_tab(slot, &tab, window, cx)
                         }
-                        _ => self.render_review_tab(slot, &tab, cx),
+                        _ => self.render_review_tab(slot, &tab, window, cx),
                     }
                 }
-                (Shown::Page(_), Some(tab)) => self.render_browser(slot, &tab, owns_keyboard, cx),
+                (Shown::Page(_), Some(tab)) => {
+                    self.render_browser(slot, &tab, owns_keyboard, window, cx)
+                }
                 (Shown::Elsewhere(tab), _) => match self.live_frame_of(tab, window_frame.clone()) {
                     Some(frame) => self.render_terminal_mirror(
                         slot,

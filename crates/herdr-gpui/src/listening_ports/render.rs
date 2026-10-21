@@ -31,6 +31,7 @@ impl HerdrWindow {
                     (endpoint, workspace),
                     &self.tunnels,
                     &self.theme,
+                    self.menu_look(),
                     14.,
                     cx,
                 )),
@@ -86,10 +87,11 @@ pub(crate) fn chips(
     (endpoint, workspace): (&str, &str),
     tunnels: &super::Tunnels,
     theme: &Theme,
+    look: crate::design::MenuLook,
     glyph: f32,
     cx: &mut Context<HerdrWindow>,
 ) -> Div {
-    let (muted, foreground, surface) = (theme.muted, theme.foreground, theme.surface);
+    let (muted, foreground) = (theme.muted, theme.foreground);
     div()
         .flex()
         .items_center()
@@ -112,14 +114,7 @@ pub(crate) fn chips(
                 .flex_none()
                 .text_color(rgb(muted))
                 .child(format!(":{}", port.number))
-                .tooltip(move |_, cx| {
-                    cx.new(|_| crate::usage::Hint {
-                        text: hint.clone(),
-                        foreground,
-                        surface,
-                    })
-                    .into()
-                });
+                .tooltip(look.tooltip(hint));
             let Some(link) = link else {
                 return div().flex_none().child(chip);
             };
@@ -129,6 +124,7 @@ pub(crate) fn chips(
                     key,
                     glyph,
                     theme,
+                    look,
                     cx,
                 )),
                 _ => None,
@@ -158,9 +154,10 @@ pub(crate) fn close_button(
     key: &Key,
     glyph: f32,
     theme: &Theme,
+    look: crate::design::MenuLook,
     cx: &mut Context<HerdrWindow>,
 ) -> Stateful<Div> {
-    let (muted, foreground, surface) = (theme.muted, theme.foreground, theme.surface);
+    let (muted, surface) = (theme.muted, theme.surface);
     let hint = SharedString::from(format!(
         "Close the SSH tunnel to {}:{}",
         key.target, key.port
@@ -178,14 +175,7 @@ pub(crate) fn close_button(
                 .text_color(rgb(muted)),
         )
         .hover(|style| style.bg(rgb(surface)))
-        .tooltip(move |_, cx| {
-            cx.new(|_| crate::usage::Hint {
-                text: hint.clone(),
-                foreground,
-                surface,
-            })
-            .into()
-        })
+        .tooltip(look.tooltip(hint))
         .on_click(cx.listener(move |this, _, _, cx| {
             cx.stop_propagation();
             if this.tunnels.close(&key) {

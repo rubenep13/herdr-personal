@@ -4,7 +4,6 @@
 
 use super::GitGraphView;
 use crate::{
-    config::mix,
     fonts::StyledFont,
     git_graph::{
         search::{SearchHit, results_label},
@@ -26,6 +25,16 @@ pub(super) struct Search {
     index: Option<usize>,
     failed: bool,
 }
+
+/// The open search's field, and the results' panel and columns, at the
+/// graph's `[ui]`-sized face of 12.
+const FIELD_WIDTH: f32 = 240.;
+const RESULTS_INSET: f32 = 12.;
+const RESULTS_WIDTH: f32 = 560.;
+const RESULTS_HEIGHT: f32 = 320.;
+const HASH_WIDTH: f32 = 60.;
+const AUTHOR_WIDTH: f32 = 120.;
+const DATE_WIDTH: f32 = 96.;
 
 impl GitGraphView {
     /// Opens the field, focused.
@@ -136,9 +145,9 @@ impl GitGraphView {
     }
 
     /// The field and what it found, for the top bar; `None` when closed.
-    pub(super) fn render_search_field(&self) -> Option<AnyElement> {
+    pub(super) fn render_search_field(&self, focused: bool) -> Option<AnyElement> {
         let search = self.search.as_ref()?;
-        let theme = &self.look.theme;
+        let view = self.look.view();
         let count = match (&search.hits, search.query.is_empty()) {
             _ if search.failed => "Search failed".into(),
             (Some(hits), _) => results_label(hits.len(), search.more),
@@ -146,37 +155,25 @@ impl GitGraphView {
             (None, true) => String::new(),
         };
         Some(
-            div()
-                .flex_none()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
+            view.field(
+                "graph-search-input".to_owned(),
+                focused,
+                Some("icons/search.svg"),
+            )
+            .w(view.at(FIELD_WIDTH))
+            .flex_shrink(1.)
+            .child(div().flex_1().min_w_0().child(self.search_input.clone()))
+            .when(!count.is_empty(), |field| {
+                field.child(
                     div()
-                        .debug_selector(|| "graph-search-input".to_owned())
-                        .w(px(240.))
-                        .h(px(26.))
-                        .px_2()
-                        .flex()
-                        .items_center()
-                        .rounded(px(4.))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .bg(rgb(theme.background))
-                        .line_height(px(20.))
-                        .child(self.search_input.clone()),
+                        .debug_selector(|| "graph-search-count".to_owned())
+                        .flex_none()
+                        .text_size(px(view.scale().secondary))
+                        .text_color(view.muted())
+                        .child(count),
                 )
-                .when(!count.is_empty(), |el| {
-                    el.child(
-                        div()
-                            .debug_selector(|| "graph-search-count".to_owned())
-                            .flex_none()
-                            .text_size(px(11.5))
-                            .text_color(rgb(theme.muted))
-                            .child(count),
-                    )
-                })
-                .into_any_element(),
+            })
+            .into_any_element(),
         )
     }
 
@@ -189,87 +186,73 @@ impl GitGraphView {
             .as_ref()
             .filter(|hits| !hits.is_empty())?
             .clone();
-        let theme = &self.look.theme;
+        let view = self.look.view();
         let now = chrono::Utc::now().timestamp();
         let rows = hits.iter().enumerate().map(|(index, hit)| {
             let chosen = search.index == Some(index);
-            div()
-                .id(("graph-search-result", index))
-                .debug_selector(move || format!("graph-search-result-{index}"))
-                .h(px(28.))
-                .px_2()
-                .flex()
-                .items_center()
-                .gap_2()
-                .whitespace_nowrap()
-                .cursor_pointer()
-                .rounded(px(4.))
-                .when(chosen, |el| el.bg(rgb(theme.active)))
-                .hover(|style| style.bg(rgb(theme.active)))
-                .child(
-                    div()
-                        .flex_none()
-                        .w(px(60.))
-                        .text_font(&self.look.mono)
-                        .text_size(px(11.5))
-                        .text_color(rgb(theme.subtext()))
-                        .child(hit.oid.chars().take(7).collect::<String>()),
-                )
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .truncate()
-                        .child(hit.subject.clone()),
-                )
-                .child(
-                    div()
-                        .flex_none()
-                        .w(px(120.))
-                        .truncate()
-                        .text_color(rgb(theme.muted))
-                        .child(hit.author.clone()),
-                )
-                .child(
-                    div()
-                        .flex_none()
-                        .w(px(96.))
-                        .truncate()
-                        .text_color(rgb(theme.muted))
-                        .child(relative_time(hit.authored, now)),
-                )
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    if let Some(search) = this.search.as_mut() {
-                        search.index = Some(index);
-                    }
-                    if let Some(hit) = this
-                        .search
-                        .as_ref()
-                        .and_then(|search| search.hits.as_ref()?.get(index).cloned())
-                    {
-                        this.jump_to(&hit.oid, cx);
-                    }
-                }))
+            view.row(
+                ("graph-search-result", index),
+                format!("graph-search-result-{index}"),
+                false,
+                chosen,
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(view.at(HASH_WIDTH))
+                    .text_font(&self.look.mono)
+                    .text_size(px(view.scale().detail))
+                    .text_color(view.text())
+                    .child(hit.oid.chars().take(7).collect::<String>()),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .child(hit.subject.clone()),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(view.at(AUTHOR_WIDTH))
+                    .truncate()
+                    .text_size(px(view.scale().secondary))
+                    .text_color(view.muted())
+                    .child(hit.author.clone()),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .w(view.at(DATE_WIDTH))
+                    .truncate()
+                    .text_size(px(view.scale().secondary))
+                    .text_color(view.muted())
+                    .child(relative_time(hit.authored, now)),
+            )
+            .on_click(cx.listener(move |this, _, _, cx| {
+                if let Some(search) = this.search.as_mut() {
+                    search.index = Some(index);
+                }
+                if let Some(hit) = this
+                    .search
+                    .as_ref()
+                    .and_then(|search| search.hits.as_ref()?.get(index).cloned())
+                {
+                    this.jump_to(&hit.oid, cx);
+                }
+            }))
         });
         Some(
             deferred(
-                div()
-                    .id("graph-search-results")
+                view.menu_panel("graph-search-results")
                     .occlude()
                     .absolute()
                     .top(px(top))
-                    .right(px(12.))
-                    .w(px(560.))
-                    .max_h(px(320.))
+                    .right(view.at(RESULTS_INSET))
+                    .w(view.at(RESULTS_WIDTH))
+                    .max_h(view.at(RESULTS_HEIGHT))
                     .overflow_y_scroll()
-                    .p_1()
-                    .rounded(px(6.))
-                    .border_1()
-                    .border_color(rgb(theme.active))
-                    .bg(rgb(mix(theme.surface, theme.foreground, 4)))
-                    .shadow_lg()
-                    .text_size(px(12.5))
-                    .line_height(px(28.))
                     .children(rows),
             )
             .into_any_element(),

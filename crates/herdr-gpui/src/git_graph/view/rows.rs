@@ -11,7 +11,6 @@ use crate::{
         model::{Commit, CommitKind},
         text::{full_date, relative_time},
     },
-    usage::Hint,
 };
 use gpui::{prelude::*, *};
 
@@ -20,23 +19,6 @@ use gpui::{prelude::*, *};
 const MESSAGE_TINT: u32 = 9;
 const MESSAGE_HOVER: u32 = 15;
 const MESSAGE_SELECTED: u32 = 30;
-
-/// Text shown on hover.
-fn hint(
-    text: impl Into<SharedString>,
-    foreground: u32,
-    surface: u32,
-) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
-    let text = text.into();
-    move |_, cx| {
-        cx.new(|_| Hint {
-            text: text.clone(),
-            foreground,
-            surface,
-        })
-        .into()
-    }
-}
 
 impl GitGraphView {
     /// The optional columns that are on, with their header and width.
@@ -257,7 +239,7 @@ impl GitGraphView {
                     .child(commit.description.clone()),
             )
         })
-        .tooltip(hint(text, theme.foreground, theme.surface))
+        .tooltip(self.look.view().menu().tooltip(text))
         .into_any_element()
     }
 
@@ -295,7 +277,7 @@ impl GitGraphView {
                     })
                     .child(text)
                     .when(!title.is_empty(), |cell| {
-                        cell.tooltip(hint(title, theme.foreground, theme.surface))
+                        cell.tooltip(self.look.view().menu().tooltip(title))
                     })
                     .into_any_element()
             })
@@ -323,7 +305,7 @@ impl GitGraphView {
             .text_size(px(11.))
             .line_height(px(18.))
             .child(when.to_owned())
-            .tooltip(hint(full_date(at), theme.foreground, theme.surface))
+            .tooltip(self.look.view().menu().tooltip(full_date(at)))
             .into_any_element()
     }
 }

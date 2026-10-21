@@ -12,11 +12,15 @@ use crate::{
     HerdrWindow,
     browser::{Slot, TabId},
     config::mix,
+    design::ButtonKind,
 };
 use gpui::{prelude::*, *};
 use herdr_client::protocol::AgentStatus;
 
 const BARS_HEIGHT: f32 = 64.;
+/// The card's padding and its title row, at `[ui] size = 12`.
+const CARD_PADDING: f32 = 14.;
+const CARD_HEADER: f32 = 44.;
 const LANE_HEIGHT: f32 = 12.;
 /// The labels left of the lanes and the counts right of them, so the bars
 /// and every lane share one time axis.
@@ -97,33 +101,19 @@ pub(super) fn activity(
                 .text_color(rgb(theme.muted))
                 .child(format!("peak {peak} in 2 h")),
         );
-    let toggle = div()
-        .id(SharedString::from(slot.selector("devices-lanes-toggle")))
-        .debug_selector(move || slot.selector("devices-lanes-toggle"))
-        .flex()
-        .items_center()
-        .gap_1()
-        .px_2()
-        .py(px(2.))
-        .rounded(px(crate::config::corners::CONTROL))
-        .cursor_pointer()
-        .text_size(look.small())
-        .text_color(rgb(theme.subtext()))
-        .hover(|style| style.bg(rgb(theme.active)))
-        .child(if lanes {
-            "Hide devices"
-        } else {
-            "View all devices"
-        })
-        .child(
-            svg()
-                .size(px(11.))
-                .path(if lanes {
-                    "icons/chevron-up.svg"
-                } else {
-                    "icons/chevron-down.svg"
-                })
-                .text_color(rgb(theme.muted)),
+    let view = look.view;
+    let toggle = view
+        .button(
+            SharedString::from(slot.selector("devices-lanes-toggle")),
+            slot.selector("devices-lanes-toggle"),
+            None,
+            if lanes {
+                "Hide devices"
+            } else {
+                "View all devices"
+            },
+            ButtonKind::Normal,
+            true,
         )
         .on_click(cx.listener(move |this, _, _, cx| {
             if let Some(page) = this.devices_overview.pages.get_mut(&id) {
@@ -135,35 +125,19 @@ pub(super) fn activity(
         .flex()
         .justify_between()
         .children(["2 h ago", "1 h ago", "now"].map(|label| look.mono(label)));
-    look.panel()
-        .debug_selector(move || slot.selector("devices-activity"))
-        .p_3()
+    let body = div()
+        .px(view.at(CARD_PADDING))
+        .pb(view.at(CARD_PADDING))
         .flex()
         .flex_col()
-        .gap_2()
-        .child(
-            div()
-                .flex()
-                .flex_wrap()
-                .items_center()
-                .gap_3()
-                .child(
-                    div()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child("Agent activity"),
-                )
-                .child(look.mono("last 2 h"))
-                .child(div().flex_1())
-                .child(look.legend()),
-        )
+        .gap(view.at(8.))
         .child(row(
             summary,
             bars(padded(totals), peak, [working, blocked], theme, BARS_HEIGHT),
             None,
         ))
-        .when(lanes, |panel| {
-            panel
-                .child(div().h(px(1.)).bg(rgb(theme.active)))
+        .when(lanes, |body| {
+            body.child(div().h(px(1.)).bg(view.line()))
                 .children(shown.iter().map(|device| {
                     let lane = history.lane(&device.id);
                     row(
@@ -191,16 +165,24 @@ pub(super) fn activity(
                     )
                 }))
         })
-        .child(row(div(), axis.into_any_element(), None))
-        .child(row(
-            div(),
-            div()
-                .flex()
-                .justify_center()
-                .child(toggle)
-                .into_any_element(),
-            None,
-        ))
+        .child(row(div(), axis.into_any_element(), None));
+    view.settings()
+        .card(slot.selector("devices-activity"))
+        .child(
+            view.card_header("devices-activity-header", "Agent activity")
+                // A narrow tab wraps the legend and the button under the
+                // title rather than cutting them.
+                .h_auto()
+                .min_h(view.at(CARD_HEADER))
+                .py(view.at(6.))
+                .flex_wrap()
+                .whitespace_normal()
+                .child(look.mono("last 2 h"))
+                .child(div().flex_1())
+                .child(look.legend())
+                .child(toggle),
+        )
+        .child(body)
 }
 
 /// Every device's agents for the last two hours as a small chart, for the

@@ -5,7 +5,8 @@ use super::{Device, Link, Tally, chart, table};
 use crate::{
     HerdrWindow,
     browser::{Slot, Tab},
-    config::{Theme, corners},
+    config::Theme,
+    design::{ButtonKind, ViewLook},
     fonts::StyledFont,
     sidebar::Indicators,
 };
@@ -19,7 +20,20 @@ pub(crate) struct Look<'a> {
     pub ui: &'a crate::config::FontConfig,
     pub mono: &'a crate::config::FontConfig,
     pub indicators: Indicators,
+    /// The redesigned views' pieces the page builds from.
+    pub view: ViewLook,
 }
+
+/// The page's margins and the room between its blocks, at `[ui] size = 12`.
+const PAGE_PADDING_X: f32 = 22.;
+const PAGE_PADDING_Y: f32 = 18.;
+const BLOCK_GAP: f32 = 14.;
+/// The search field's width when the bar has room for it.
+const SEARCH_WIDTH: f32 = 240.;
+const TOTAL_PADDING: f32 = 14.;
+const TOTAL_GAP: f32 = 4.;
+/// A total's figure, this much over the `[ui]` size.
+const FIGURE_OVER: f32 = 10.;
 
 impl Look<'_> {
     pub fn small(&self) -> Pixels {
@@ -42,44 +56,19 @@ impl Look<'_> {
 
     /// A status dot as the sidebar draws it: idle hollow, the rest filled.
     pub fn dot(&self, status: AgentStatus) -> Div {
-        let color = self.status(status);
-        let dot = div().flex_none().size(px(7.)).rounded_full();
-        if status == AgentStatus::Idle {
-            dot.border_1().border_color(rgb(color))
-        } else {
-            dot.bg(rgb(color))
-        }
+        self.view
+            .status_dot(self.status(status), status == AgentStatus::Idle)
     }
 
     pub fn link(&self, link: Link) -> Div {
-        div()
-            .flex_none()
-            .size(px(7.))
-            .rounded_full()
-            .bg(rgb(match link {
+        self.view.status_dot(
+            match link {
                 Link::Online => crate::menu::online(self.theme),
                 Link::Connecting => self.status(AgentStatus::Working),
                 Link::Offline | Link::Disabled => self.theme.muted,
-            }))
-    }
-
-    pub fn panel(&self) -> Div {
-        div()
-            .flex_none()
-            .rounded(px(corners::PANEL))
-            .border_1()
-            .border_color(rgb(self.theme.active))
-            .bg(rgb(self.theme.surface))
-            .overflow_hidden()
-    }
-
-    pub fn title(&self, title: &'static str, count: usize) -> Div {
-        div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
-            .child(self.mono(count.to_string()))
+            },
+            false,
+        )
     }
 
     pub fn legend(&self) -> Div {
@@ -120,6 +109,7 @@ impl HerdrWindow {
                 ),
                 &self.theme,
             ),
+            view: self.view_look(),
         }
     }
 
@@ -128,6 +118,7 @@ impl HerdrWindow {
         &self,
         slot: Slot,
         tab: &Tab,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let id = tab.id;
@@ -151,8 +142,10 @@ impl HerdrWindow {
             .debug_selector(move || slot.selector("devices-tab"))
             .size_full()
             .min_w_0()
+            .flex()
+            .flex_col()
             .track_focus(&focus)
-            .bg(rgb(look.theme.background))
+            .bg(look.view.background())
             .text_color(rgb(look.theme.foreground))
             .text_font(look.ui)
             .text_size(px(look.ui.size))
@@ -166,19 +159,28 @@ impl HerdrWindow {
                     }
                 }),
             )
+            .child(self.overview_bar(
+                &look,
+                &devices,
+                page,
+                search_focus_now(page, window, cx),
+                cx,
+            ))
             .child(
                 div()
                     .id(SharedString::from(slot.selector("devices-scroll")))
-                    .size_full()
+                    .flex_1()
+                    .min_h_0()
                     .overflow_y_scroll()
                     .track_scroll(&page.scroll)
                     .child(
                         div()
-                            .p_5()
+                            .px(look.view.at(PAGE_PADDING_X))
+                            .py(look.view.at(PAGE_PADDING_Y))
                             .flex()
                             .flex_col()
-                            .gap_5()
-                            .child(self.overview_header(&look, &devices, page, cx))
+                            .gap(look.view.at(BLOCK_GAP))
+                            .child(totals(&look, &devices))
                             .child(chart::activity(
                                 &look,
                                 &self.devices_overview.history,
@@ -189,112 +191,87 @@ impl HerdrWindow {
                                 id,
                                 cx,
                             ))
-                            .child(totals(&look, &devices))
-                            .child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .flex()
-                                            .flex_wrap()
-                                            .items_center()
-                                            .gap_3()
-                                            .child(look.title("Devices", shown.len()))
-                                            .child(div().flex_1())
-                                            .child(look.legend()),
-                                    )
-                                    .child(table::devices(
-                                        &look,
-                                        &shown,
-                                        &self.system_load,
-                                        slot,
-                                        id,
-                                        &page.expanded,
-                                        cx,
-                                    )),
-                            ),
+                            .child(table::devices(
+                                &look,
+                                &shown,
+                                &self.system_load,
+                                slot,
+                                id,
+                                &page.expanded,
+                                cx,
+                            )),
                     ),
             )
             .into_any_element()
     }
 
-    fn overview_header(
+    /// The bar: the page's title and what it counts, its search, and Add
+    /// Device, faded with the reason in its tooltip when no device can be
+    /// added.
+    fn overview_bar(
         &self,
         look: &Look,
         devices: &[Device],
         page: &super::Page,
+        search_focused: bool,
         cx: &mut Context<Self>,
     ) -> Div {
-        let theme = look.theme;
+        let view = look.view;
         let agents = Tally::sum(devices).total();
         let unavailable = self.device_setup_unavailable();
         let noun =
             |n: usize, one: &str, many: &str| format!("{n} {}", if n == 1 { one } else { many });
-        div()
-            .flex()
-            .flex_wrap()
-            .items_end()
-            .gap_3()
+        view.bar("devices-bar")
             .child(
-                div()
-                    .flex_1()
-                    .min_w(px(220.))
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .child(
-                        div()
-                            .text_size(px(look.ui.size + 7.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Devices overview"),
-                    )
-                    .child(div().text_color(rgb(theme.subtext())).child(format!(
-                        "{} · {}",
-                        noun(devices.len(), "device", "devices"),
-                        noun(agents, "agent", "agents")
-                    ))),
+                view.bar_title(
+                    Some("icons/devices.svg"),
+                    "Devices overview",
+                    Some(
+                        format!(
+                            "{} \u{b7} {}",
+                            noun(devices.len(), "device", "devices"),
+                            noun(agents, "agent", "agents")
+                        )
+                        .into(),
+                    ),
+                ),
             )
-            // The field gives way before the button wraps under the title.
+            .child(div().flex_1())
+            // The field gives way before the button.
             .child(
-                div()
-                    .flex_1()
-                    .min_w(px(160.))
-                    .max_w(px(320.))
-                    .child(page.search.clone()),
+                view.field(
+                    "devices-search".into(),
+                    search_focused,
+                    Some("icons/search.svg"),
+                )
+                .w(view.at(SEARCH_WIDTH))
+                .flex_shrink(1.)
+                .child(div().flex_1().min_w_0().child(page.search.clone())),
             )
             .child(
-                div()
-                    .id("devices-add")
-                    .debug_selector(|| "devices-add".into())
-                    .flex_none()
-                    .px_3()
-                    .py_1()
-                    .rounded(px(corners::CONTROL))
-                    .bg(rgb(theme.primary()))
-                    .text_color(rgb(theme.text_on(theme.primary())))
-                    .child("Add Device")
-                    .when_some(unavailable, |button, reason| {
-                        let (foreground, surface) = (theme.foreground, theme.surface);
-                        button.opacity(0.5).tooltip(move |_, cx| {
-                            cx.new(|_| crate::usage::Hint {
-                                text: reason.into(),
-                                foreground,
-                                surface,
-                            })
-                            .into()
-                        })
-                    })
-                    .when(unavailable.is_none(), |button| {
-                        button
-                            .cursor_pointer()
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.open_device_setup(window, cx);
-                            }))
-                    }),
+                view.button(
+                    "devices-add",
+                    "devices-add".into(),
+                    None,
+                    "Add Device",
+                    ButtonKind::Primary,
+                    unavailable.is_none(),
+                )
+                .when_some(unavailable, |button, reason| {
+                    button.tooltip(self.menu_look().tooltip(reason))
+                })
+                .when(unavailable.is_none(), |button| {
+                    button.on_click(cx.listener(|this, _, window, cx| {
+                        this.open_device_setup(window, cx);
+                    }))
+                }),
             )
     }
+}
+
+/// Whether the page's search has the keyboard, for its field's ring.
+fn search_focus_now(page: &super::Page, window: &Window, cx: &App) -> bool {
+    page.search.read(cx).focus.is_focused(window)
 }
 
 /// Working, blocked, and idle agents on every device, and how many devices
@@ -340,30 +317,29 @@ fn totals(look: &Look, devices: &[Device]) -> Div {
             None,
         ),
     ];
-    look.panel()
+    let view = look.view;
+    let scale = view.scale();
+    div()
         .debug_selector(|| "devices-totals".into())
         .flex()
-        .flex_wrap()
+        .gap(view.at(BLOCK_GAP))
         .children(
             cells
                 .into_iter()
                 .enumerate()
                 .map(|(index, (title, value, detail, status))| {
-                    div()
+                    view.settings()
+                        .card(format!("devices-total-{index}"))
+                        // All four share a row in a narrow tab; the detail
+                        // line truncates first.
                         .flex_1()
-                        // Narrow enough that all four share a row in a
-                        // narrow tab; the detail line truncates first.
-                        .min_w(px(100.))
-                        .p_3()
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .when(index > 0, |cell| {
-                            cell.border_l_1().border_color(rgb(theme.active))
-                        })
+                        .min_w_0()
+                        .p(view.at(TOTAL_PADDING))
+                        .gap(view.at(TOTAL_GAP))
                         .child(
                             div()
-                                .text_size(look.small())
+                                .truncate()
+                                .text_size(px(scale.secondary))
                                 .text_color(rgb(theme.subtext()))
                                 .child(title),
                         )
@@ -371,20 +347,21 @@ fn totals(look: &Look, devices: &[Device]) -> Div {
                             div()
                                 .flex()
                                 .items_center()
-                                .gap_2()
+                                .gap(view.at(8.))
                                 .when_some(status, |row, status| row.child(look.dot(status)))
                                 .child(
                                     div()
-                                        .text_size(px(look.ui.size + 9.))
+                                        .text_size(px(look.ui.size + FIGURE_OVER))
                                         .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(view.title())
                                         .child(value),
                                 ),
                         )
                         .child(
                             div()
                                 .truncate()
-                                .text_size(look.small())
-                                .text_color(rgb(theme.muted))
+                                .text_size(px(scale.detail))
+                                .text_color(view.muted())
                                 .child(detail),
                         )
                 }),

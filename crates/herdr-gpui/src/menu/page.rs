@@ -89,15 +89,13 @@ pub(crate) enum Page {
 }
 
 /// The panel a page wears: a menu's; a centred dialog's, the same panel
-/// without its padding so its header and footer reach the edges; a form's
-/// that a menu turns into, which keeps the menu's; or the panel from before
-/// the redesign, which only the usage panel still wears until its phase.
+/// without its padding so its header and footer reach the edges; or a
+/// form's that a menu turns into, which keeps the menu's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Look {
     Menu,
     Dialog,
     Form,
-    Legacy,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -164,6 +162,7 @@ impl Page {
             | Self::Sessions
             | Self::Tab
             | Self::Themes
+            | Self::Usage(_)
             | Self::Workspace => Look::Menu,
             #[cfg(feature = "cloud")]
             Self::AddCloud(_) => Look::Dialog,
@@ -199,8 +198,6 @@ impl Page {
             | Self::RemoveWsl
             | Self::RenamePane
             | Self::RenameTab => Look::Form,
-            // The status bar's usage panel is the fifth phase's.
-            Self::Usage(_) => Look::Legacy,
         }
     }
 

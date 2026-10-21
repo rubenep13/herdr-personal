@@ -86,6 +86,21 @@ impl HerdrWindow {
         crate::design::DialogLook::of(&self.theme, &self.config.ui, self.theme_light)
     }
 
+    /// The redesigned views' look, for this window's theme and `[ui]` face.
+    pub(crate) fn view_look(&self) -> crate::design::ViewLook {
+        crate::design::ViewLook::of(&self.theme, &self.config.ui, self.theme_light)
+    }
+
+    /// The `[ui]` face grown as Cmd-+ grows the terminal's, for the chrome
+    /// of the views that follow the terminal's size (the orchestrator and
+    /// the Git graph): as tall as every other view's at the configured
+    /// sizes.
+    pub(crate) fn chrome_font(&self) -> crate::config::FontConfig {
+        let mut font = self.config.ui.clone();
+        font.size *= self.config.terminal.size / self.configured_terminal_size.max(1.);
+        font
+    }
+
     pub(crate) fn menu_target_current(&self) -> bool {
         self.menu.endpoint_target
             == (
@@ -556,20 +571,9 @@ impl HerdrWindow {
                 panel.w((viewport.width - px(24.)).max(px(0.)).min(px(340.)))
             })
             .map(|panel| {
-                // Every page wears the redesigned panel but those whose turn
-                // has not come.
-                if page.look() != Look::Legacy {
-                    let look = self.menu_look();
-                    look.panel(panel)
-                        .text_color(look.ink(crate::design::ItemState::default()))
-                } else {
-                    panel
-                        .rounded(px(crate::config::corners::PANEL))
-                        .border_1()
-                        .border_color(rgb(theme.active))
-                        .bg(rgb(theme.surface))
-                        .text_color(rgb(theme.foreground))
-                }
+                let look = self.menu_look();
+                look.panel(panel)
+                    .text_color(look.ink(crate::design::ItemState::default()))
             })
             .text_font(font)
             .text_size(px(font.size))

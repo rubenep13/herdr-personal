@@ -64,7 +64,8 @@ impl HerdrWindow {
     pub(super) fn navigation(&self, cx: &mut Context<Self>) -> Div {
         let style = Style::NATIVE;
         let theme = &self.theme;
-        let (ink, surface) = (theme.foreground, theme.surface);
+        let ink = theme.foreground;
+        let look = self.menu_look();
         let button = |step: Step| {
             let enabled = self.can_travel(step);
             let (frame, radius) = style.button();
@@ -109,14 +110,7 @@ impl HerdrWindow {
                         .cursor_pointer()
                         .hover(move |button| button.bg(wash(ink, hover)))
                         .active(move |button| button.bg(wash(ink, pressed)))
-                        .tooltip(move |_, cx| {
-                            cx.new(|_| crate::usage::Hint {
-                                text: label.into(),
-                                foreground: ink,
-                                surface,
-                            })
-                            .into()
-                        })
+                        .tooltip(look.tooltip(label))
                         .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
                             this.travel(step, cx);

@@ -43,6 +43,10 @@ pub struct SearchInput {
     /// Text drawn dimmed after the caret, which the owner offers to complete
     /// what is typed; shown only while the caret ends the text.
     completion: Option<String>,
+    /// While the field does not have the keyboard, only the part of the
+    /// text this picks keeps the text colour and the rest is drawn quiet,
+    /// as the browser's address shows its host.
+    emphasis: Option<fn(&str) -> Range<usize>>,
 }
 
 // Internal offsets are UTF-8 boundaries; only the platform input API uses UTF-16.
@@ -164,6 +168,7 @@ impl SearchInput {
             frame: Frame::Own,
             masked: false,
             completion: None,
+            emphasis: None,
         }
     }
 
@@ -171,6 +176,12 @@ impl SearchInput {
         self.masked = masked;
         self.layout = None;
         cx.notify();
+    }
+
+    /// Draws only what `emphasis` picks from the text in the text colour
+    /// while the field does not have the keyboard.
+    pub(crate) fn set_emphasis(&mut self, emphasis: fn(&str) -> Range<usize>) {
+        self.emphasis = Some(emphasis);
     }
 
     /// Draw only the text, inside a frame the owner draws.
@@ -629,7 +640,45 @@ impl Render for SearchInput {
                             .marked
                             .clone()
                             .map(|marked| input.shown(marked.start)..input.shown(marked.end));
-                        let runs = if let Some(marked) = &marked {
+                        // At rest, an emphasised field quiets all but the part
+                        // it picks; editing shows the text whole.
+                        let emphasis = input
+                            .emphasis
+                            .filter(|_| {
+                                !placeholder
+                                    && !input.masked
+                                    && marked.is_none()
+                                    && !input.focus.is_focused(window)
+                            })
+                            .map(|pick| pick(&text))
+                            .filter(|range| {
+                                range.start <= range.end
+                                    && text.is_char_boundary(range.start)
+                                    && text.is_char_boundary(range.end)
+                            });
+                        let runs = if let Some(bright) = emphasis {
+                            let quiet = TextRun {
+                                color: rgb(input.theme.muted).into(),
+                                ..run.clone()
+                            };
+                            vec![
+                                TextRun {
+                                    len: bright.start,
+                                    ..quiet.clone()
+                                },
+                                TextRun {
+                                    len: bright.len(),
+                                    ..run.clone()
+                                },
+                                TextRun {
+                                    len: text.len() - bright.end,
+                                    ..quiet
+                                },
+                            ]
+                            .into_iter()
+                            .filter(|run| run.len > 0)
+                            .collect()
+                        } else if let Some(marked) = &marked {
                             vec![
                                 TextRun {
                                     len: marked.start,

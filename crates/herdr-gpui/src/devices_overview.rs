@@ -115,6 +115,8 @@ impl HerdrWindow {
             "Search devices, agents, workspaces",
             cx,
         );
+        // The bar's field draws the frame.
+        search.update(cx, |input, cx| input.set_frameless(cx));
         self.devices_overview.pages.insert(
             id,
             Page {

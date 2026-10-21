@@ -4,14 +4,14 @@
 
 use super::{OrchestratorView, look::agent_icon};
 use crate::{
-    config::{corners, mix},
+    design::{ButtonKind, ButtonSize, Header, NoteTone},
     orchestrator::{
-        Action, DispatchRequest, Item, Notice, SourceKey,
+        Action, DispatchRequest, Notice, SourceKey,
         actions::valid_model,
         prompt::{self, MAX_EXTRA},
     },
     pull_request::MergeMethod,
-    search_input::SearchInput,
+    search_input::{Frame, SearchInput},
     teleport::AgentKind,
 };
 use gpui::{prelude::*, *};
@@ -56,6 +56,17 @@ pub(crate) enum Confirm {
         method: MergeMethod,
         target: crate::pr_actions::Target,
     },
+}
+
+/// How a confirmation's verb is drawn: in the danger red when it stops,
+/// removes or deletes something, in the accent for a merge.
+pub(super) fn verb_kind(confirm: &Confirm) -> ButtonKind {
+    match confirm {
+        Confirm::Merge { .. } => ButtonKind::Primary,
+        Confirm::Stop { .. } | Confirm::Remove { .. } | Confirm::DeleteBead { .. } => {
+            ButtonKind::Danger
+        }
+    }
 }
 
 impl Confirm {
@@ -184,6 +195,9 @@ impl OrchestratorView {
                 let mut input = SearchInput::new(cx);
                 input.set_placeholder(placeholder, cx);
                 input.set_appearance(ui, theme, cx);
+                // Each field wears Settings' frame, its ring in the accent
+                // while it has the keyboard.
+                input.set_frame(Frame::Field, cx);
                 if !text.is_empty() {
                     input.set_text_selected(text, cx);
                 }
@@ -342,29 +356,32 @@ impl OrchestratorView {
         cx.notify();
     }
 
-    /// The outcome of the newest action, with a dismiss button.
+    /// The outcome of the newest action, as the dialogs' note or error, with
+    /// a dismiss button.
     pub(super) fn render_notice(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let look = &self.look;
+        let view = look.view();
         let notice = self.notice.as_ref()?;
-        let (hue, text) = match &notice.outcome {
-            Ok(text) => (super::look::GREEN, (*text).to_owned()),
-            Err(error) => (super::look::RED, error.to_string()),
+        let shown = match &notice.outcome {
+            Ok(text) => view.dialog().note(
+                "orchestrator-notice-text".into(),
+                NoteTone::Done,
+                (*text).to_owned(),
+            ),
+            Err(error) => view
+                .dialog()
+                .error("orchestrator-notice-text".into(), error.to_string()),
         };
         Some(
             div()
                 .id("orchestrator-notice")
                 .flex_none()
-                .mx_4()
-                .mb_2()
+                .mx(view.at(12.))
+                .my(view.at(8.))
                 .flex()
-                .items_center()
-                .gap_2()
-                .px_3()
-                .py_2()
-                .rounded(px(corners::CONTROL))
-                .bg(rgb(look.wash(hue)))
-                .child(look.dot(look.hue(hue), 7.))
-                .child(div().flex_1().min_w_0().text_size(look.small()).child(text))
+                .items_start()
+                .gap(view.at(8.))
+                .child(shown.flex_1())
                 .child(
                     look.icon_button("orchestrator-notice-close", "icons/close.svg")
                         .on_click(cx.listener(|this, _, _, cx| {
@@ -376,15 +393,16 @@ impl OrchestratorView {
         )
     }
 
-    /// The dialog or confirmation over the view, if one is open.
+    /// The dialog or confirmation over the view, if one is open, on the
+    /// dialogs' dimming.
     pub(super) fn render_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let card = match (&self.dialog, &self.confirm) {
             (Some(dialog), _) => self.render_dialog(dialog, cx),
             (None, Some(confirm)) => self.render_confirm(confirm, cx),
             (None, None) => return None,
         };
-        let theme = &self.look.theme;
-        let backdrop = (mix(theme.background, theme.foreground, 12) << 8) | 0xB0;
+        let view = self.look.view();
+        let backdrop = (self.look.theme.background << 8) | 0xb0;
         Some(
             div()
                 .id("orchestrator-overlay")
@@ -396,12 +414,13 @@ impl OrchestratorView {
                 .flex()
                 .items_center()
                 .justify_center()
-                .p_4()
+                .p(view.at(16.))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 // A short window or large text scrolls the card rather than
                 // pushing its fields and buttons out of reach.
                 .child(
-                    div()
+                    view.menu()
+                        .panel(div())
                         .id("orchestrator-overlay-card")
                         .debug_selector(|| "orchestrator-overlay-card".into())
                         .max_h_full()
@@ -415,42 +434,78 @@ impl OrchestratorView {
 
     fn render_confirm(&self, confirm: &Confirm, cx: &mut Context<Self>) -> AnyElement {
         let look = &self.look;
+        let view = look.view();
+        let dialog = view.dialog();
         let (title, body, verb) = confirm.text();
+        let kind = verb_kind(confirm);
         let confirm = confirm.clone();
-        card(look)
-            .w(px(420.))
-            .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
+        let close = view
+            .menu()
+            .close_button("orchestrator-confirm-close")
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.close_overlays(window, cx);
+            }));
+        let verb_id = format!("orchestrator-confirm-{verb}");
+        div()
+            .w(view.at(CONFIRM_WIDTH))
+            // Never wider than the view, whatever the type's size.
+            .max_w_full()
+            .flex()
+            .flex_col()
+            .child(dialog.header(
+                Header {
+                    selector: "orchestrator-confirm-header",
+                    icon: "icons/alert.svg",
+                    title: ("orchestrator-confirm-title", &title),
+                    sub: None,
+                    danger: kind == ButtonKind::Danger,
+                },
+                close,
+            ))
             .child(
-                div()
-                    .text_size(look.small())
-                    .text_color(rgb(look.theme.subtext()))
-                    .child(body),
+                dialog
+                    .body("orchestrator-confirm-body")
+                    .child(dialog.lead("orchestrator-confirm-lead", body)),
             )
             .child(
-                div()
-                    .flex()
-                    .gap_2()
-                    .child(div().flex_1())
-                    .child(
-                        look.button("orchestrator-confirm-cancel", "Cancel", false)
+                dialog
+                    .footer("orchestrator-confirm-footer")
+                    .hint("Esc", "cancel")
+                    .button(
+                        dialog
+                            .button(
+                                "orchestrator-confirm-cancel",
+                                "Cancel",
+                                ButtonKind::Normal,
+                                true,
+                            )
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.close_overlays(window, cx);
                             })),
                     )
-                    .child(
-                        danger(look, verb).on_click(cx.listener(move |this, _, window, cx| {
-                            match confirm.clone() {
-                                Confirm::Merge { method, target } => {
-                                    this.merge(method, &target, cx)
-                                }
-                                confirm => {
-                                    if let Some(action) = confirm.action() {
-                                        this.act(action);
+                    .button(
+                        view.settings()
+                            .button(
+                                SharedString::from(verb_id.clone()),
+                                verb_id,
+                                verb,
+                                kind,
+                                ButtonSize::Regular,
+                                true,
+                            )
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                match confirm.clone() {
+                                    Confirm::Merge { method, target } => {
+                                        this.merge(method, &target, cx)
+                                    }
+                                    confirm => {
+                                        if let Some(action) = confirm.action() {
+                                            this.act(action);
+                                        }
                                     }
                                 }
-                            }
-                            this.close_overlays(window, cx);
-                        })),
+                                this.close_overlays(window, cx);
+                            })),
                     ),
             )
             .into_any_element()
@@ -458,7 +513,8 @@ impl OrchestratorView {
 
     fn render_dialog(&self, dialog: &Dialog, cx: &mut Context<Self>) -> AnyElement {
         let look = &self.look;
-        let theme = &look.theme;
+        let view = look.view();
+        let parts = view.dialog();
         let item = self
             .snapshot
             .items
@@ -468,24 +524,6 @@ impl OrchestratorView {
             herdr_client::ConnectTarget::Ssh { target, .. } => target.clone(),
             _ => "this machine".into(),
         };
-        let section = |title: &'static str, body: AnyElement| {
-            div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(look.label(title))
-                .child(body)
-        };
-        let field = |input: &Entity<SearchInput>| {
-            div()
-                .px_2()
-                .py(px(4.))
-                .rounded(px(corners::CONTROL))
-                .bg(rgb(theme.background))
-                .border_1()
-                .border_color(rgb(theme.active))
-                .child(input.clone())
-        };
         let profiles = std::iter::once((None, "built-in".to_owned())).chain(
             self.snapshot
                 .profiles
@@ -493,31 +531,27 @@ impl OrchestratorView {
                 .enumerate()
                 .map(|(index, profile)| (Some(index), profile.name.clone())),
         );
-        let segmented = div()
-            .flex()
+        // Many profiles wrap onto more rows of segments.
+        let segmented = view
+            .segments("orchestrator-profiles".into())
+            .h_auto()
+            .min_h(view.at(26.))
             .flex_wrap()
-            .p(px(2.))
-            .gap(px(2.))
-            .rounded(px(corners::CONTROL))
-            .bg(rgb(theme.surface))
             .children(profiles.map(|(index, name)| {
-                let on = index == dialog.profile;
-                div()
-                    .id(SharedString::from(format!("orchestrator-profile-{name}")))
-                    .px_3()
-                    .py(px(3.))
-                    .rounded(px(corners::SMALL))
-                    .cursor_pointer()
-                    .when(on, |el| el.bg(rgb(theme.background)))
-                    .text_size(look.small())
-                    .text_color(rgb(if on { theme.foreground } else { theme.muted }))
-                    .child(name)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        if let Some(dialog) = &mut this.dialog {
-                            dialog.profile = index;
-                        }
-                        cx.notify();
-                    }))
+                let selector = format!("orchestrator-profile-{name}");
+                view.segment(
+                    SharedString::from(selector.clone()),
+                    selector,
+                    name,
+                    index == dialog.profile,
+                )
+                .h(view.at(22.))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if let Some(dialog) = &mut this.dialog {
+                        dialog.profile = index;
+                    }
+                    cx.notify();
+                }))
             }));
         let agents: Vec<AgentKind> = self
             .snapshot
@@ -527,113 +561,163 @@ impl OrchestratorView {
             .map(|installed| installed.iter().copied().take(8).collect())
             .unwrap_or_default();
         let tiles = if agents.is_empty() {
-            look.muted(
-                if dialog.host == self.snapshot.installed_endpoint
-                    && self.snapshot.installed_error.is_some()
-                {
-                    "Could not discover agents. Select the host to retry."
-                } else if self.snapshot.installed.is_none()
-                    || dialog.host != self.snapshot.installed_endpoint
-                {
-                    "Looking for installed agents\u{2026}"
-                } else {
-                    "No supported agent is installed on this host."
-                },
-            )
-            .into_any_element()
+            let failed = dialog.host == self.snapshot.installed_endpoint
+                && self.snapshot.installed_error.is_some();
+            let text = if failed {
+                "Could not discover agents. Select the host to retry."
+            } else if self.snapshot.installed.is_none()
+                || dialog.host != self.snapshot.installed_endpoint
+            {
+                "Looking for installed agents\u{2026}"
+            } else {
+                "No supported agent is installed on this host."
+            };
+            parts
+                .note(
+                    "orchestrator-agents-note".into(),
+                    if failed {
+                        NoteTone::Warning
+                    } else {
+                        NoteTone::Info
+                    },
+                    text,
+                )
+                .into_any_element()
         } else {
+            let settings = view.settings();
             div()
                 .flex()
                 .flex_wrap()
-                .gap_2()
+                .gap(view.at(8.))
                 .children(agents.into_iter().map(|kind| {
                     let on = dialog.kind == Some(kind);
-                    div()
+                    let hover = view.hover();
+                    let tile = div()
                         .id(SharedString::from(format!(
                             "orchestrator-agent-{}",
                             kind.name()
                         )))
-                        .w(px(84.))
+                        .w(view.at(AGENT_TILE))
                         .flex()
                         .flex_col()
                         .items_center()
-                        .gap_1()
-                        .py_2()
-                        .rounded(px(corners::CONTROL))
+                        .gap(view.at(6.))
+                        .py(view.at(10.))
+                        .rounded(view.at(8.))
                         .border_1()
-                        .border_color(rgb(if on { theme.primary() } else { theme.active }))
-                        .when(on, |el| el.bg(rgb(theme.primary_wash())))
+                        .border_color(view.line())
+                        .bg(settings.card_fill())
                         .cursor_pointer()
-                        .child(look.icon(agent_icon(kind.name()), 20., theme.foreground))
-                        .child(div().text_size(look.small()).child(kind.name()))
+                        .when(!on, |el| el.hover(move |style| style.bg(hover)))
+                        .child(look.icon(agent_icon(kind.name()), 20., look.theme.foreground))
+                        .child(
+                            div()
+                                .text_size(px(view.scale().secondary))
+                                .text_color(view.title())
+                                .child(kind.name()),
+                        )
                         .on_click(cx.listener(move |this, _, _, cx| {
                             if let Some(dialog) = &mut this.dialog {
                                 dialog.kind = Some(kind);
                             }
                             cx.notify();
-                        }))
+                        }));
+                    // The chosen agent wears the accent's ring.
+                    if on { parts.ring(tile) } else { tile }
                 }))
                 .into_any_element()
         };
-        card(look)
-            .w(px(600.))
+        let title = if dialog.review {
+            "Review with agent"
+        } else {
+            "Dispatch agent"
+        };
+        let summary = item
+            .map(|item| format!("{} {}", item.identifier, item.title))
+            .unwrap_or_default();
+        let close = div()
+            .id("orchestrator-dialog-actions")
+            .flex_none()
+            .flex()
+            .items_center()
+            .gap(view.at(8.))
+            .child(look.chip(format!("on {host}")))
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .child(
-                        div()
-                            .flex_1()
-                            .text_size(px(look.ui.size + 3.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(if dialog.review {
-                                "Review with agent"
+                look.icon_button("orchestrator-dialog-close", "icons/close.svg")
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.close_overlays(window, cx);
+                    })),
+            );
+        let mut rows: Vec<(&'static str, AnyElement)> =
+            vec![("Prompt", segmented.into_any_element()), ("Agent", tiles)];
+        if let Some(hosts) = self.render_hosts(dialog, cx) {
+            rows.push(("Host", hosts));
+        }
+        rows.push(("Model", dialog.model.clone().into_any_element()));
+        rows.push(("Branch", dialog.branch.clone().into_any_element()));
+        div()
+            .w(view.at(DIALOG_WIDTH))
+            .max_w_full()
+            .flex()
+            .flex_col()
+            .child(parts.header(
+                Header {
+                    selector: "orchestrator-dialog-header",
+                    icon: "icons/send.svg",
+                    title: ("orchestrator-dialog-title", title),
+                    sub: item.map(|item| {
+                        (
+                            if item.pull_request.is_some() {
+                                "icons/git-branch.svg"
                             } else {
-                                "Dispatch agent"
-                            }),
-                    )
-                    .child(look.chip(format!("on {host}")))
-                    .child(
-                        look.icon_button("orchestrator-dialog-close", "icons/close.svg")
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.close_overlays(window, cx);
-                            })),
-                    ),
-            )
-            .when_some(item, |el, item| el.child(item_line(look, item)))
-            .child(section("PROMPT", segmented.into_any_element()))
-            .child(section("AGENT", tiles))
-            .when_some(self.render_hosts(dialog, cx), |el, hosts| {
-                el.child(section("HOST", hosts))
-            })
-            .child(section("MODEL", field(&dialog.model).into_any_element()))
-            .child(section("BRANCH", field(&dialog.branch).into_any_element()))
-            .child(section(
-                "EXTRA INSTRUCTIONS",
-                field(&dialog.extra).into_any_element(),
+                                "icons/note.svg"
+                            },
+                            "orchestrator-dialog-item",
+                            summary.as_str(),
+                        )
+                    }),
+                    danger: false,
+                },
+                close,
             ))
-            .when_some(dialog.problem, |el, problem| {
-                el.child(
-                    div()
-                        .text_size(look.small())
-                        .text_color(rgb(look.hue(super::look::RED)))
-                        .child(problem),
-                )
-            })
             .child(
-                div()
-                    .flex()
-                    .gap_2()
-                    .child(div().flex_1())
+                parts
+                    .body("orchestrator-dialog-body")
+                    .child(parts.captions("orchestrator-dialog-captions", rows))
                     .child(
-                        look.button("orchestrator-dialog-cancel", "Cancel", false)
+                        parts
+                            .label("orchestrator-dialog-extra-label", "Extra instructions")
+                            .child(dialog.extra.clone()),
+                    )
+                    .when_some(dialog.problem, |el, problem| {
+                        el.child(parts.error("orchestrator-dialog-problem".into(), problem))
+                    }),
+            )
+            .child(
+                parts
+                    .footer("orchestrator-dialog-footer")
+                    .hint("Esc", "cancel")
+                    .hint("\u{21b5}", "dispatch")
+                    .button(
+                        parts
+                            .button(
+                                "orchestrator-dialog-cancel",
+                                "Cancel",
+                                ButtonKind::Normal,
+                                true,
+                            )
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.close_overlays(window, cx);
                             })),
                     )
-                    .child(
-                        look.button("orchestrator-dialog-dispatch", "Dispatch", true)
+                    .button(
+                        parts
+                            .button(
+                                "orchestrator-dialog-dispatch",
+                                "Dispatch",
+                                ButtonKind::Primary,
+                                true,
+                            )
                             .on_click(
                                 cx.listener(|this, _, window, cx| this.submit_dispatch(window, cx)),
                             ),
@@ -660,53 +744,8 @@ impl OrchestratorView {
     }
 }
 
-fn card(look: &super::Look) -> Div {
-    let theme = &look.theme;
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .p_4()
-        .rounded(px(corners::PANEL))
-        .bg(rgb(theme.background))
-        .border_1()
-        .border_color(rgb(theme.active))
-        .shadow_lg()
-}
-
-fn danger(look: &super::Look, label: &'static str) -> Stateful<Div> {
-    let fill = look.hue(super::look::RED);
-    div()
-        .id(SharedString::from(format!("orchestrator-confirm-{label}")))
-        .px_3()
-        .py(px(4.))
-        .rounded(px(corners::CONTROL))
-        .bg(rgb(fill))
-        .cursor_pointer()
-        .text_color(rgb(look.theme.text_on(fill)))
-        .text_size(look.small())
-        .child(label)
-}
-
-fn item_line(look: &super::Look, item: &Item) -> Div {
-    let theme = &look.theme;
-    div()
-        .flex()
-        .items_center()
-        .gap_2()
-        .p_2()
-        .rounded(px(corners::CONTROL))
-        .bg(rgb(theme.surface))
-        .child(super::list::source_mark(look, item.key.source.provider))
-        .child(
-            look.mono(item.identifier.clone())
-                .text_color(rgb(theme.muted)),
-        )
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .child(item.title.clone()),
-        )
-}
+/// The dialogs' widths at the orchestrator's face of 12, and an agent's
+/// tile.
+const DIALOG_WIDTH: f32 = 600.;
+const CONFIRM_WIDTH: f32 = 420.;
+const AGENT_TILE: f32 = 84.;

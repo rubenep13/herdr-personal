@@ -1,7 +1,13 @@
 //! The notes beside the diff: the composer for the line being noted or the
 //! note being edited, the notes, and Send, Copy, or Clear sent.
 use super::{PANEL_SHARE, Review};
-use crate::{HerdrWindow, browser::TabId, review::notes::Note};
+use crate::{
+    HerdrWindow,
+    browser::TabId,
+    design::{ButtonKind, Edge, Tone},
+    fonts::StyledFont,
+    review::notes::Note,
+};
 use gpui::{prelude::*, *};
 
 impl HerdrWindow {
@@ -11,23 +17,21 @@ impl HerdrWindow {
         review: &Review,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let theme = &self.theme;
+        let look = self.view_look();
+        let settings = look.settings();
         let button = |id: &'static str, label: SharedString, primary: bool| {
-            let background = if primary {
-                theme.primary()
-            } else {
-                theme.active
-            };
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px_2()
-                .py_1()
-                .rounded(px(crate::config::corners::CONTROL))
-                .cursor_pointer()
-                .bg(rgb(background))
-                .text_color(rgb(theme.text_on(background)))
-                .child(label)
+            look.button(
+                id,
+                id.into(),
+                None,
+                label,
+                if primary {
+                    ButtonKind::Primary
+                } else {
+                    ButtonKind::Normal
+                },
+                true,
+            )
         };
         let editing = review.editing;
         let drafting = review
@@ -37,15 +41,25 @@ impl HerdrWindow {
             .and_then(|anchor| Note::new(anchor, "x"))
             .map(|note| note.place())
             .or_else(|| Some(review.notes.get(editing?)?.place()));
-        let composer = drafting.map(|place| {
+        let place = |text: String| {
+            div()
+                .min_w_0()
+                .truncate()
+                .text_font(&self.config.terminal)
+                .text_size(look.at(PLACE_TEXT))
+                .text_color(look.muted())
+                .child(text)
+        };
+        let composer = drafting.map(|drafted| {
             div()
                 .flex()
                 .flex_col()
-                .gap_1()
-                .p_2()
+                .gap(look.at(6.))
+                .px(look.at(PADDING))
+                .pb(look.at(PADDING))
                 .border_b_1()
-                .border_color(rgb(theme.active))
-                .child(div().text_color(rgb(theme.muted)).truncate().child(place))
+                .border_color(look.line())
+                .child(place(drafted))
                 .child(
                     div()
                         .id("review-input")
@@ -68,7 +82,7 @@ impl HerdrWindow {
                         .child(review.input.clone()),
                 )
                 .child(
-                    div().flex().child(
+                    div().flex().justify_end().child(
                         button(
                             "review-add",
                             if editing.is_some() {
@@ -85,91 +99,75 @@ impl HerdrWindow {
                     ),
                 )
         });
-        let rows =
-            review.notes.iter().enumerate().map(|(index, note)| {
-                div()
-                    .id(("review-note", index))
-                    .when(note.sent, |row| row.opacity(0.6))
-                    .when(editing == Some(index), |row| row.bg(rgb(theme.active)))
-                    .flex()
-                    .gap_2()
-                    .p_2()
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child(
-                        div()
-                            .flex_none()
-                            .size(px(18.))
-                            .rounded_full()
-                            .bg(rgb(theme.palette[3]))
-                            .text_color(rgb(theme.text_on(theme.palette[3])))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child((index + 1).to_string()),
+        let rows = review.notes.iter().enumerate().map(|(index, note)| {
+            settings
+                .card(format!("review-note-{index}"))
+                .id(("review-note", index))
+                .when(note.sent, |card| card.opacity(0.6))
+                .when(editing == Some(index), |card| card.bg(look.selection()))
+                .flex_row()
+                .items_start()
+                .gap(look.at(8.))
+                .px(look.at(12.))
+                .py(look.at(10.))
+                .child(settings.chip(
+                    format!("review-note-{index}-number"),
+                    (index + 1).to_string(),
+                    Tone::Warn,
+                ))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .flex()
+                        .flex_col()
+                        .gap(look.at(4.))
+                        .child(place(if note.sent {
+                            format!("{} \u{b7} sent", note.place())
+                        } else {
+                            note.place()
+                        }))
+                        // Clicking the text edits it.
+                        .child(
+                            div()
+                                .id(("review-edit", index))
+                                .debug_selector(move || format!("review-edit-{index}"))
+                                .cursor_text()
+                                .text_color(look.title())
+                                .child(note.comment.clone())
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.edit_review_note(id, index, window, cx)
+                                })),
+                        ),
+                )
+                .child(
+                    look.icon_button(
+                        ("review-remove", index),
+                        format!("review-remove-{index}"),
+                        "icons/close.svg",
+                        false,
+                        true,
                     )
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_col()
-                            .child(div().text_color(rgb(theme.muted)).truncate().child(
-                                if note.sent {
-                                    format!("{} \u{b7} sent", note.place())
-                                } else {
-                                    note.place()
-                                },
-                            ))
-                            // Clicking the text edits it.
-                            .child(
-                                div()
-                                    .id(("review-edit", index))
-                                    .debug_selector(move || format!("review-edit-{index}"))
-                                    .cursor_text()
-                                    .child(note.comment.clone())
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.edit_review_note(id, index, window, cx)
-                                    })),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .id(("review-remove", index))
-                            .flex_none()
-                            .size(px(18.))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .cursor_pointer()
-                            .rounded(px(crate::config::corners::CONTROL))
-                            .hover(|s| s.bg(rgb(theme.active)))
-                            .child(
-                                svg()
-                                    .path("icons/close.svg")
-                                    .size(px(12.))
-                                    .text_color(rgb(theme.muted)),
-                            )
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.remove_review_note(id, index, cx)
-                            })),
-                    )
-            });
+                    .size(look.at(REMOVE))
+                    .on_click(
+                        cx.listener(move |this, _, _, cx| this.remove_review_note(id, index, cx)),
+                    ),
+                )
+        });
         let has_notes = !review.notes.is_empty();
         let has_agent = review.agent.is_some();
         let unsent = review.notes.iter().filter(|note| !note.sent).count();
         let send_label = crate::agent_notes::send_label(review.notes.len(), unsent);
         let any_sent = unsent < review.notes.len();
         let panel =
-            div()
+            look.side_panel("review-notes", Edge::Right)
                 .id("review-notes")
-                .debug_selector(|| "review-notes".into())
-                .flex_none()
                 .h_full()
-                .flex()
-                .flex_col()
-                .border_l_1()
-                .border_color(rgb(theme.active))
+                .child(look.side_header(
+                    "review-notes-header",
+                    "Notes",
+                    has_notes.then_some(review.notes.len()),
+                ))
                 .children(composer)
                 .child(
                     div()
@@ -177,28 +175,30 @@ impl HerdrWindow {
                         .flex_1()
                         .min_h_0()
                         .overflow_y_scroll()
+                        .px(look.at(PADDING))
+                        .py(look.at(8.))
+                        .flex()
+                        .flex_col()
+                        .gap(look.at(8.))
                         .children(rows)
                         .when(!has_notes && review.draft.is_none(), |list| {
                             list.child(
-                                div().p_2().text_color(rgb(theme.muted)).child(
+                                div().text_color(look.muted()).child(
                                     "Click a line or a file name to note what should change.",
                                 ),
                             )
                         }),
                 )
+                // The action that sends is the footer's last, as a dialog's is.
                 .when(has_notes, |panel| {
                     panel.child(
                         div()
                             .flex()
-                            .gap_1()
-                            .p_2()
+                            .items_center()
+                            .gap(look.at(6.))
+                            .p(look.at(PADDING))
                             .border_t_1()
-                            .border_color(rgb(theme.active))
-                            .when(has_agent, |row| {
-                                row.child(button("review-send", send_label.into(), true).on_click(
-                                    cx.listener(move |this, _, _, cx| this.send_review(id, cx)),
-                                ))
-                            })
+                            .border_color(look.line())
                             .child(button("review-copy", "Copy".into(), !has_agent).on_click(
                                 cx.listener(move |this, _, _, cx| this.copy_review(id, cx)),
                             ))
@@ -209,6 +209,12 @@ impl HerdrWindow {
                                             this.clear_sent_review_notes(id, cx)
                                         })),
                                 )
+                            })
+                            .child(div().flex_1())
+                            .when(has_agent, |row| {
+                                row.child(button("review-send", send_label.into(), true).on_click(
+                                    cx.listener(move |this, _, _, cx| this.send_review(id, cx)),
+                                ))
                             }),
                     )
                 });
@@ -221,3 +227,9 @@ impl HerdrWindow {
         )
     }
 }
+
+/// The panel's padding, a note's place and its remove button, at `[ui]
+/// size = 12`.
+const PADDING: f32 = 10.;
+const PLACE_TEXT: f32 = 11.5;
+const REMOVE: f32 = 22.;

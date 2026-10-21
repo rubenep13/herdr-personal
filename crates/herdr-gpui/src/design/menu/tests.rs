@@ -117,7 +117,7 @@ fn an_empty_shortcut_has_no_keys() {
 struct CloseHarness;
 
 impl Render for CloseHarness {
-    fn render(&mut self, _: &mut gpui::Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let look = MenuLook::of(&Theme::default(), &font(12.), false);
         div().child(look.close_button("close-demo"))
     }

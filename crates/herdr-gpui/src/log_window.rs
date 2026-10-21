@@ -1,7 +1,6 @@
 use crate::{
     config::{Config, FontConfig, Theme},
     diagnostics::{self, Record},
-    fonts::StyledFont,
     search_input::{Changed, SearchInput},
 };
 use gpui::{prelude::*, *};
@@ -59,6 +58,18 @@ fn palette_color(theme: &Theme, index: usize) -> Rgba {
     crate::menu::tint(theme, index)
 }
 
+/// A level's chip: failures in red, warnings in yellow, information in the
+/// accent and the chatter in grey.
+fn level_tone(level: Level) -> crate::design::Tone {
+    use crate::design::Tone;
+    match level {
+        Level::ERROR => Tone::Danger,
+        Level::WARN => Tone::Warn,
+        Level::INFO => Tone::Accent,
+        Level::DEBUG | Level::TRACE => Tone::Neutral,
+    }
+}
+
 fn severity_color(theme: &Theme, level: Level) -> Rgba {
     palette_color(
         theme,
@@ -103,6 +114,9 @@ fn open_deferred(cx: &mut App) {
 
 struct LogWindow {
     appearance: Appearance,
+    /// The redesigned views' pieces for `appearance`, built when it changes
+    /// rather than for every line drawn.
+    look: crate::design::ViewLook,
     _appearance: Subscription,
     focus: FocusHandle,
     search: Entity<SearchInput>,
@@ -201,6 +215,8 @@ impl LogWindow {
         search.update(cx, |input, cx| {
             input.set_appearance(appearance.config.ui.clone(), appearance.theme.clone(), cx);
             input.set_placeholder("Search, namespace:herdr_gpui target:terminal_painter", cx);
+            // The bar's field draws the frame.
+            input.set_frameless(cx);
             window.focus(&input.focus, cx);
         });
         let appearance_subscription = cx.observe_global::<Appearance>(|this, cx| {
@@ -214,6 +230,7 @@ impl LogWindow {
                 this.scroll.scroll_to(offset);
             }
             this.appearance = cx.global::<Appearance>().clone();
+            this.look = view::look(&this.appearance);
             this.search.update(cx, |input, cx| {
                 input.set_appearance(
                     this.appearance.config.ui.clone(),
@@ -314,7 +331,9 @@ impl LogWindow {
                     .await;
             }
         });
+        let look = view::look(&appearance);
         Self {
+            look,
             appearance,
             _appearance: appearance_subscription,
             focus: cx.focus_handle(),
@@ -413,310 +432,6 @@ impl LogWindow {
     }
 }
 
-fn button(id: &'static str, label: impl Into<SharedString>, theme: &Theme) -> Stateful<Div> {
-    let active = theme.active;
-    div()
-        .id(id)
-        .debug_selector(move || id.into())
-        .px_2()
-        .py_1()
-        .rounded(px(crate::config::corners::CONTROL))
-        .bg(rgb(theme.surface))
-        .cursor_pointer()
-        .hover(move |style| style.bg(rgb(active)))
-        .child(label.into())
-}
-
-fn styled_body(record: &Record, theme: &Theme) -> StyledText {
-    use std::fmt::Write;
-    let mut text = record.target.clone();
-    let target_end = text.len();
-    for span in &record.spans {
-        let _ = write!(text, " [{span}]");
-    }
-    let spans_end = text.len();
-    if !record.message.is_empty() {
-        let _ = write!(text, " {}", record.message);
-    }
-    let fields_start = text.len();
-    for (key, value) in &record.fields {
-        let _ = write!(text, " {key}={value}");
-    }
-    if record.truncated {
-        text.push_str(" [truncated]");
-    }
-    let end = text.len();
-    StyledText::new(text).with_highlights(
-        [
-            (
-                0..target_end,
-                HighlightStyle {
-                    color: Some(palette_color(theme, 6).into()),
-                    ..Default::default()
-                },
-            ),
-            (
-                target_end..spans_end,
-                HighlightStyle {
-                    color: Some(rgb(theme.muted).into()),
-                    ..Default::default()
-                },
-            ),
-            (
-                fields_start..end,
-                HighlightStyle {
-                    color: Some(palette_color(theme, 4).into()),
-                    ..Default::default()
-                },
-            ),
-        ]
-        .into_iter()
-        .filter(|(range, _)| !range.is_empty()),
-    )
-}
-
-impl Render for LogWindow {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.following {
-            self.scroll.scroll_to(ListOffset {
-                item_ix: self.rows.len(),
-                offset_in_item: px(0.),
-            });
-        }
-        let header = crate::titlebar::header(&self.appearance.theme, window, |window, _| {
-            window.remove_window();
-        });
-        let Appearance { config, theme } = &self.appearance;
-        let root = div()
-            .key_context("LogWindow")
-            .track_focus(&self.focus)
-            .on_action(cx.listener(|_, _: &Close, window, _| window.remove_window()))
-            .on_action(cx.listener(|_, action: &crate::RunCommand, window, cx| {
-                crate::window::run_window_command(action.command, window, cx);
-            }))
-            .on_action(cx.listener(|this, _: &FocusSearch, window, cx| {
-                this.level_menu = None;
-                window.focus(&this.search.read(cx).focus.clone(), cx);
-                cx.notify();
-            }))
-            .on_action(cx.listener(|this, _: &FocusLevel, window, cx| {
-                this.level_menu = None;
-                window.focus(&this.level_focus, cx);
-                cx.notify();
-            }))
-            .size_full()
-            .flex()
-            .flex_col()
-            .bg(rgb(theme.background))
-            .text_color(rgb(theme.foreground))
-            .text_font(&config.ui)
-            .text_size(px(config.ui.size))
-            .line_height(px(config.ui.line_height()))
-            .children(header)
-            .child(
-                div()
-                    .flex_none()
-                    .p_3()
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(
-                        div()
-                            .text_size(px(config.ui.size + 4.))
-                            .child("Logs"),
-                    )
-                    .child(self.search.clone())
-                    .child(
-                        div()
-                            .flex()
-                            .flex_wrap()
-                            .items_center()
-                            .gap_2()
-                            .child(
-                                button("minimum-level", format!("Minimum: {} v", self.minimum), theme)
-                                    .track_focus(&self.level_focus)
-                                    .border_1()
-                                    .border_color(if self.level_focus.is_focused(window) { palette_color(theme, 4) } else { rgb(theme.active) })
-                                    .on_click(cx.listener(|this, _, window, cx| this.open_levels(window, cx)))
-                                    .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
-                                        if matches!(event.keystroke.key.as_str(), "enter" | "space" | "down" | "up") {
-                                            cx.stop_propagation();
-                                            window.prevent_default();
-                                            this.open_levels(window, cx);
-                                        }
-                                    }))
-                                    .when_some(self.level_menu, |el, selected| el.child(
-                                        deferred(
-                                            anchored().child(
-                                                div().id("level-menu").debug_selector(|| "level-menu".into())
-                                                    .absolute().top_full().left_0().w(px(180.))
-                                                    .p_1().bg(rgb(theme.surface)).border_1().border_color(rgb(theme.active))
-                                                    .occlude().track_focus(&self.menu_focus)
-                                                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                                                    .on_click(|_, _, cx| cx.stop_propagation())
-                                                    .on_mouse_down_out(cx.listener(|this, _, window, cx| this.close_levels(window, cx)))
-                                                    .on_key_down(cx.listener(Self::level_key))
-                                                    .children(LEVELS.iter().enumerate().map(|(index, level)| {
-                                                        let level = *level;
-                                                        div().id(("level-option", index)).debug_selector(move || format!("level-option-{index}"))
-                                                            .px_2().py_1().cursor_pointer()
-                                                            .when(index == selected, |el| el.bg(rgb(theme.active)))
-                                                            .child(format!("{} {}", if self.minimum == level { "*" } else { " " }, level))
-                                                            .on_click(cx.listener(move |this, _, window, cx| {
-                                                                cx.stop_propagation();
-                                                                this.minimum = level;
-                                                                this.generation = None;
-                                                                this.close_levels(window, cx);
-                                                            }))
-                                                    }))
-                                            )
-                                        ).with_priority(1)
-                                    )),
-                            )
-                            .child(div().flex_1())
-                            .child(
-                                button(
-                                    "follow",
-                                    if self.following {
-                                        "Pause"
-                                    } else {
-                                        "Resume tail"
-                                    },
-                                    theme,
-                                )
-                                .on_click(cx.listener(
-                                    |this, _, _, cx| {
-                                        this.following = !this.following;
-                                        this.generation = None;
-                                        cx.notify();
-                                    },
-                                )),
-                            )
-                            .child(
-                                button("copy", "Copy", theme)
-                                    .on_click(cx.listener(|this, _, _, cx| this.share(false, cx))),
-                            )
-                            .child(
-                                button(
-                                    "export",
-                                    if self.exporting {
-                                        "Working..."
-                                    } else {
-                                        "Export..."
-                                    },
-                                    theme,
-                                )
-                                .on_click(cx.listener(|this, _, _, cx| this.share(true, cx))),
-                            ),
-                    ),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_hidden()
-                    .on_scroll_wheel(cx.listener(|this, _, _, cx| {
-                        this.following = false;
-                        cx.notify();
-                    }))
-                    .when(self.rows.is_empty(), |el| {
-                        el.child(div().p_3().child("No matching logs."))
-                    })
-                    .when(!self.rows.is_empty(), |el| {
-                        el.child(
-                            list(
-                                self.scroll.clone(),
-                                cx.processor(|this, index: usize, _, cx| {
-                                    let record = this.rows[index].clone();
-                                    let theme = &this.appearance.theme;
-                                    let font = &this.appearance.config.terminal;
-                                    let active = theme.active;
-                                    div()
-                                        .id(index)
-                                        .debug_selector(move || format!("log-row-{index}"))
-                                        .flex()
-                                        .w_full()
-                                        .py(px(1.))
-                                        .px_3()
-                                        .text_color(rgb(theme.foreground))
-                                        .text_font(font)
-                                        .text_size(px(font.size))
-                                        .line_height(px(font.line_height()))
-                                        .child(
-                                            div()
-                                                .flex_none()
-                                                .whitespace_nowrap()
-                                                .text_color(rgb(theme.muted))
-                                                .child(format!("{} ", record.timestamp)),
-                                        )
-                                        .child(
-                                            div()
-                                                .flex_none()
-                                                .whitespace_nowrap()
-                                                .text_color(severity_color(
-                                                    theme,
-                                                    record.level,
-                                                ))
-                                                .child(format!("{:<5} ", record.level.as_str())),
-                                        )
-                                        .child(
-                                            div()
-                                                .flex_1()
-                                                .min_w_0()
-                                                .whitespace_normal()
-                                                .debug_selector(move || format!("log-body-{index}"))
-                                                .child(styled_body(&record, theme)),
-                                        )
-                                        .cursor_pointer()
-                                        .hover(move |style| style.bg(rgb(active)))
-                                        .on_click(cx.listener(move |this, _, _, cx| {
-                                            this.selected = Some(record.clone());
-                                            cx.notify();
-                                        }))
-                                        .into_any_element()
-                                }),
-                            )
-                            .size_full(),
-                        )
-                    }),
-            )
-            .when_some(self.selected.clone(), |el, record| {
-                el.child(
-                    div()
-                        .id("log-detail")
-                        .debug_selector(|| "log-detail".into())
-                        .flex_none()
-                        .h((window.viewport_size().height * 0.2).min(px(100.)))
-                        .overflow_y_scroll()
-                        .p_3()
-                        .bg(rgb(theme.surface))
-                        .text_color(severity_color(theme, record.level))
-                        .text_font(&config.terminal)
-                        .text_size(px(config.terminal.size))
-                        .line_height(px(config.terminal.line_height()))
-                        .child(record.line()),
-                )
-            })
-            .child(
-                div()
-                    .flex_none()
-                    .p_3()
-                    .border_t_1()
-                    .border_color(rgb(theme.active))
-                    .truncate()
-                    .child(format!(
-                        "{} shown | {} dropped | {} | {}",
-                        self.rows.len(),
-                        self.dropped,
-                        if self.following { "LIVE" } else { "PAUSED" },
-                        self.status
-                    )),
-            );
-        let border = theme.active;
-        crate::titlebar::frame(window, border, root)
-    }
-}
-
 /// GPUI re-measures only the rows it lays out, so rows outside the viewport
 /// keep stale heights unless the list is reset when the row font changes.
 fn row_metrics_changed(previous: &FontConfig, font: &FontConfig) -> bool {
@@ -724,6 +439,8 @@ fn row_metrics_changed(previous: &FontConfig, font: &FontConfig) -> bool {
         || font.size != previous.size
         || font.line_height() != previous.line_height()
 }
+
+mod view;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

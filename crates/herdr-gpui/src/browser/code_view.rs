@@ -47,45 +47,33 @@ impl HerdrWindow {
                 },
             }
         };
-        centered(
-            div()
-                .debug_selector(|| "code-placeholder".into())
-                .text_color(rgb(self.theme.muted))
-                .child(text),
-        )
+        self.view_look()
+            .empty("code-placeholder", Some(VSCODE), text)
+            .flex_1()
+            .into_any_element()
     }
 
     /// Why the server did not answer, and that it is asked again.
     fn render_code_unreachable(&self, message: SharedString) -> AnyElement {
-        let theme = &self.theme;
-        centered(
-            div()
-                .debug_selector(|| "code-unreachable".into())
-                .flex()
-                .flex_col()
-                .items_center()
-                .gap(px(8.))
-                .text_center()
-                .child(
-                    svg()
-                        .path("icons/error.svg")
-                        .size(px(32.))
-                        .text_color(rgb(theme.ink(theme.palette[1]))),
-                )
-                .child(
-                    div()
-                        .text_color(rgb(theme.foreground))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child("Cannot reach the VS Code server"),
-                )
-                .child(div().text_color(rgb(theme.muted)).child(message))
-                .child(
-                    div()
-                        .text_color(rgb(theme.muted))
-                        .text_sm()
-                        .child("Retrying\u{2026}"),
-                ),
+        let look = self.view_look();
+        look.empty(
+            "code-unreachable",
+            Some(VSCODE),
+            "Cannot reach the VS Code server",
         )
+        .flex_1()
+        .child(
+            look.dialog()
+                .error("code-unreachable-reason".into(), message)
+                .max_w(look.at(READING_WIDTH)),
+        )
+        .child(
+            div()
+                .text_size(px(look.scale().secondary))
+                .text_color(look.muted())
+                .child("Retrying\u{2026}"),
+        )
+        .into_any_element()
     }
 
     /// Whether VS Code is offered, in each group's "…" menu and as Open
@@ -96,15 +84,7 @@ impl HerdrWindow {
     }
 }
 
-/// `content` in the middle of the tab, both ways.
-pub(super) fn centered(content: impl IntoElement) -> AnyElement {
-    div()
-        .flex_1()
-        .min_h_0()
-        .flex()
-        .items_center()
-        .justify_center()
-        .px_4()
-        .child(content)
-        .into_any_element()
-}
+/// VS Code's mark, on its status's tile.
+pub(super) const VSCODE: &str = "icons/vscode.svg";
+/// How wide a paragraph of the status reads, at `[ui] size = 12`.
+pub(super) const READING_WIDTH: f32 = 420.;

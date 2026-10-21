@@ -27,11 +27,19 @@ fn run_host_badges_stay_inside_their_column(cx: &mut TestAppContext) {
             let config = crate::config::Config::default();
             let mut ui = config.ui.clone();
             ui.size = font_size;
-            let look = Look {
-                theme: crate::config::Theme::default(),
-                ui,
-                mono: config.terminal.clone(),
-            };
+            let look = Look::new(
+                crate::sidebar::Indicators::new(
+                    None,
+                    None,
+                    false,
+                    &crate::config::Theme::default(),
+                ),
+                crate::config::Theme::default(),
+                ui.clone(),
+                config.terminal.clone(),
+                false,
+                &ui,
+            );
             let (view, cx) = cx.add_window_view(|_, cx| OrchestratorView::new(request, look, cx));
             let issue = item(
                 Provider::Github,

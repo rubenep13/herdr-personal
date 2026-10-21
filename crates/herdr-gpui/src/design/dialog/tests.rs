@@ -47,7 +47,7 @@ fn primary_and_danger_buttons_read_on_their_fill() {
     all.push(Theme::builtin("Catppuccin Mocha").unwrap());
     for theme in all {
         let look = SettingsLook::of(&theme, &font(12.));
-        for kind in [ButtonKind::Primary, ButtonKind::Danger] {
+        for kind in [ButtonKind::Primary, ButtonKind::Danger, ButtonKind::Lit] {
             let (fill, _, ink) = look.button_colours(kind);
             let ratio = crate::contrast::ratio(hex(ink), hex(fill));
             assert!(ratio >= 3., "{kind:?}: {ratio} on {:06x}", hex(fill));
