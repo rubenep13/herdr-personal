@@ -1,6 +1,7 @@
 //! The Tree layout's host header: where the host runs, its name and kind, a
-//! connection dot, and its CPU and memory, which give way to fold and new
-//! space buttons while the header is pointed at.
+//! connection dot and, while it is pointed at, fold and new space buttons;
+//! its CPU and memory go on a line of their own under the name, so the name
+//! never gives way to them.
 
 use super::{label_text, layout::SidebarLook, layouts::control, row::removing_dot, wash};
 use crate::{
@@ -19,6 +20,10 @@ use gpui::{prelude::*, *};
 const HOST_GROUP: &str = "sidebar-host";
 const ORIGIN: f32 = 16.;
 const DOT: f32 = 7.;
+/// The gap between the header's parts on its first line.
+const GAP: f32 = 8.;
+/// The CPU and memory line under the name, at `[ui]` 12.
+const METRICS_LINE: f32 = 14.;
 
 /// The connection dot's colour: the online green while connected, muted
 /// otherwise.
@@ -73,8 +78,7 @@ fn load(selector: String, reading: &Reading, size: f32) -> Option<Div> {
             .text_size(px(size))
             .font_features(FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)])))
             .children(cpu.map(part))
-            .children(memory.map(part))
-            .group_hover(HOST_GROUP, |style| style.hidden()),
+            .children(memory.map(part)),
     )
 }
 
@@ -162,16 +166,29 @@ impl HerdrWindow {
                 .device_drag
                 .as_ref()
                 .is_some_and(|drag| drag.carries(&endpoint.id));
+        let metrics = reading
+            .and_then(|reading| load(format!("{prefix}host-load-{id}"), reading, scale.detail));
+        let height = if metrics.is_some() {
+            ROW_HEIGHT + f32::from(self.view_look().at(METRICS_LINE))
+        } else {
+            ROW_HEIGHT
+        };
+        // The metrics line up with the name, past the origin icon.
+        let indent = if self.config.show_device_icons {
+            ORIGIN + GAP
+        } else {
+            0.
+        };
         div()
             .id(SharedString::from(format!("{prefix}host-{id}")))
             .debug_selector(|| format!("{prefix}host-{id}"))
             .group(HOST_GROUP)
-            .h(px(ROW_HEIGHT))
+            .h(px(height))
             .flex_none()
             .relative()
             .flex()
-            .items_center()
-            .gap(px(8.))
+            .flex_col()
+            .justify_center()
             .px(px(look.content_x()))
             // Rows scrolling underneath show through anything translucent, so
             // the copy paints the sidebar's own background, and stops hover
@@ -211,68 +228,81 @@ impl HerdrWindow {
                     this.menu.opening_right_click = this.menu.page == Some(crate::menu::Page::Host);
                 }),
             )
-            .when(self.config.show_device_icons, |row| {
-                row.child(
-                    div()
-                        .debug_selector(|| format!("{prefix}host-origin-{id}"))
-                        .flex_none()
-                        .child(icon(
-                            origin.icon(),
-                            ORIGIN,
-                            if endpoint.enabled {
-                                theme.subtext()
-                            } else {
-                                theme.muted
-                            },
-                        )),
-                )
-            })
-            .when(removing, |row| {
-                row.child(removing_dot("host-removing", theme))
-            })
             .child(
                 div()
-                    .debug_selector(|| format!("{prefix}host-label-{id}"))
-                    .flex_shrink_1()
-                    .min_w_0()
-                    .truncate()
-                    .text_size(px(scale.name))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child(label_text(&endpoint.label)),
-            )
-            .child(
-                div()
-                    .debug_selector(|| format!("{prefix}host-kind-{id}"))
-                    .flex_shrink(100.)
-                    .min_w_0()
-                    .truncate()
-                    .text_size(px(scale.secondary))
-                    .text_color(rgb(theme.muted))
-                    .child(label_text(&kind(origin))),
-            )
-            .child(
-                div()
-                    .debug_selector(|| format!("{prefix}host-dot-{id}"))
-                    .size(px(DOT))
-                    .flex_none()
-                    .rounded_full()
-                    .bg(rgb(host_dot(&live.status, theme))),
-            )
-            .child(
-                div()
-                    .ml_auto()
                     .min_w_0()
                     .flex()
                     .items_center()
-                    .justify_end()
-                    .gap(px(2.))
-                    .text_color(rgb(theme.muted))
-                    .children(reading.and_then(|reading| {
-                        load(format!("{prefix}host-load-{id}"), reading, scale.detail)
-                    }))
-                    .child(fold)
-                    .child(new_space),
+                    .gap(px(GAP))
+                    .when(self.config.show_device_icons, |line| {
+                        line.child(
+                            div()
+                                .debug_selector(|| format!("{prefix}host-origin-{id}"))
+                                .flex_none()
+                                .child(icon(
+                                    origin.icon(),
+                                    ORIGIN,
+                                    if endpoint.enabled {
+                                        theme.subtext()
+                                    } else {
+                                        theme.muted
+                                    },
+                                )),
+                        )
+                    })
+                    .when(removing, |line| {
+                        line.child(removing_dot("host-removing", theme))
+                    })
+                    .child(
+                        div()
+                            .debug_selector(|| format!("{prefix}host-label-{id}"))
+                            .flex_shrink_1()
+                            .min_w_0()
+                            .truncate()
+                            .text_size(px(scale.name))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(label_text(&endpoint.label)),
+                    )
+                    .child(
+                        div()
+                            .debug_selector(|| format!("{prefix}host-kind-{id}"))
+                            .flex_shrink(100.)
+                            .min_w_0()
+                            .truncate()
+                            .text_size(px(scale.secondary))
+                            .text_color(rgb(theme.muted))
+                            .child(label_text(&kind(origin))),
+                    )
+                    .child(
+                        div()
+                            .debug_selector(|| format!("{prefix}host-dot-{id}"))
+                            .size(px(DOT))
+                            .flex_none()
+                            .rounded_full()
+                            .bg(rgb(host_dot(&live.status, theme))),
+                    )
+                    .child(
+                        div()
+                            .ml_auto()
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .gap(px(2.))
+                            .text_color(rgb(theme.muted))
+                            .child(fold)
+                            .child(new_space),
+                    ),
             )
+            .children(metrics.map(|metrics| {
+                div()
+                    .debug_selector(|| format!("{prefix}host-load-line-{id}"))
+                    .min_w_0()
+                    .flex()
+                    .overflow_hidden()
+                    .ml(px(indent))
+                    .text_color(rgb(theme.muted))
+                    .child(metrics)
+            }))
             .on_click(cx.listener(move |this, _, window, cx| {
                 this.select_endpoint(&select_id, cx);
                 window.focus(&this.focus, cx);

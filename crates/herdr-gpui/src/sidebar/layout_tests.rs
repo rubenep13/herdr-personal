@@ -37,6 +37,8 @@ mod host_agents;
 #[cfg(test)]
 mod host_groups;
 #[cfg(test)]
+mod host_metrics;
+#[cfg(test)]
 mod host_nesting;
 #[cfg(test)]
 mod host_origin;
