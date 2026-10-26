@@ -13,6 +13,7 @@ mod dialog;
 mod host_badges;
 mod look;
 mod markdown;
+mod narrow;
 mod rows;
 mod sessions;
 mod status_colours;

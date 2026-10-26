@@ -3,7 +3,7 @@
 //! virtualized, so thousands of beads cost only the rows on screen.
 
 use super::{
-    Event, OrchestratorView, PREVIEW_MAX_SHARE, PREVIEW_MIN, PreviewDrag,
+    Event, LIST_MIN, OrchestratorView, PREVIEW_MAX_SHARE, PREVIEW_MIN, PreviewDrag,
     look::{Look, age},
     rows::{Runs, Sort, Tab},
 };
@@ -14,6 +14,15 @@ use crate::{
 use gpui::{prelude::*, *};
 
 impl OrchestratorView {
+    /// Whether the preview goes under the list: beside it, the list would
+    /// get narrower than `LIST_MIN`. Unknown before the first layout.
+    pub(super) fn preview_stacked(&self) -> bool {
+        let width = self.width.get();
+        self.preview_open
+            && width > 0.
+            && width - self.preview_width < f32::from(self.look.view().at(LIST_MIN))
+    }
+
     pub(super) fn render_inbox(
         &mut self,
         window: &mut Window,
@@ -22,6 +31,7 @@ impl OrchestratorView {
         let preview = self
             .preview_open
             .then(|| self.render_preview_pane(window, cx));
+        let side_by_side = f32::from(self.look.view().at(LIST_MIN)) + self.preview_width;
         div()
             .flex_1()
             .min_h_0()
@@ -34,11 +44,17 @@ impl OrchestratorView {
             .child(
                 div()
                     .id("orchestrator-body")
+                    .relative()
                     .flex_1()
                     .min_h_0()
                     .flex()
+                    .when(self.preview_stacked(), |body| body.flex_col())
                     .on_drag_move(cx.listener(
                         |this, event: &DragMoveEvent<PreviewDrag>, window, cx| {
+                            // Under the list the preview has no edge to drag.
+                            if this.preview_stacked() {
+                                return;
+                            }
                             let right = event.bounds.right();
                             let width = f32::from(right - event.event.position.x);
                             let max = f32::from(window.viewport_size().width) * PREVIEW_MAX_SHARE;
@@ -51,6 +67,7 @@ impl OrchestratorView {
                             cx.notify();
                         },
                     ))
+                    .child(self.width.probe([side_by_side]))
                     .child(self.render_list(cx))
                     .children(preview),
             )
