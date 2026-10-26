@@ -16,7 +16,7 @@ use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px,
 use herdr_client::ConnectTarget;
 use std::sync::Arc;
 
-fn change(path: &str, kind: char) -> FileChange {
+pub(super) fn change(path: &str, kind: char) -> FileChange {
     FileChange {
         path: path.into(),
         old_path: None,
@@ -29,7 +29,7 @@ fn change(path: &str, kind: char) -> FileChange {
     }
 }
 
-fn detail_of(commit: Commit, files: Vec<FileChange>) -> Arc<CommitDetail> {
+pub(super) fn detail_of(commit: Commit, files: Vec<FileChange>) -> Arc<CommitDetail> {
     Arc::new(CommitDetail {
         commit,
         body: "first line\nsecond line".into(),

@@ -122,3 +122,44 @@ fn a_saved_width_paints_unscaled_at_twelve(cx: &mut TestAppContext) {
     draw(cx);
     assert!((bounds(cx, "graph-col-refs").size.width - px(200.)).abs() < px(0.5));
 }
+
+#[gpui::test]
+fn the_diff_grows_with_the_interface(cx: &mut TestAppContext) {
+    use super::detail::{change, detail_of, focus};
+    use crate::git_graph::worker::Reply;
+    use crate::review::{Kind, Lines};
+    let commits = line(3);
+    let (view, cx) = shown(cx, History::new(&commits, &[], None, None, false), 600.);
+    focus(&view, cx);
+    cx.simulate_keystrokes("j enter");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let detail = detail_of(commits[0].clone(), vec![change("big.txt", 'M')]);
+            assert!(view.receive(0, Reply::Detail(detail), cx));
+        })
+    });
+    draw(cx);
+    draw(cx);
+    let file = bounds(cx, "graph-file-0").center();
+    cx.simulate_click(file, Modifiers::none());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let mut lines = Lines::default();
+            lines.push(Kind::Hunk, None, None, "@@ -1 +1 @@");
+            lines.push(Kind::Added, None, Some(1), "added");
+            let reply = Reply::Diff {
+                oid: "c0".into(),
+                path: "big.txt".into(),
+                lines: std::sync::Arc::new(lines.finish()),
+                spans: std::sync::Arc::new(vec![Vec::new(); 2]),
+                truncated: false,
+                binary: false,
+            };
+            assert!(view.receive(0, reply, cx));
+            view.set_look(chrome(18.), cx);
+        })
+    });
+    draw(cx);
+    draw(cx);
+    assert_eq!(bounds(cx, "graph-diff-line-1").size.height, px(27.));
+}

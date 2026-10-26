@@ -774,16 +774,18 @@ impl GitGraphView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = &self.look.theme;
+        // The diff grows with the history, as its rows do.
+        let at = |measure: f32| px(self.look.at(measure));
         let path = match diff.section {
             Some(section) => format!("{} \u{00b7} {}", section.title(), diff.path),
             None => diff.path.clone(),
         };
         let title = div()
             .flex_none()
-            .px_4()
-            .py_1()
+            .px(at(16.))
+            .py(at(4.))
             .text_font(&self.look.mono)
-            .text_size(px(12.))
+            .text_size(at(12.))
             .text_color(rgb(theme.subtext()))
             .truncate()
             .child(path);
@@ -833,9 +835,9 @@ impl GitGraphView {
                     div()
                         .debug_selector(|| "graph-diff-truncated".to_owned())
                         .flex_none()
-                        .px_4()
-                        .py_1()
-                        .text_size(px(12.))
+                        .px(at(16.))
+                        .py(at(4.))
+                        .text_size(at(12.))
                         .text_color(rgb(theme.muted))
                         .child(format!(
                             "Diff cut at {} lines.",
@@ -848,15 +850,16 @@ impl GitGraphView {
 
     fn render_diff_line(&self, lines: &Lines, spans: &[Vec<Span>], index: usize) -> AnyElement {
         let theme = &self.look.theme;
+        let at = |measure: f32| px(self.look.at(measure));
         let Some(line) = lines.get(index) else {
-            return div().h(px(DIFF_LINE_H)).into_any_element();
+            return div().h(at(DIFF_LINE_H)).into_any_element();
         };
         let tint = diff_tint(theme, line.kind);
         let number = |value: Option<u32>| {
             div()
                 .flex_none()
-                .w(px(42.))
-                .pr(px(6.))
+                .w(at(42.))
+                .pr(at(6.))
                 .flex()
                 .justify_end()
                 .text_color(rgb(theme.muted))
@@ -888,19 +891,19 @@ impl GitGraphView {
         });
         div()
             .debug_selector(move || format!("graph-diff-line-{index}"))
-            .h(px(DIFF_LINE_H))
+            .h(at(DIFF_LINE_H))
             .flex()
             .whitespace_nowrap()
             .text_font(&self.look.mono)
-            .text_size(px(12.))
-            .line_height(px(DIFF_LINE_H))
+            .text_size(at(12.))
+            .line_height(at(DIFF_LINE_H))
             .when_some(background, |el, wash| el.bg(wash))
             .when(line.kind == Kind::Hunk, |el| {
                 el.text_color(rgb(theme.ink(theme.palette[4])))
             })
             .child(number(line.old))
             .child(number(line.new))
-            .child(div().pl_1().pr_2().child(sign))
+            .child(div().pl(at(4.)).pr(at(8.)).child(sign))
             .child(code)
             .into_any_element()
     }
