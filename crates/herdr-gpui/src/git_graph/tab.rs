@@ -105,12 +105,17 @@ impl HerdrWindow {
     /// The graph's look: the UI font's family at the terminal font's size,
     /// so Cmd-+ and Cmd-- scale it with the terminals.
     pub(super) fn graph_look(&self) -> GraphLook {
+        // The rows' text grows with the terminal's, as Cmd-+ does, and with
+        // `[ui]`, as the rows' measures do.
+        let grown = self.config.terminal.size * self.config.ui.size / 12.;
         let mut ui = self.config.ui.clone();
-        ui.size = self.config.terminal.size;
+        ui.size = grown;
+        let mut mono = self.config.terminal.clone();
+        mono.size = grown;
         GraphLook::new(
             self.theme.clone(),
             ui,
-            self.config.terminal.clone(),
+            mono,
             self.theme_light,
             &self.chrome_font(),
         )

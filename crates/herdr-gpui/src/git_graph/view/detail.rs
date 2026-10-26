@@ -325,12 +325,13 @@ impl GitGraphView {
     /// three quarters of the tab.
     pub(super) fn panel_width(&self) -> f32 {
         let tab = self.width.get();
+        let least = self.look.at(PANEL_MIN);
         let most = if tab > 0. {
-            (tab * PANEL_SHARE).max(PANEL_MIN)
+            (tab * PANEL_SHARE).max(least)
         } else {
             f32::MAX
         };
-        self.prefs.panel_width.clamp(PANEL_MIN, most)
+        self.look.at(self.prefs.panel_width).clamp(least, most)
     }
 
     /// Whether the panel goes under the graph: beside it, at the width it
@@ -340,7 +341,7 @@ impl GitGraphView {
         let tab = self.width.get();
         self.panel.is_some()
             && tab > 0.
-            && tab - self.prefs.panel_width.max(PANEL_MIN)
+            && tab - self.look.at(self.prefs.panel_width.max(PANEL_MIN))
                 < f32::from(self.look.view().at(GRAPH_SIDE_MIN))
     }
 
@@ -348,8 +349,10 @@ impl GitGraphView {
     /// `tab` wide. The graph keeps `GRAPH_SIDE_MIN` beside it.
     pub(super) fn drag_panel(&self, x: f32, tab: f32, cx: &mut App) {
         let graph = f32::from(self.look.view().at(GRAPH_SIDE_MIN));
-        let most = (tab * PANEL_SHARE).min(tab - graph).max(PANEL_MIN);
-        let width = (tab - x).clamp(PANEL_MIN, most);
+        let least = self.look.at(PANEL_MIN);
+        let most = (tab * PANEL_SHARE).min(tab - graph).max(least);
+        // Saved as at the face of 12, as the columns are.
+        let width = (tab - x).clamp(least, most) / self.look.scale();
         crate::git_graph::prefs::GraphPrefsStore::update(cx, |prefs| prefs.panel_width = width);
     }
 

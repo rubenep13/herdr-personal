@@ -34,8 +34,10 @@ struct Piece {
     dangling: bool,
 }
 
-/// What a row paints under its node.
+/// What a row paints under its node, in the geometry's measures at the
+/// face of 12; `scale` takes them to the graph's size.
 struct Paint {
+    scale: f32,
     node_x: f32,
     colour: u32,
     band: f32,
@@ -44,27 +46,29 @@ struct Paint {
 }
 
 fn paint(bounds: Bounds<Pixels>, paint: &Paint, window: &mut Window) {
-    let at = |x: f32, y: f32| point(bounds.origin.x + px(x), bounds.origin.y + px(y));
+    let scale = paint.scale;
+    let length = |measure: f32| px(measure * scale);
+    let at = |x: f32, y: f32| point(bounds.origin.x + length(x), bounds.origin.y + length(y));
     window.with_content_mask(Some(ContentMask { bounds }), |window| {
         let band = Bounds::new(
             at(paint.node_x, 1.),
             size(
-                (bounds.size.width - px(paint.node_x)).max(px(0.)),
-                px(ROW_H - 2.),
+                (bounds.size.width - length(paint.node_x)).max(px(0.)),
+                length(ROW_H - 2.),
             ),
         );
         window.paint_quad(fill(band, tint(paint.colour, paint.band)));
         if paint.leader {
             let leader = Bounds::new(
                 at(0., ROW_H / 2. - 0.75),
-                size(px((paint.node_x - NODE_R).max(0.)), px(1.5)),
+                size(length((paint.node_x - NODE_R).max(0.)), length(1.5)),
             );
             window.paint_quad(fill(leader, tint(paint.colour, LEADER_ALPHA)));
         }
         for piece in &paint.pieces {
-            let mut path = PathBuilder::stroke(px(STROKE));
+            let mut path = PathBuilder::stroke(length(STROKE));
             if piece.dangling {
-                path = path.dash_array(&DASH.map(px));
+                path = path.dash_array(&DASH.map(length));
             }
             for step in &piece.steps {
                 match *step {
@@ -76,7 +80,7 @@ fn paint(bounds: Bounds<Pixels>, paint: &Paint, window: &mut Window) {
                         x,
                         y,
                     } => path.arc_to(
-                        point(px(radius), px(radius)),
+                        point(length(radius), length(radius)),
                         px(0.),
                         false,
                         sweep,
@@ -119,6 +123,7 @@ impl GitGraphView {
             })
             .collect();
         let painted = Paint {
+            scale: self.look.scale(),
             node_x,
             colour,
             band: self.band(row),
@@ -161,7 +166,7 @@ impl GitGraphView {
             CommitKind::Stash => (
                 STASH_SIDE,
                 div()
-                    .rounded(px(3.))
+                    .rounded(px(self.look.at(3.)))
                     .bg(rgb(theme.background))
                     .border_2()
                     .border_dashed()
@@ -195,8 +200,8 @@ impl GitGraphView {
                             div()
                                 .debug_selector(move || format!("graph-initials-{row}"))
                                 .text_color(white())
-                                .text_size(px(9.))
-                                .line_height(px(9.))
+                                .text_size(px(self.look.at(9.)))
+                                .line_height(px(self.look.at(9.)))
                                 .font_weight(FontWeight::BOLD)
                                 .child(initials(&commit.author)),
                         ),
@@ -205,9 +210,9 @@ impl GitGraphView {
         };
         node.debug_selector(move || format!("graph-node-{row}"))
             .absolute()
-            .left(px(x - side / 2.))
-            .top(px((ROW_H - side) / 2.))
-            .size(px(side))
+            .left(px(self.look.at(x - side / 2.)))
+            .top(px(self.look.at((ROW_H - side) / 2.)))
+            .size(px(self.look.at(side)))
             .into_any_element()
     }
 }

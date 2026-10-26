@@ -30,7 +30,7 @@ impl GitGraphView {
         ]
         .into_iter()
         .filter(|(on, ..)| *on)
-        .map(|(_, key, label, width)| (key, label, width))
+        .map(|(_, key, label, width)| (key, label, self.look.at(width)))
         .collect()
     }
 
@@ -45,7 +45,7 @@ impl GitGraphView {
         let theme = self.look.theme.clone();
         let (Some(commit), Some(node)) = (history.commits.get(row), history.layout.nodes.get(row))
         else {
-            return div().h(px(ROW_H)).into_any_element();
+            return div().h(px(self.look.at(ROW_H))).into_any_element();
         };
         let colour = if commit.kind == CommitKind::Worktree {
             theme.subtext()
@@ -88,7 +88,7 @@ impl GitGraphView {
             .debug_selector(move || format!("graph-row-{row}"))
             .group("graph-row")
             .relative()
-            .h(px(ROW_H))
+            .h(px(self.look.at(ROW_H)))
             .w_full()
             .flex()
             .items_center()
@@ -115,6 +115,7 @@ impl GitGraphView {
         colour: u32,
     ) -> AnyElement {
         let theme = &self.look.theme;
+        let at = |measure: f32| px(self.look.at(measure));
         let tint = if self.selected_row() == Some(row) {
             MESSAGE_SELECTED
         } else {
@@ -124,12 +125,12 @@ impl GitGraphView {
             .id(("graph-msg", row))
             .debug_selector(move || format!("graph-msg-{row}"))
             .flex_1()
-            .min_w(px(MESSAGE_MIN))
-            .h(px(ROW_H - 2.))
-            .px(px(10.))
+            .min_w(at(MESSAGE_MIN))
+            .h(at(ROW_H - 2.))
+            .px(at(10.))
             .flex()
             .items_center()
-            .gap(px(8.))
+            .gap(at(8.))
             .overflow_hidden()
             .whitespace_nowrap()
             .border_l_3()
@@ -145,13 +146,13 @@ impl GitGraphView {
                     div()
                         .debug_selector(move || format!("graph-wip-{key}-{row}"))
                         .flex_none()
-                        .h(px(18.))
-                        .px(px(7.))
-                        .rounded(px(9.))
+                        .h(at(18.))
+                        .px(at(7.))
+                        .rounded(at(9.))
                         .bg(rgb(mix(theme.background, theme.foreground, 6)))
                         .text_color(rgb(ink))
-                        .text_size(px(11.))
-                        .line_height(px(18.))
+                        .text_size(at(11.))
+                        .line_height(at(18.))
                         .child(format!("{count} {what}"))
                 })
             };
@@ -213,7 +214,7 @@ impl GitGraphView {
                     .right_0()
                     .top_0()
                     .h_full()
-                    .w(px(3.))
+                    .w(at(3.))
                     .bg(rgb(match_colour)),
             )
         })
@@ -269,9 +270,9 @@ impl GitGraphView {
                     .id(SharedString::from(format!("graph-{key}-{}", commit.oid)))
                     .flex_none()
                     .w(px(width))
-                    .px_2()
+                    .px(px(self.look.at(8.)))
                     .truncate()
-                    .text_size(px(if mono { 11.5 } else { 12. }))
+                    .text_size(px(self.look.at(if mono { 11.5 } else { 12. })))
                     .text_color(rgb(if mono { theme.muted } else { theme.subtext() }))
                     .when(mono, |cell| {
                         use crate::fonts::StyledFont;
@@ -289,6 +290,7 @@ impl GitGraphView {
     /// A pill on the top edge of the first row of a time bucket.
     fn render_marker(&self, when: &str, at: i64) -> AnyElement {
         let theme = &self.look.theme;
+        let scaled = |measure: f32| px(self.look.at(measure));
         let tail: f32 = self
             .optional_columns()
             .iter()
@@ -297,15 +299,15 @@ impl GitGraphView {
         div()
             .id(SharedString::from(format!("graph-when-{at}")))
             .absolute()
-            .top(px(-9.))
-            .right(px(tail + 8.))
-            .h(px(18.))
-            .px(px(7.))
-            .rounded(px(3.))
+            .top(scaled(-9.))
+            .right(px(tail) + scaled(8.))
+            .h(scaled(18.))
+            .px(scaled(7.))
+            .rounded(scaled(3.))
             .bg(rgb(mix(theme.background, theme.foreground, 20)))
             .text_color(rgb(theme.foreground))
-            .text_size(px(11.))
-            .line_height(px(18.))
+            .text_size(scaled(11.))
+            .line_height(scaled(18.))
             .child(when.to_owned())
             .tooltip(self.look.view().menu().tooltip(full_date(at)))
             .into_any_element()

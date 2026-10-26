@@ -87,6 +87,18 @@ impl GraphLook {
     pub(crate) fn view(&self) -> crate::design::ViewLook {
         self.view
     }
+
+    /// How much the history grows with the chrome: 1 at the face of 12.
+    pub(crate) fn scale(&self) -> f32 {
+        f32::from(self.view.at(1.))
+    }
+
+    /// `measure`, given at the face of 12, at the chrome's face. Rows,
+    /// lanes, nodes, labels and column widths all go through it, the same
+    /// for painting and for the pointer.
+    pub(crate) fn at(&self, measure: f32) -> f32 {
+        measure * self.scale()
+    }
 }
 
 pub(crate) struct GitGraphView {
@@ -587,7 +599,8 @@ impl GitGraphView {
         {
             return;
         }
-        if look.ui.family != self.look.ui.family {
+        // Labels shape at the chrome's size too.
+        if look.ui.family != self.look.ui.family || look.view() != self.look.view() {
             self.chip_widths.clear();
         }
         self.search_input.update(cx, |input, cx| {
@@ -603,7 +616,8 @@ impl GitGraphView {
             .history
             .as_ref()
             .map_or(1, |history| history.layout.lane_count);
-        self.prefs.graph_width.unwrap_or_else(|| graph_width(lanes))
+        self.look
+            .at(self.prefs.graph_width.unwrap_or_else(|| graph_width(lanes)))
     }
 
     /// Which of `row`'s labels fit in the label column.
@@ -766,7 +780,7 @@ impl Render for GitGraphView {
             .text_color(rgb(theme.foreground))
             .text_font(&self.look.ui)
             .text_size(px(self.look.ui.size))
-            .line_height(px(ROW_H))
+            .line_height(px(self.look.at(ROW_H)))
             .relative()
             .child(measure)
             .child(bar)

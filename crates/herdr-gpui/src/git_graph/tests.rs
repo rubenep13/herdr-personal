@@ -31,6 +31,7 @@ mod prefs;
 mod readonly;
 mod remote;
 mod rows;
+mod scale;
 mod search;
 mod tab;
 mod text;

@@ -178,7 +178,7 @@ impl GitGraphView {
     /// `REFS_MIN` when the graph's side of the tab has no room for the
     /// other columns, its labels then fitting fewer.
     pub(super) fn refs_width(&self) -> f32 {
-        let chosen = self.prefs.refs_width;
+        let chosen = self.look.at(self.prefs.refs_width);
         let tab = self.width.get();
         if tab <= 0. {
             return chosen;
@@ -193,8 +193,8 @@ impl GitGraphView {
             .iter()
             .map(|(_, _, width)| width)
             .sum();
-        let others = self.graph_width() + MESSAGE_MIN + optional + self.gear_place();
-        (side - others).clamp(REFS_MIN.min(chosen), chosen)
+        let others = self.graph_width() + self.look.at(MESSAGE_MIN) + optional + self.gear_place();
+        (side - others).clamp(self.look.at(REFS_MIN).min(chosen), chosen)
     }
 
     pub(super) fn render_columns(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -263,7 +263,7 @@ impl GitGraphView {
             .child(
                 column("msg", "Commit message")
                     .flex_1()
-                    .min_w(px(MESSAGE_MIN))
+                    .min_w(px(self.look.at(MESSAGE_MIN)))
                     .border_l_1()
                     .border_color(rgb(theme.active)),
             )
@@ -358,12 +358,15 @@ impl GitGraphView {
         .into_any_element()
     }
 
-    /// Follows a dragged column edge: `x` is the pointer, from the view's left.
+    /// Follows a dragged column edge: `x` is the pointer, from the view's
+    /// left. Widths are saved as at the face of 12, so every size shares
+    /// them.
     pub(super) fn drag_column(&self, drag: ColumnDrag, x: f32, cx: &mut App) {
         let refs = self.refs_width();
+        let scale = self.look.scale();
         GraphPrefsStore::update(cx, |prefs| match drag {
-            ColumnDrag::Refs => prefs.refs_width = x,
-            ColumnDrag::Graph => prefs.graph_width = Some(x - refs),
+            ColumnDrag::Refs => prefs.refs_width = x / scale,
+            ColumnDrag::Graph => prefs.graph_width = Some((x - refs) / scale),
             ColumnDrag::Panel => {}
         });
     }

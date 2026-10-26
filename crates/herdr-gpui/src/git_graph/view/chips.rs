@@ -83,7 +83,7 @@ impl GitGraphView {
         let width = f32::from(
             window
                 .text_system()
-                .shape_line(text.clone(), px(CHIP_TEXT), &[run], None)
+                .shape_line(text.clone(), px(self.look.at(CHIP_TEXT)), &[run], None)
                 .width,
         )
         .ceil();
@@ -94,8 +94,9 @@ impl GitGraphView {
     fn chip_width(&mut self, chip: &Chip, window: &Window) -> f32 {
         let (before, after) = chip_icons(chip);
         self.text_width(&chip.label, window)
-            + 2. * CHIP_PAD
-            + (before.len() + after.len()) as f32 * ICON_STEP
+            + self
+                .look
+                .at(2. * CHIP_PAD + (before.len() + after.len()) as f32 * ICON_STEP)
     }
 
     pub(super) fn fit(&mut self, chips: &[Chip], window: &Window) -> ChipFit {
@@ -104,14 +105,14 @@ impl GitGraphView {
             .map(|chip| self.chip_width(chip, window))
             .collect();
         let badges: Vec<f32> = (0..=chips.len())
-            .map(|hidden| self.text_width(&format!("+{hidden}"), window) + BADGE_PAD)
+            .map(|hidden| self.text_width(&format!("+{hidden}"), window) + self.look.at(BADGE_PAD))
             .collect();
         fit_chips(
             &widths,
-            self.refs_width() - REFS_INSET,
+            self.refs_width() - self.look.at(REFS_INSET),
             |hidden| badges.get(hidden).copied().unwrap_or_default(),
-            CHIP_GAP,
-            MIN_LEADER,
+            self.look.at(CHIP_GAP),
+            self.look.at(MIN_LEADER),
         )
     }
 
@@ -131,28 +132,29 @@ impl GitGraphView {
     fn chip(&self, chip: &Chip, width: f32, lane: u32) -> Div {
         let (fill, text, border, bold) = self.chip_colours(chip, lane);
         let (before, after) = chip_icons(chip);
+        let at = |measure: f32| px(self.look.at(measure));
         let icon = |path: &'static str| {
             svg()
                 .flex_none()
-                .size(px(ICON))
+                .size(at(ICON))
                 .path(path)
                 .text_color(rgb(text))
         };
         div()
             .flex_none()
             .w(px(width))
-            .h(px(CHIP_H))
-            .px(px(CHIP_PAD))
-            .rounded(px(3.))
+            .h(at(CHIP_H))
+            .px(at(CHIP_PAD))
+            .rounded(at(3.))
             .flex()
             .items_center()
-            .gap(px(ICON_STEP - ICON))
+            .gap(at(ICON_STEP - ICON))
             .overflow_hidden()
             .when_some(fill, |el, fill| el.bg(rgb(fill)))
             .when_some(border, |el, border| el.border_1().border_color(rgb(border)))
             .text_color(rgb(text))
-            .text_size(px(CHIP_TEXT))
-            .line_height(px(CHIP_H))
+            .text_size(at(CHIP_TEXT))
+            .line_height(at(CHIP_H))
             .font_weight(if bold {
                 FontWeight::SEMIBOLD
             } else {
@@ -181,6 +183,8 @@ impl GitGraphView {
     ) -> (AnyElement, Option<AnyElement>) {
         let fit = self.fit(chips, window);
         let theme = self.look.theme.clone();
+        let look = self.look.clone();
+        let at = |measure: f32| px(look.at(measure));
         let mut cell = div()
             .id(("graph-refs", row))
             .flex_none()
@@ -188,11 +192,11 @@ impl GitGraphView {
             .h_full()
             .flex()
             .items_center()
-            .gap(px(CHIP_GAP))
-            .pl(px(REFS_INSET))
+            .gap(at(CHIP_GAP))
+            .pl(at(REFS_INSET))
             .overflow_hidden();
         let mut whole = None;
-        let mut x = REFS_INSET;
+        let mut x = look.at(REFS_INSET);
         for (position, &index) in fit.shown.iter().enumerate() {
             let Some(chip) = chips.get(index) else {
                 continue;
@@ -224,14 +228,14 @@ impl GitGraphView {
                         div()
                             .absolute()
                             .left(px(x))
-                            .top(px((ROW_H - CHIP_H) / 2.))
+                            .top(at((ROW_H - CHIP_H) / 2.))
                             .shadow_md()
                             .child(self.chip(chip, natural, lane)),
                     )
                     .into_any_element(),
                 );
             }
-            x += width + CHIP_GAP;
+            x += width + look.at(CHIP_GAP);
         }
         if fit.hidden > 0 {
             let hidden: Vec<&str> = chips
@@ -246,20 +250,20 @@ impl GitGraphView {
                     .id(SharedString::from(format!("graph-chip-more-{row}")))
                     .debug_selector(move || format!("graph-chip-more-{row}"))
                     .flex_none()
-                    .h(px(CHIP_H))
-                    .px(px(BADGE_PAD / 2.))
-                    .rounded(px(3.))
+                    .h(at(CHIP_H))
+                    .px(at(BADGE_PAD / 2.))
+                    .rounded(at(3.))
                     .bg(rgb(mix(theme.background, theme.foreground, 8)))
                     .text_color(rgb(theme.subtext()))
-                    .text_size(px(CHIP_TEXT))
-                    .line_height(px(CHIP_H))
+                    .text_size(at(CHIP_TEXT))
+                    .line_height(at(CHIP_H))
                     .child(format!("+{}", fit.hidden))
                     .tooltip(self.look.view().menu().tooltip(hint)),
             );
         }
         let mut leader: Hsla = rgb(lane).into();
         leader.a = LEADER_ALPHA;
-        cell = cell.child(div().flex_1().min_w(px(12.)).h(px(1.5)).bg(leader));
+        cell = cell.child(div().flex_1().min_w(at(12.)).h(at(1.5)).bg(leader));
         (cell.into_any_element(), whole)
     }
 }
