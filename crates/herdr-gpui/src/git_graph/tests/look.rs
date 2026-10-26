@@ -5,7 +5,7 @@ use crate::git_graph::history::History;
 use gpui::{TestAppContext, px, size};
 
 /// A view at the graph's face of `font` points, showing a short line.
-fn sized(
+pub(super) fn sized(
     cx: &mut TestAppContext,
     font: f32,
 ) -> (

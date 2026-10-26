@@ -37,7 +37,7 @@ fn detail_of(commit: Commit, files: Vec<FileChange>) -> Arc<CommitDetail> {
     })
 }
 
-fn focus(view: &gpui::Entity<GitGraphView>, cx: &mut VisualTestContext) {
+pub(super) fn focus(view: &gpui::Entity<GitGraphView>, cx: &mut VisualTestContext) {
     cx.update(|window, cx| {
         let handle = view.read(cx).focus_handle.clone();
         window.focus(&handle, cx);
@@ -294,6 +294,9 @@ fn panel_resizes_within_bounds_and_is_remembered(cx: &mut TestAppContext) {
     let (view, cx) = shown(cx, History::new(&line(5), &[], None, None, false), 600.);
     focus(&view, cx);
     cx.simulate_keystrokes("j enter");
+    // Wide enough that the share, not the graph's room, bounds the panel.
+    cx.simulate_resize(size(px(2000.), px(600.)));
+    draw(cx);
     draw(cx);
     let drag = |cx: &mut VisualTestContext, to: f32| {
         let edge = bounds(cx, "graph-detail-resize").center();
@@ -316,9 +319,9 @@ fn panel_resizes_within_bounds_and_is_remembered(cx: &mut TestAppContext) {
         draw(cx);
         bounds(cx, "graph-detail").size.width
     };
-    assert_eq!(drag(cx, 10.), px(750.), "at most 75 % of the tab");
-    assert_eq!(drag(cx, 990.), px(320.), "at least 320");
-    let width = drag(cx, 500.);
+    assert_eq!(drag(cx, 10.), px(1500.), "at most 75 % of the tab");
+    assert_eq!(drag(cx, 1990.), px(320.), "at least 320");
+    let width = drag(cx, 1500.);
     assert_eq!(width, px(500.));
     assert_eq!(
         cx.update(|_, cx| GraphPrefsStore::get(cx).panel_width),

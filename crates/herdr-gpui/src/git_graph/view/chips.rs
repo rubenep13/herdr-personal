@@ -108,7 +108,7 @@ impl GitGraphView {
             .collect();
         fit_chips(
             &widths,
-            self.prefs.refs_width - REFS_INSET,
+            self.refs_width() - REFS_INSET,
             |hidden| badges.get(hidden).copied().unwrap_or_default(),
             CHIP_GAP,
             MIN_LEADER,
@@ -184,7 +184,7 @@ impl GitGraphView {
         let mut cell = div()
             .id(("graph-refs", row))
             .flex_none()
-            .w(px(self.prefs.refs_width))
+            .w(px(self.refs_width()))
             .h_full()
             .flex()
             .items_center()

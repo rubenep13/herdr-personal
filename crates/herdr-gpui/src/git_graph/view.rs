@@ -37,9 +37,7 @@ use crate::{
 use gpui::{prelude::*, *};
 use header::ColumnDrag;
 use std::{
-    cell::Cell,
     collections::{HashMap, HashSet},
-    rc::Rc,
     sync::Arc,
     time::Instant,
 };
@@ -125,8 +123,9 @@ pub(crate) struct GitGraphView {
     panel: Option<detail::Panel>,
     /// A commit being looked for page by page, and the pages left to read.
     jump: Option<(String, usize)>,
-    /// The tab's width at the last frame, for the panel's bounds.
-    width: Rc<Cell<f32>>,
+    /// The tab's width at the last frame, for the panel's bounds and
+    /// whether it goes under the graph.
+    width: crate::design::Width,
     search_input: Entity<SearchInput>,
     /// The search, while its field is open.
     search: Option<search::Search>,
@@ -246,7 +245,7 @@ impl GitGraphView {
             hovered_chip: None,
             panel: None,
             jump: None,
-            width: Rc::default(),
+            width: Default::default(),
             search_input,
             search: None,
             matches: HashSet::new(),
@@ -740,13 +739,9 @@ impl Render for GitGraphView {
         let panel = self.render_panel(cx);
         let results = self.render_results(f32::from(view.at(header::BAR_H)), cx);
         let help = self.render_help(cx);
-        let width = self.width.clone();
-        let measure = canvas(
-            move |bounds, _, _| width.set(f32::from(bounds.size.width)),
-            |_, (), _, _| {},
-        )
-        .absolute()
-        .size_full();
+        // Any move counts: the label column narrows smoothly with it.
+        let measure = self.width.follow();
+        let stacked = self.detail_stacked();
         div()
             .id("git-graph")
             .key_context("GitGraph")
@@ -757,7 +752,7 @@ impl Render for GitGraphView {
                     let x = f32::from(event.event.position.x - event.bounds.origin.x);
                     match *event.drag(cx) {
                         ColumnDrag::Panel => {
-                            Self::drag_panel(x, f32::from(event.bounds.size.width), cx)
+                            this.drag_panel(x, f32::from(event.bounds.size.width), cx)
                         }
                         drag => this.drag_column(drag, x, cx),
                     }
@@ -777,6 +772,14 @@ impl Render for GitGraphView {
             .child(bar)
             .children(results)
             .children(help)
-            .child(div().flex_1().min_h_0().flex().child(body).children(panel))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .when(stacked, |area| area.flex_col())
+                    .child(body)
+                    .children(panel),
+            )
     }
 }

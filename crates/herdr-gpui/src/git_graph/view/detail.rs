@@ -1,6 +1,7 @@
-//! The panel beside the graph: the selected commit's message, author, date,
-//! parents and labels, the files it changed, and the diff of the one chosen,
-//! as hgg's details panel shows them. It resizes by its left edge.
+//! The panel beside the graph, or under it in a narrow tab: the selected
+//! commit's message, author, date, parents and labels, the files it
+//! changed, and the diff of the one chosen, as hgg's details panel shows
+//! them. Beside the graph it resizes by its left edge.
 
 use super::{GitGraphView, header::ColumnDrag};
 use crate::{
@@ -26,6 +27,9 @@ use std::sync::Arc;
 const JUMP_PAGES: usize = 10;
 /// The share of the tab the panel may take.
 const PANEL_SHARE: f32 = 0.75;
+/// The narrowest the graph gets beside the panel, at the face of 12;
+/// narrower, the panel goes under it.
+const GRAPH_SIDE_MIN: f32 = 400.;
 const DIFF_LINE_H: f32 = 18.;
 /// The panel's measures at the graph's `[ui]`-sized face of 12: its resize
 /// edge, padding and line height, the captions' column, the subject's size
@@ -319,7 +323,7 @@ impl GitGraphView {
 
     /// The panel's width in a tab `tab` wide: chosen, within 320 px and
     /// three quarters of the tab.
-    fn panel_width(&self) -> f32 {
+    pub(super) fn panel_width(&self) -> f32 {
         let tab = self.width.get();
         let most = if tab > 0. {
             (tab * PANEL_SHARE).max(PANEL_MIN)
@@ -329,10 +333,23 @@ impl GitGraphView {
         self.prefs.panel_width.clamp(PANEL_MIN, most)
     }
 
+    /// Whether the panel goes under the graph: beside it, at the width it
+    /// was given, the graph would get narrower than `GRAPH_SIDE_MIN`.
+    /// Unknown before the first frame.
+    pub(super) fn detail_stacked(&self) -> bool {
+        let tab = self.width.get();
+        self.panel.is_some()
+            && tab > 0.
+            && tab - self.prefs.panel_width.max(PANEL_MIN)
+                < f32::from(self.look.view().at(GRAPH_SIDE_MIN))
+    }
+
     /// Follows the panel's dragged edge: `x` from the tab's left, in a tab
-    /// `tab` wide.
-    pub(super) fn drag_panel(x: f32, tab: f32, cx: &mut App) {
-        let width = (tab - x).clamp(PANEL_MIN, (tab * PANEL_SHARE).max(PANEL_MIN));
+    /// `tab` wide. The graph keeps `GRAPH_SIDE_MIN` beside it.
+    pub(super) fn drag_panel(&self, x: f32, tab: f32, cx: &mut App) {
+        let graph = f32::from(self.look.view().at(GRAPH_SIDE_MIN));
+        let most = (tab * PANEL_SHARE).min(tab - graph).max(PANEL_MIN);
+        let width = (tab - x).clamp(PANEL_MIN, most);
         crate::git_graph::prefs::GraphPrefsStore::update(cx, |prefs| prefs.panel_width = width);
     }
 
@@ -393,19 +410,27 @@ impl GitGraphView {
             )),
             (None, None) => self.panel_note("Loading commit\u{2026}"),
         };
+        // Under the graph it takes half the height and keeps the width it
+        // was given for when there is room beside.
+        let stacked = self.detail_stacked();
         Some(
             view.side_panel("graph-detail", Edge::Right)
                 .id("graph-detail")
                 .relative()
-                .w(px(self.panel_width()))
-                .h_full()
+                .map(|panel| {
+                    if stacked {
+                        panel.border_l_0().border_t_1().w_full().h(relative(0.5))
+                    } else {
+                        panel.w(px(self.panel_width())).h_full()
+                    }
+                })
                 .line_height(view.at(LINE))
                 .child(
                     view.side_header("graph-detail-header", title, None)
                         .child(close),
                 )
                 .child(body)
-                .child(edge)
+                .when(!stacked, |panel| panel.child(edge))
                 .into_any_element(),
         )
     }

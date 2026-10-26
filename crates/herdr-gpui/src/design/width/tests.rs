@@ -26,3 +26,12 @@ fn a_new_width_crossing_no_cut_asks_for_no_frame() {
     assert!(width.record(399., &[400., 800.]));
     assert!(!width.record(399., &[]));
 }
+
+#[test]
+fn following_asks_for_a_frame_on_any_move() {
+    let width = Width::default();
+    assert!(width.record_any(500.));
+    assert!(!width.record_any(500.2));
+    assert!(width.record_any(503.));
+    assert_eq!(width.get(), 503.);
+}

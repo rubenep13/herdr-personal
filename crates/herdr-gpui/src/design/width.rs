@@ -19,10 +19,20 @@ impl Width {
     /// lays out, and asks for another frame when that width moves across
     /// one of `cuts`, so the view follows on the next frame.
     pub(crate) fn probe<const N: usize>(&self, cuts: [f32; N]) -> impl IntoElement {
+        self.canvas(move |width, now| width.record(now, &cuts))
+    }
+
+    /// Like [`Self::probe`] for a view whose shape follows its width
+    /// smoothly: any move asks for another frame.
+    pub(crate) fn follow(&self) -> impl IntoElement {
+        self.canvas(Self::record_any)
+    }
+
+    fn canvas(&self, moved: impl Fn(&Self, f32) -> bool + 'static) -> impl IntoElement {
         let width = self.clone();
         canvas(
             move |bounds, window, _| {
-                if width.record(f32::from(bounds.size.width), &cuts) {
+                if moved(&width, f32::from(bounds.size.width)) {
                     window.refresh();
                 }
             },
@@ -37,6 +47,11 @@ impl Width {
     fn record(&self, now: f32, cuts: &[f32]) -> bool {
         let before = self.0.replace(now);
         before <= 0. && now > 0. || band(before, cuts) != band(now, cuts)
+    }
+
+    /// Keeps `now` and says whether it moved by half a pixel or more.
+    fn record_any(&self, now: f32) -> bool {
+        (self.0.replace(now) - now).abs() >= 0.5
     }
 }
 

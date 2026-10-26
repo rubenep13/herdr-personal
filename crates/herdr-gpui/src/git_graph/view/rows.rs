@@ -61,7 +61,7 @@ impl GitGraphView {
             None => (
                 div()
                     .flex_none()
-                    .w(px(self.prefs.refs_width))
+                    .w(px(self.refs_width()))
                     .h_full()
                     .into_any_element(),
                 None,
@@ -100,6 +100,8 @@ impl GitGraphView {
             .child(graph)
             .child(self.render_message_cell(history, commit, row, colour))
             .children(self.render_optional_cells(commit, now))
+            // Under the headings' gear.
+            .child(div().flex_none().w(px(self.gear_place())))
             .children(marker)
             .children(whole)
             .into_any_element()
