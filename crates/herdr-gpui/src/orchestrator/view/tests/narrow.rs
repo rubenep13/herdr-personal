@@ -147,3 +147,31 @@ fn the_empty_list_reads_on_one_line(cx: &mut TestAppContext) {
     let name = view.read_with(cx, |view, _| view.look.view().scale().name);
     assert!(empty.size.height <= px(name * 2.), "{empty:?}");
 }
+
+#[gpui::test]
+fn dragging_the_preview_wide_keeps_it_beside_the_list(cx: &mut TestAppContext) {
+    use gpui::{Modifiers, MouseButton, point};
+    let (_dir, view, cx) = inbox(cx, issues(3));
+    // Three fifths of the window would leave the list under 400 px.
+    settle(cx, 900., 700.);
+    let preview = bounds(cx, "orchestrator-preview-pane");
+    let edge = point(preview.left() + px(2.), preview.center().y);
+    cx.simulate_mouse_down(edge, MouseButton::Left, Modifiers::default());
+    for x in [edge.x - px(20.), px(10.)] {
+        cx.simulate_mouse_move(point(x, edge.y), MouseButton::Left, Modifiers::default());
+    }
+    cx.simulate_mouse_up(
+        point(px(10.), edge.y),
+        MouseButton::Left,
+        Modifiers::default(),
+    );
+    settle(cx, 900., 700.);
+    let list = bounds(cx, "orchestrator-list");
+    let preview = bounds(cx, "orchestrator-preview-pane");
+    assert!(
+        preview.left() >= list.right(),
+        "{list:?} beside {preview:?}"
+    );
+    assert!(list.size.width >= px(400.) - px(1.), "{list:?}");
+    view.read_with(cx, |view, _| assert!(!view.preview_stacked()));
+}

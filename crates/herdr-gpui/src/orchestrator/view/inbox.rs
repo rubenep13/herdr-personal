@@ -59,7 +59,11 @@ impl OrchestratorView {
                             }
                             let right = event.bounds.right();
                             let width = f32::from(right - event.event.position.x);
-                            let max = f32::from(window.viewport_size().width) * PREVIEW_MAX_SHARE;
+                            // The list keeps its least width beside it, so a
+                            // drag never sends the preview under the list.
+                            let list = f32::from(this.look.view().at(LIST_MIN));
+                            let max = (f32::from(window.viewport_size().width) * PREVIEW_MAX_SHARE)
+                                .min(f32::from(event.bounds.size.width) - list);
                             // Dragged nearly shut, the preview closes.
                             if width < PREVIEW_MIN / 2. {
                                 this.preview_open = false;
