@@ -147,7 +147,7 @@ impl HerdrWindow {
         let row_of_four = f32::from(look.view.at(CARD_MIN)) * 4.
             + f32::from(look.view.at(BLOCK_GAP)) * 3.
             + padding;
-        let card = (width > 0.).then(|| width - padding);
+        let card = (width > 0.).then_some(width - padding);
         let [beside, middle_beside, middle_under] = chart::Shape::cuts(look.view);
         div()
             .id(SharedString::from(slot.selector("devices-tab")))
