@@ -4,6 +4,7 @@
 
 use super::{
     Event, LIST_MIN, OrchestratorView, PREVIEW_MAX_SHARE, PREVIEW_MIN, PreviewDrag,
+    filters::{FIELD_MIN, FilterFit},
     look::{Look, age},
     rows::{Runs, Sort, Tab},
 };
@@ -32,6 +33,7 @@ impl OrchestratorView {
             .preview_open
             .then(|| self.render_preview_pane(window, cx));
         let side_by_side = f32::from(self.look.view().at(LIST_MIN)) + self.preview_width;
+        let (fit, [full, icon_sort]) = self.filter_layout(window);
         div()
             .flex_1()
             .min_h_0()
@@ -39,7 +41,7 @@ impl OrchestratorView {
             .flex_col()
             .child(self.render_header(cx))
             .child(self.render_tabs(cx))
-            .child(self.render_search_row(window, cx))
+            .child(self.render_search_row(fit, window, cx))
             .children(self.render_banners(cx))
             .child(
                 div()
@@ -67,7 +69,7 @@ impl OrchestratorView {
                             cx.notify();
                         },
                     ))
-                    .child(self.width.probe([side_by_side]))
+                    .child(self.width.probe([side_by_side, full, icon_sort]))
                     .child(self.render_list(cx))
                     .children(preview),
             )
@@ -215,88 +217,11 @@ impl OrchestratorView {
         )
     }
 
-    fn render_search_row(&self, window: &Window, cx: &mut Context<Self>) -> Div {
-        let look = &self.look;
-        let view = look.view();
-        let filters = self.filters;
-        let mut row = view
-            .filters("orchestrator-filters")
-            .child(self.render_search_field(window, cx));
-        let toggle = |id: &'static str, label: &'static str, on: bool, flip: fn(&mut Self)| {
-            look.toggle(id, label, on)
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    flip(this);
-                    this.refresh_rows();
-                    cx.notify();
-                }))
-        };
-        match self.tab {
-            Tab::Issues => {
-                row = row
-                    .child(toggle(
-                        "orchestrator-beads",
-                        "Beads",
-                        filters.provider == Some(Provider::Beads),
-                        |this| {
-                            this.filters.provider = match this.filters.provider {
-                                Some(Provider::Beads) => None,
-                                _ => Some(Provider::Beads),
-                            };
-                        },
-                    ))
-                    .child(toggle(
-                        "orchestrator-has-run",
-                        "Has agent",
-                        filters.has_run,
-                        |this| {
-                            this.filters.has_run = !this.filters.has_run;
-                        },
-                    ))
-                    .child(toggle(
-                        "orchestrator-blocked",
-                        "Blocked",
-                        filters.blocked,
-                        |this| {
-                            this.filters.blocked = !this.filters.blocked;
-                        },
-                    ));
-            }
-            Tab::PullRequests => {
-                row = row
-                    .child(toggle(
-                        "orchestrator-open",
-                        "Open",
-                        filters.open_only,
-                        |this| {
-                            this.filters.open_only = !this.filters.open_only;
-                        },
-                    ))
-                    .when(self.login.is_some(), |row| {
-                        row.child(toggle("orchestrator-mine", "Mine", self.mine, |this| {
-                            this.mine = !this.mine;
-                        }))
-                    })
-                    .child(toggle(
-                        "orchestrator-pr-has-run",
-                        "Has agent",
-                        filters.has_run,
-                        |this| {
-                            this.filters.has_run = !this.filters.has_run;
-                        },
-                    ));
-            }
-            Tab::Runs => {
-                row = row.child(toggle(
-                    "orchestrator-active",
-                    "Active",
-                    self.active_runs,
-                    |this| {
-                        this.active_runs = !this.active_runs;
-                    },
-                ));
-            }
-        }
-        row.child(div().flex_1())
+    fn render_search_row(&self, fit: FilterFit, window: &Window, cx: &mut Context<Self>) -> Div {
+        let view = self.look.view();
+        view.filters("orchestrator-filters")
+            .child(self.render_search_field(window, cx))
+            .children(self.render_filter_toggles(fit, cx))
             .when(self.tab != Tab::Runs, |row| {
                 row.child(
                     view.dropdown(
@@ -304,13 +229,19 @@ impl OrchestratorView {
                         "orchestrator-sort".to_owned(),
                         Some("icons/sort.svg"),
                         None,
-                        self.sort.label(),
+                        // Short of room, the order keeps only its icon.
+                        if fit == FilterFit::Full {
+                            self.sort.label()
+                        } else {
+                            ""
+                        },
                     )
-                    // In a narrow window the order's name gives way too.
+                    .ml_auto()
                     .flex_shrink(1.)
                     .min_w_0()
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.sort_open = !this.sort_open;
+                        this.filters_open = false;
                         cx.notify();
                     })),
                 )
@@ -332,6 +263,7 @@ impl OrchestratorView {
         .id("orchestrator-search")
         .flex_1()
         .flex_shrink(1.)
+        .min_w(view.at(FIELD_MIN))
         .max_w(view.at(SEARCH_WIDTH))
         .child(div().flex_1().min_w_0().child(self.search.clone()))
         .when(!self.query.is_empty(), |field| {

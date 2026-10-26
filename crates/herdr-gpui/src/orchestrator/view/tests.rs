@@ -10,6 +10,7 @@ mod clicks;
 mod conversation;
 mod detail_look;
 mod dialog;
+mod filters_fold;
 mod host_badges;
 mod look;
 mod markdown;

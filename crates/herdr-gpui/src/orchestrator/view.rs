@@ -9,6 +9,7 @@
 mod conversation;
 mod detail;
 mod dispatch;
+mod filters;
 mod hosts;
 mod inbox;
 mod list;
@@ -29,7 +30,10 @@ use super::{Item, Notice, Request, Service, Snapshot};
 use crate::search_input::{self, SearchInput};
 use gpui::{prelude::*, *};
 use rows::{Filters, ItemRow, RunLine, Runs, Sort, Tab};
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 /// What the view asks its host to do.
 #[derive(Clone, Debug)]
@@ -149,6 +153,10 @@ pub(crate) struct OrchestratorView {
     sort: Sort,
     sort_open: bool,
     filters: Filters,
+    /// Whether the Filters menu is open, when a narrow row folds them.
+    filters_open: bool,
+    /// The filter row's labels shaped at the look's size; see `filters`.
+    label_widths: HashMap<&'static str, f32>,
     mine: bool,
     active_runs: bool,
     collapsed: HashSet<String>,
@@ -246,6 +254,8 @@ impl OrchestratorView {
             tab: Tab::default(),
             sort: Sort::default(),
             sort_open: false,
+            filters_open: false,
+            label_widths: HashMap::new(),
             filters: Filters::default(),
             mine: false,
             active_runs: false,
@@ -409,6 +419,7 @@ impl OrchestratorView {
             });
         }
         self.look = look;
+        self.label_widths.clear();
         cx.notify();
     }
 
@@ -577,6 +588,7 @@ impl OrchestratorView {
         self.tab = tab;
         self.selected = None;
         self.sort_open = false;
+        self.filters_open = false;
         self.refresh_rows();
         cx.notify();
     }
@@ -745,8 +757,9 @@ impl OrchestratorView {
                 cx.notify();
                 true
             }
-            ("escape", None) if self.sort_open => {
+            ("escape", None) if self.sort_open || self.filters_open => {
                 self.sort_open = false;
+                self.filters_open = false;
                 cx.notify();
                 true
             }

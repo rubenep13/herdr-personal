@@ -482,7 +482,7 @@ impl ViewLook {
             .border_1()
             .whitespace_nowrap()
             .cursor_pointer()
-            .text_size(px(self.scale.name - 0.5))
+            .text_size(self.control_text())
             .when(on, |pill| {
                 pill.bg(self.pill)
                     .border_color(self.pill)
@@ -502,6 +502,38 @@ impl ViewLook {
                     .hover(move |pill| pill.bg(hover))
             })
             .child(label)
+    }
+
+    /// The size of a pill's and a dropdown's text.
+    pub(crate) fn control_text(&self) -> Pixels {
+        px(self.scale.name - 0.5)
+    }
+
+    /// The space between a filter row's controls.
+    pub(crate) fn control_gap(&self) -> f32 {
+        f32::from(self.at(CONTROL_GAP))
+    }
+
+    /// A filter row's inset on each side.
+    pub(crate) fn filters_padding(&self) -> f32 {
+        f32::from(self.at(FILTERS_PADDING))
+    }
+
+    /// How wide [`Self::pill`] draws around a label `text` wide.
+    pub(crate) fn pill_width(&self, text: f32, on: bool) -> f32 {
+        let mark = if on {
+            f32::from(self.at(PILL_MARK) + self.at(CONTROL_GAP))
+        } else {
+            0.
+        };
+        text + mark + f32::from(self.at(CONTROL_PADDING)) * 2. + 2.
+    }
+
+    /// How wide [`Self::dropdown`] draws with its icon and a value `text`
+    /// wide, and no prefix.
+    pub(crate) fn dropdown_width(&self, text: f32) -> f32 {
+        let glyphs = f32::from(self.at(DROPDOWN_ICON)) * 2. + f32::from(self.at(CONTROL_GAP)) * 2.;
+        text + glyphs + f32::from(self.at(CONTROL_PADDING) + self.at(DROPDOWN_PADDING_RIGHT)) + 2.
     }
 
     /// A small dropdown's button: an icon, a quiet prefix, the value and a
@@ -538,7 +570,7 @@ impl ViewLook {
             .border_color(self.line)
             .whitespace_nowrap()
             .cursor_pointer()
-            .text_size(px(self.scale.name - 0.5))
+            .text_size(self.control_text())
             .text_color(self.title)
             .hover(move |dropdown| dropdown.border_color(hover))
             .when_some(icon, |dropdown, icon| dropdown.child(glyph(icon)))
