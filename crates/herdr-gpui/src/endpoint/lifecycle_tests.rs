@@ -42,6 +42,7 @@ mod mouse_targets;
 mod plugin_selection;
 mod prompts;
 mod reconnect_backoff;
+mod reconnect_card;
 mod remote_drop;
 mod resize_reassert;
 mod scrollbar_drag;

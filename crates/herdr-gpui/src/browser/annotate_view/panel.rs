@@ -4,6 +4,7 @@ use super::super::Tab;
 use crate::{
     HerdrWindow,
     browser::annotate::{Anchor, Note},
+    design::{ButtonKind, Edge, Tone},
 };
 use gpui::{prelude::*, *};
 use std::{sync::Arc, time::Instant};
@@ -13,6 +14,7 @@ impl HerdrWindow {
     pub(crate) fn render_annotations(&mut self, tab: &Tab, cx: &mut Context<Self>) -> AnyElement {
         let id = tab.id;
         let theme = self.theme.clone();
+        let look = self.view_look();
         let armed = self.browser.annotations.armed(id);
         let notes = self.tab_notes(id);
         let input = notes.input.clone();
@@ -41,22 +43,15 @@ impl HerdrWindow {
         let origin = tab.origin.is_some();
         let tab_for_send = tab.clone();
         let tab_for_copy = tab.clone();
-        let button = |id: &'static str, label: SharedString, primary: bool| {
-            let background = if primary {
-                theme.primary()
+        let button = |id: &'static str, label: SharedString, kind: ButtonKind| {
+            look.button(id, id.into(), None, label, kind, true)
+        };
+        let primary = |lead: bool| {
+            if lead {
+                ButtonKind::Primary
             } else {
-                theme.active
-            };
-            div()
-                .id(id)
-                .debug_selector(move || id.into())
-                .px_2()
-                .py_1()
-                .rounded(px(crate::config::corners::CONTROL))
-                .cursor_pointer()
-                .bg(rgb(background))
-                .text_color(rgb(theme.text_on(background)))
-                .child(label)
+                ButtonKind::Normal
+            }
         };
         let thumbnail = |image: Arc<Image>| {
             img(image)
@@ -107,7 +102,7 @@ impl HerdrWindow {
                                 "Add note"
                             }
                             .into(),
-                            true,
+                            ButtonKind::Primary,
                         )
                         .on_click(
                             cx.listener(move |this, _, window, cx| this.add_note(id, window, cx)),
@@ -133,18 +128,11 @@ impl HerdrWindow {
                 .p_2()
                 .border_b_1()
                 .border_color(rgb(theme.active))
-                .child(
-                    div()
-                        .flex_none()
-                        .size(px(18.))
-                        .rounded_full()
-                        .bg(rgb(theme.palette[3]))
-                        .text_color(rgb(theme.text_on(theme.palette[3])))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .child((index + 1).to_string()),
-                )
+                .child(look.settings().chip(
+                    format!("annotation-note-{index}-number"),
+                    (index + 1).to_string(),
+                    Tone::Warn,
+                ))
                 .child(
                     div()
                         .flex_1()
@@ -180,63 +168,43 @@ impl HerdrWindow {
                         .children(note.image.clone().map(thumbnail)),
                 )
                 .child(
-                    div()
-                        .id(("annotation-remove", index))
-                        .flex_none()
-                        .size(px(18.))
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .cursor_pointer()
-                        .rounded(px(crate::config::corners::CONTROL))
-                        .hover(|s| s.bg(rgb(theme.active)))
-                        .child(
-                            svg()
-                                .path("icons/close.svg")
-                                .size(px(12.))
-                                .text_color(rgb(theme.muted)),
-                        )
-                        .on_click(
-                            cx.listener(move |this, _, _, cx| this.remove_note(id, index, cx)),
-                        ),
+                    look.icon_button(
+                        ("annotation-remove", index),
+                        format!("annotation-remove-{index}"),
+                        "icons/close.svg",
+                        false,
+                        true,
+                    )
+                    .size(look.at(22.))
+                    .on_click(cx.listener(move |this, _, _, cx| this.remove_note(id, index, cx))),
                 )
         });
         let has_notes = !self.tab_notes(id).notes.is_empty();
-        let panel = div()
+        let panel = look
+            .side_panel("annotations", Edge::Right)
             .id("annotations")
-            .debug_selector(|| "annotations".into())
-            .flex_none()
             .h_full()
-            .flex()
-            .flex_col()
-            .bg(rgb(theme.surface))
-            .border_l_1()
-            .border_color(rgb(theme.active))
             .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .p_2()
-                    .border_b_1()
-                    .border_color(rgb(theme.active))
-                    .child("Notes")
+                look.side_header("annotations-header", "Notes", None)
                     .child(
-                        div()
-                            .flex()
-                            .gap_1()
-                            .child(
-                                // Drag draws a region while this is on;
-                                // Shift-drag draws one either way.
-                                button("annotation-region", "Region".into(), regions).on_click(
-                                    cx.listener(move |this, _, _, cx| this.toggle_regions(id, cx)),
-                                ),
-                            )
-                            .child(button("annotation-page", "Note on page".into(), false).on_click(
-                                cx.listener(move |this, _, window, cx| {
-                                    this.begin_note(id, Anchor::Page, None, window, cx);
-                                }),
-                            )),
+                        // Drag draws a region while this is on; Shift-drag
+                        // draws one either way.
+                        button(
+                            "annotation-region",
+                            "Region".into(),
+                            if regions {
+                                ButtonKind::Lit
+                            } else {
+                                ButtonKind::Normal
+                            },
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| this.toggle_regions(id, cx))),
+                    )
+                    .child(
+                        button("annotation-page", "Note on page".into(), ButtonKind::Normal)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.begin_note(id, Anchor::Page, None, window, cx);
+                            })),
                     ),
             )
             .children(composer)
@@ -256,27 +224,42 @@ impl HerdrWindow {
                         )
                     }),
             )
+            // The action that sends is the footer's last, as a dialog's is.
             .when(has_notes, |panel| {
                 panel.child(
                     div()
                         .flex()
-                        .gap_1()
-                        .p_2()
+                        .items_center()
+                        .gap(look.at(6.))
+                        .p(look.at(10.))
                         .border_t_1()
-                        .border_color(rgb(theme.active))
-                        .when(origin, |row| {
-                            row.child(button("annotation-send", send_label.into(), true).on_click(
-                                cx.listener(move |this, _, _, cx| this.send_notes(&tab_for_send, cx)),
-                            ))
-                        })
-                        .child(button("annotation-copy", "Copy".into(), !origin).on_click(
-                            cx.listener(move |this, _, _, cx| this.copy_notes(&tab_for_copy, cx)),
-                        ))
+                        .border_color(look.line())
+                        .child(
+                            button("annotation-copy", "Copy".into(), primary(!origin)).on_click(
+                                cx.listener(move |this, _, _, cx| {
+                                    this.copy_notes(&tab_for_copy, cx)
+                                }),
+                            ),
+                        )
                         .when(any_sent, |row| {
                             row.child(
-                                button("annotation-clear-sent", "Clear sent".into(), false).on_click(
-                                    cx.listener(move |this, _, _, cx| this.clear_sent_notes(id, cx)),
-                                ),
+                                button(
+                                    "annotation-clear-sent",
+                                    "Clear sent".into(),
+                                    ButtonKind::Normal,
+                                )
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.clear_sent_notes(id, cx)
+                                })),
+                            )
+                        })
+                        .child(div().flex_1())
+                        .when(origin, |row| {
+                            row.child(
+                                button("annotation-send", send_label.into(), ButtonKind::Primary)
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        this.send_notes(&tab_for_send, cx)
+                                    })),
                             )
                         }),
                 )

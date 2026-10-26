@@ -3,7 +3,15 @@
 //! are staged, discarded or committed from a terminal.
 
 use super::{GitGraphView, detail::Panel};
-use crate::git_graph::worktree::{Section, WorktreeStatus, upstream_label};
+use crate::{
+    design::NoteTone,
+    git_graph::worktree::{Section, WorktreeStatus, upstream_label},
+};
+
+/// The panel's padding and its captions' column, as the commit's detail
+/// draws them.
+const PADDING: f32 = 14.;
+const TERM_WIDTH: f32 = 76.;
 use gpui::{prelude::*, *};
 
 impl GitGraphView {
@@ -13,7 +21,7 @@ impl GitGraphView {
         status: &WorktreeStatus,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let theme = &self.look.theme;
+        let view = self.look.view();
         let branch = self
             .history
             .as_ref()
@@ -39,8 +47,9 @@ impl GitGraphView {
                 .child(
                     div()
                         .flex_none()
-                        .w(px(76.))
-                        .text_color(rgb(theme.muted))
+                        .w(view.at(TERM_WIDTH))
+                        .text_size(px(view.scale().secondary))
+                        .text_color(view.muted())
                         .child(label.to_owned()),
                 )
                 .child(
@@ -53,33 +62,25 @@ impl GitGraphView {
         };
         let mut info = div()
             .id("graph-worktree-info")
-            .px_4()
-            .pb_3()
+            .px(view.at(PADDING))
+            .pb(view.at(12.))
             .flex()
             .flex_col()
             .gap_2()
             .overflow_y_scroll()
             .when(panel.diff_shown(), |el| el.max_h(relative(0.45)))
             .when(!panel.diff_shown(), |el| el.flex_1())
-            .child(
-                div()
-                    .text_size(px(16.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(theme.foreground))
-                    .child("Uncommitted changes"),
-            )
             .child(row("Branch", branch, "graph-branch-name"))
             .child(row("Upstream", upstream_label(status), "graph-upstream"))
-            .child(
-                div()
-                    .text_size(px(12.))
-                    .text_color(rgb(theme.muted))
-                    .child("Read-only: stage, discard or commit from a terminal."),
-            );
+            .child(view.dialog().note(
+                "graph-worktree-readonly".to_owned(),
+                NoteTone::Info,
+                "Read-only: stage, discard or commit from a terminal.",
+            ));
         if status.files.is_empty() {
             info = info.child(
                 div()
-                    .text_color(rgb(theme.muted))
+                    .text_color(view.muted())
                     .child("The working tree is clean."),
             );
         }
@@ -95,32 +96,22 @@ impl GitGraphView {
                 continue;
             }
             let key = section.key();
-            let heading = if section == Section::Conflicted {
-                theme.ink(theme.palette[1])
-            } else {
-                theme.subtext()
-            };
             info = info
                 .child(
-                    div()
-                        .debug_selector(move || format!("graph-section-{key}"))
-                        .mt_2()
-                        .text_size(px(11.))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(rgb(heading))
-                        .child(format!(
-                            "{} \u{00b7} {}",
-                            section.title().to_uppercase(),
-                            files.len()
-                        )),
+                    view.menu()
+                        .section(
+                            format!("graph-section-{key}"),
+                            format!("{} \u{00b7} {}", section.title(), files.len()),
+                        )
+                        .px_0()
+                        .when(section == Section::Conflicted, |heading| {
+                            heading.text_color(view.settings().danger())
+                        }),
                 )
                 .child(
                     div()
                         .flex()
                         .flex_col()
-                        .rounded(px(4.))
-                        .overflow_hidden()
-                        .bg(rgb(theme.background))
                         .children(files.into_iter().map(|(index, file)| {
                             self.render_file(index, file, panel.file == Some(index), false, cx)
                         })),

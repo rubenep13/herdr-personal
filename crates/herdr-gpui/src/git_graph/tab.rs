@@ -104,14 +104,16 @@ impl HerdrWindow {
 
     /// The graph's look: the UI font's family at the terminal font's size,
     /// so Cmd-+ and Cmd-- scale it with the terminals.
-    fn graph_look(&self) -> GraphLook {
+    pub(super) fn graph_look(&self) -> GraphLook {
         let mut ui = self.config.ui.clone();
         ui.size = self.config.terminal.size;
-        GraphLook {
-            theme: self.theme.clone(),
+        GraphLook::new(
+            self.theme.clone(),
             ui,
-            mono: self.config.terminal.clone(),
-        }
+            self.config.terminal.clone(),
+            self.theme_light,
+            &self.chrome_font(),
+        )
     }
 
     /// Whether the host at `index` can be asked anything: an SSH host only

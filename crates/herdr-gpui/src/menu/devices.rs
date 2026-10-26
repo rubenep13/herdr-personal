@@ -48,26 +48,6 @@ fn room_above(anchor_y: Pixels) -> Pixels {
     anchor_y - px(chrome + MENU_GAP + super::MENU_MARGIN + 12.)
 }
 
-struct SettingsHint {
-    text: SharedString,
-    foreground: u32,
-    surface: u32,
-}
-
-impl Render for SettingsHint {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .px(px(8.))
-            .py(px(4.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .shadow_md()
-            .text_size(px(12.))
-            .text_color(rgb(self.foreground))
-            .bg(rgb(self.surface))
-            .child(self.text.clone())
-    }
-}
-
 impl HerdrWindow {
     /// The cloud providers set up in the config or environment, in rail order.
     #[cfg(feature = "cloud")]
@@ -218,8 +198,7 @@ impl HerdrWindow {
                 |shortcut| format!("Settings ({shortcut})"),
             )
             .into();
-        let foreground = self.theme.foreground;
-        let surface = self.theme.surface;
+        let look = self.menu_look();
         let label = self
             .device_filter
             .as_ref()
@@ -338,14 +317,7 @@ impl HerdrWindow {
                     .justify_center()
                     .rounded(px(crate::config::corners::CONTROL))
                     .cursor_pointer()
-                    .tooltip(move |_, cx| {
-                        cx.new(|_| SettingsHint {
-                            text: "Sessions".into(),
-                            foreground,
-                            surface,
-                        })
-                        .into()
-                    })
+                    .tooltip(look.tooltip("Sessions"))
                     .hover(|s| s.bg(rgb(self.theme.active)))
                     .child(
                         svg()
@@ -379,14 +351,7 @@ impl HerdrWindow {
                     .justify_center()
                     .rounded(px(crate::config::corners::CONTROL))
                     .cursor_pointer()
-                    .tooltip(move |_, cx| {
-                        cx.new(|_| SettingsHint {
-                            text: hint.clone(),
-                            foreground,
-                            surface,
-                        })
-                        .into()
-                    })
+                    .tooltip(look.tooltip(hint))
                     .hover(|s| s.bg(rgb(self.theme.active)))
                     .child(
                         svg()

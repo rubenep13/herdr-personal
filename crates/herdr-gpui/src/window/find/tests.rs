@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 
 mod application_menu;
 mod close_button;
+mod look;
 mod padding;
 mod tab_switch;
 

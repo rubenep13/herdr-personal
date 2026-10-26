@@ -51,6 +51,9 @@ mod notes;
 #[cfg(any(target_os = "macos", windows))]
 mod page_results;
 
+/// The toolbar and a blank tab in the redesign's pieces.
+mod look;
+
 /// Middle-clicking a strip's tab closes it.
 mod middle_click;
 

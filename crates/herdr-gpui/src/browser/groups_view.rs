@@ -25,6 +25,21 @@ fn neighbour(tabs: &[Pick], pick: &Pick, near: impl Fn(&Pick) -> bool) -> Option
         .cloned()
 }
 
+/// An address as the field shows it while not typed in: its host, and what
+/// follows it. A scheme before the host is left out of both.
+pub(crate) fn address_parts(address: &str) -> (&str, &str) {
+    let rest = address.split_once("://").map_or(address, |(_, rest)| rest);
+    rest.split_at(rest.find(['/', '?', '#']).unwrap_or(rest.len()))
+}
+
+/// Where an address's host lies in it, for the field to draw it in the text
+/// colour and the rest quiet.
+pub(crate) fn address_host(address: &str) -> std::ops::Range<usize> {
+    let (host, rest) = address_parts(address);
+    let start = address.len() - host.len() - rest.len();
+    start..start + host.len()
+}
+
 impl HerdrWindow {
     /// The daemon's focused tab, when it belongs to the focused workspace.
     pub(crate) fn focused_herdr_tab(&self) -> Option<&str> {
@@ -864,6 +879,9 @@ impl HerdrWindow {
                 let input = cx.new(|cx| {
                     let mut input = SearchInput::new(cx);
                     input.set_placeholder("Enter an address", cx);
+                    // The toolbar's field draws the frame.
+                    input.set_frameless(cx);
+                    input.set_emphasis(address_host);
                     input
                 });
                 (input, None)

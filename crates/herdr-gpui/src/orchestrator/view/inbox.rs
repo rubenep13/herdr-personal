@@ -4,11 +4,11 @@
 
 use super::{
     Event, OrchestratorView, PREVIEW_MAX_SHARE, PREVIEW_MIN, PreviewDrag,
-    look::{BLUE, GREEN, Look, MAGENTA, RED, YELLOW, age},
+    look::{Look, age},
     rows::{Runs, Sort, Tab},
 };
 use crate::{
-    config::corners,
+    design::Tone,
     orchestrator::{Access, Provider, SyncState},
 };
 use gpui::{prelude::*, *};
@@ -60,7 +60,7 @@ impl OrchestratorView {
 
     fn render_header(&self, cx: &mut Context<Self>) -> Div {
         let look = &self.look;
-        let theme = &look.theme;
+        let view = look.view();
         let info = self.snapshot.repo.as_ref();
         let name = info
             .and_then(|info| info.remote.as_ref())
@@ -85,47 +85,32 @@ impl OrchestratorView {
             .iter()
             .enumerate()
             .map(|(index, status)| {
-                let (text, color, sign_in) = match &status.state {
-                    SyncState::Syncing => ("syncing\u{2026}".to_owned(), look.hue(BLUE), false),
+                let (text, tone, sign_in) = match &status.state {
+                    SyncState::Syncing => ("syncing\u{2026}".to_owned(), Tone::Accent, false),
                     SyncState::Synced { count, at } => (
                         format!("{count} \u{00b7} {}", synced(*at)),
-                        look.hue(GREEN),
+                        Tone::Good,
                         false,
                     ),
-                    SyncState::Capped { count } => {
-                        (format!("first {count}"), look.hue(YELLOW), false)
+                    SyncState::Capped { count } => (format!("first {count}"), Tone::Warn, false),
+                    SyncState::SignIn => ("sign in".to_owned(), Tone::Warn, true),
+                    SyncState::Unsupported => {
+                        ("not supported yet".to_owned(), Tone::Neutral, false)
                     }
-                    SyncState::SignIn => ("sign in".to_owned(), look.hue(YELLOW), true),
-                    SyncState::Unsupported => ("not supported yet".to_owned(), theme.muted, false),
-                    SyncState::Failed(_) => ("failed".to_owned(), look.hue(RED), false),
+                    SyncState::Failed(_) => ("failed".to_owned(), Tone::Danger, false),
                 };
-                let provider = status.key.provider;
-                div()
+                let provider = provider_name(status.key.provider);
+                view.settings()
+                    .chip(
+                        format!("orchestrator-source-{index}"),
+                        format!("{provider} \u{00b7} {text}"),
+                        tone,
+                    )
+                    // In a narrow bar the sources give way before its buttons.
+                    .flex_shrink(1.)
+                    .min_w_0()
+                    .truncate()
                     .id(("orchestrator-source", index))
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .px_2()
-                    .py(px(2.))
-                    .rounded(px(corners::CONTROL))
-                    .border_1()
-                    .border_color(rgb(theme.active))
-                    .text_size(look.small())
-                    .child(match provider {
-                        Provider::Github => look
-                            .icon("icons/github.svg", 12., theme.subtext())
-                            .into_any_element(),
-                        Provider::Beads => look.badge("bd", MAGENTA).into_any_element(),
-                        Provider::Gitlab => look.badge("gl", RED).into_any_element(),
-                    })
-                    .child(match provider {
-                        Provider::Github => "GitHub",
-                        Provider::Beads => "Beads",
-                        Provider::Gitlab => "GitLab",
-                    })
-                    .child(look.dot(color, 6.))
-                    .child(div().text_color(rgb(theme.muted)).child(text))
                     .when(sign_in, |el| {
                         el.cursor_pointer()
                             .on_click(cx.listener(|_, _, _, cx| cx.emit(Event::SignIn)))
@@ -134,17 +119,8 @@ impl OrchestratorView {
         let dispatchable = self.tab != Tab::Runs
             && self.selected.is_some()
             && self.snapshot.access == Some(Access::ReadWrite);
-        div()
-            .flex_none()
-            .flex()
-            .flex_wrap()
-            .items_center()
-            .gap_2()
-            .px_4()
-            .py_2()
-            .child(look.icon("icons/git-branch.svg", 14., theme.subtext()))
-            .child(div().font_weight(FontWeight::SEMIBOLD).child(name))
-            .child(look.chip(host))
+        view.bar("orchestrator-bar")
+            .child(view.bar_title(Some("icons/inbox.svg"), name, Some(host.into())))
             .children(sources)
             .child(div().flex_1())
             .child(
@@ -158,11 +134,17 @@ impl OrchestratorView {
                 )
             })
             .child(
-                look.icon_button("orchestrator-preview", "icons/panel-right.svg")
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.preview_open = !this.preview_open;
-                        cx.notify();
-                    })),
+                view.icon_button(
+                    "orchestrator-preview",
+                    "orchestrator-preview".to_owned(),
+                    "icons/panel-right.svg",
+                    self.preview_open,
+                    true,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.preview_open = !this.preview_open;
+                    cx.notify();
+                })),
             )
             .when(dispatchable, |el| {
                 el.child(
@@ -178,7 +160,8 @@ impl OrchestratorView {
 
     fn render_tabs(&self, cx: &mut Context<Self>) -> Div {
         let look = &self.look;
-        let theme = &look.theme;
+        let view = look.view();
+        let menu = view.menu();
         let runs = Runs::new(&self.snapshot.runs, &self.snapshot.sessions, &self.live);
         let waiting = super::rows::attention(&runs);
         let counts = [
@@ -186,55 +169,41 @@ impl OrchestratorView {
             self.pull_request_rows.len(),
             self.snapshot.runs.len(),
         ];
-        div()
-            .flex_none()
-            .flex()
-            .items_end()
-            .gap_4()
-            .px_4()
-            .border_b_1()
-            .border_color(rgb(theme.active))
-            .children(Tab::ALL.into_iter().zip(counts).map(|(tab, count)| {
-                let on = tab == self.tab;
-                div()
-                    .id(SharedString::from(format!(
-                        "orchestrator-tab-{}",
-                        tab.label()
-                    )))
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .pb(px(6.))
-                    .cursor_pointer()
-                    .when(on, |el| el.border_b_2().border_color(rgb(theme.primary())))
-                    .text_color(rgb(if on { theme.foreground } else { theme.muted }))
-                    .child(tab.label())
-                    .child(
-                        div()
-                            .px(px(5.))
-                            .rounded_full()
-                            .bg(rgb(theme.active))
-                            .text_size(look.tiny())
-                            .child(count.to_string()),
+        menu.tabs("orchestrator-tabs").px(view.at(12.)).children(
+            Tab::ALL.into_iter().zip(counts).map(|(tab, count)| {
+                let selector = format!("orchestrator-tab-{}", tab.label());
+                menu.tab(
+                    SharedString::from(selector.clone()),
+                    selector,
+                    "orchestrator-tab-underline",
+                    tab == self.tab,
+                )
+                .gap(view.at(6.))
+                .child(tab.label())
+                .child(
+                    div()
+                        .text_size(view.at(COUNT_TEXT))
+                        .text_color(view.muted())
+                        .child(count.to_string()),
+                )
+                // A dot in the waiting colour while an agent waits.
+                .when(tab == Tab::Runs && waiting > 0, |el| {
+                    el.child(
+                        view.status_dot(look.status_hue(super::rows::Status::NeedsInput), false)
+                            .size(view.at(6.)),
                     )
-                    .when(tab == Tab::Runs && waiting > 0, |el| {
-                        el.child(look.dot(look.hue(YELLOW), 6.))
-                    })
-                    .on_click(cx.listener(move |this, _, _, cx| this.select_tab(tab, cx)))
-            }))
+                })
+                .on_click(cx.listener(move |this, _, _, cx| this.select_tab(tab, cx)))
+            }),
+        )
     }
 
     fn render_search_row(&self, window: &Window, cx: &mut Context<Self>) -> Div {
         let look = &self.look;
-        let theme = &look.theme;
+        let view = look.view();
         let filters = self.filters;
-        let mut row = div()
-            .flex_none()
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_4()
-            .py_2()
+        let mut row = view
+            .filters("orchestrator-filters")
             .child(self.render_search_field(window, cx));
         let toggle = |id: &'static str, label: &'static str, on: bool, flip: fn(&mut Self)| {
             look.toggle(id, label, on)
@@ -310,112 +279,89 @@ impl OrchestratorView {
                 ));
             }
         }
-        row.when(self.tab != Tab::Runs, |row| {
-            row.child(
-                div()
-                    .id("orchestrator-sort")
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-                    .cursor_pointer()
-                    .text_size(look.small())
-                    .text_color(rgb(theme.subtext()))
-                    .child(self.sort.label())
-                    .child(look.icon("icons/chevron-down.svg", 10., theme.muted))
+        row.child(div().flex_1())
+            .when(self.tab != Tab::Runs, |row| {
+                row.child(
+                    view.dropdown(
+                        "orchestrator-sort",
+                        "orchestrator-sort".to_owned(),
+                        Some("icons/sort.svg"),
+                        None,
+                        self.sort.label(),
+                    )
+                    // In a narrow window the order's name gives way too.
+                    .flex_shrink(1.)
+                    .min_w_0()
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.sort_open = !this.sort_open;
                         cx.notify();
+                    })),
+                )
+            })
+    }
+
+    /// The Settings field, the magnifier inside: its ring takes the accent
+    /// while it has the keyboard, and a clear button shows once there is
+    /// text.
+    fn render_search_field(&self, window: &Window, cx: &mut Context<Self>) -> Stateful<Div> {
+        let look = &self.look;
+        let view = look.view();
+        let focused = self.search.read(cx).focus.is_focused(window);
+        view.field(
+            "orchestrator-search".to_owned(),
+            focused,
+            Some("icons/search.svg"),
+        )
+        .id("orchestrator-search")
+        .flex_1()
+        .flex_shrink(1.)
+        .max_w(view.at(SEARCH_WIDTH))
+        .child(div().flex_1().min_w_0().child(self.search.clone()))
+        .when(!self.query.is_empty(), |field| {
+            field.child(
+                look.icon_button("orchestrator-search-clear", "icons/close.svg")
+                    .size(view.at(CLEAR))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.search.update(cx, |search, cx| search.clear(cx));
+                        window.focus(&this.search.read(cx).focus.clone(), cx);
                     })),
             )
         })
     }
 
-    /// One outlined field, the magnifier inside: the outline turns accent
-    /// while the field has the keyboard, and a clear button shows once there
-    /// is text.
-    fn render_search_field(&self, window: &Window, cx: &mut Context<Self>) -> Stateful<Div> {
-        let look = &self.look;
-        let theme = &look.theme;
-        let focused = self.search.read(cx).focus.is_focused(window);
-        div()
-            .id("orchestrator-search")
-            .flex_1()
-            .min_w_0()
-            .h(px(look.ui.line_height() + 12.))
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_3()
-            .rounded(px(corners::CONTROL))
-            .border_1()
-            .border_color(rgb(if focused {
-                theme.primary()
-            } else {
-                theme.active
-            }))
-            .bg(rgb(theme.background))
-            .child(look.icon(
-                "icons/search.svg",
-                13.,
-                if focused {
-                    theme.foreground
-                } else {
-                    theme.muted
-                },
-            ))
-            .child(div().flex_1().min_w_0().child(self.search.clone()))
-            .when(!self.query.is_empty(), |field| {
-                field.child(
-                    look.icon_button("orchestrator-search-clear", "icons/close.svg")
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.search.update(cx, |search, cx| search.clear(cx));
-                            window.focus(&this.search.read(cx).focus.clone(), cx);
-                        })),
-                )
-            })
-    }
-
     fn render_sort_menu(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let look = &self.look;
-        let theme = &look.theme;
+        let view = self.look.view();
         deferred(
-            div()
+            view.menu_panel("orchestrator-sort-menu")
                 .absolute()
-                .top(px(120.))
-                .right(px(16.))
-                .w(px(200.))
-                .p_1()
-                .flex()
-                .flex_col()
-                .rounded(px(corners::CONTROL))
-                .bg(rgb(theme.surface))
-                .border_1()
-                .border_color(rgb(theme.active))
-                .shadow_lg()
+                .top(view.at(SORT_TOP))
+                .right(view.at(12.))
+                .w(view.at(SORT_WIDTH))
                 .children(Sort::ALL.into_iter().map(|sort| {
-                    let on = sort == self.sort;
-                    let hover = theme.active;
-                    div()
-                        .id(SharedString::from(format!(
-                            "orchestrator-sort-{}",
-                            sort.label()
-                        )))
-                        .px_2()
-                        .h(px(28.))
-                        .flex()
-                        .items_center()
-                        .rounded(px(corners::SMALL))
-                        .cursor_pointer()
-                        .hover(move |style| style.bg(rgb(hover)))
-                        .when(on, |el| el.bg(rgb(theme.primary_wash())))
-                        .child(sort.label())
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.sort = sort;
-                            this.sort_open = false;
-                            this.refresh_rows();
-                            cx.notify();
-                        }))
+                    let selector = format!("orchestrator-sort-{}", sort.label());
+                    view.row(
+                        SharedString::from(selector.clone()),
+                        selector.clone(),
+                        false,
+                        false,
+                    )
+                    .child(div().flex_1().min_w_0().truncate().child(sort.label()))
+                    .when(sort == self.sort, |row| {
+                        row.child(
+                            svg()
+                                .debug_selector(move || format!("{selector}-check"))
+                                .path("icons/check.svg")
+                                .size(view.at(16.))
+                                .flex_none()
+                                .text_color(view.pill_on().0),
+                        )
+                    })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.sort = sort;
+                        this.sort_open = false;
+                        this.refresh_rows();
+                        cx.notify();
+                    }))
                 })),
         )
     }
@@ -424,10 +370,8 @@ impl OrchestratorView {
         let look = &self.look;
         let mut banners = Vec::new();
         if let Some(Access::ReadOnly { found }) = self.snapshot.access {
-            banners.push(banner(
-                look,
-                RED,
-                "icons/lock.svg",
+            banners.push((
+                false,
                 format!(
                     "Shared data is schema {found}; this herdr-gpui understands up to {}. Read-only until updated.",
                     crate::orchestrator::SCHEMA_VERSION
@@ -435,7 +379,7 @@ impl OrchestratorView {
             ));
         }
         if let Some(error) = &self.snapshot.error {
-            banners.push(banner(look, RED, "icons/close.svg", error.to_string()));
+            banners.push((false, error.to_string()));
         }
         for status in &self.snapshot.sources {
             let text = match &status.state {
@@ -448,18 +392,13 @@ impl OrchestratorView {
                 ),
                 _ => continue,
             };
-            let hue = if matches!(status.state, SyncState::Capped { .. }) {
-                YELLOW
-            } else {
-                RED
-            };
-            banners.push(banner(look, hue, "icons/refresh.svg", text));
+            banners.push((matches!(status.state, SyncState::Capped { .. }), text));
         }
         banners
             .into_iter()
             .enumerate()
-            .map(|(index, banner)| {
-                banner
+            .map(|(index, (warning, text))| {
+                banner(look, warning, format!("orchestrator-banner-{index}"), text)
                     .id(("orchestrator-banner", index))
                     .cursor_pointer()
                     .on_click(cx.listener(|this, _, _, _| this.refresh()))
@@ -468,6 +407,15 @@ impl OrchestratorView {
             .collect()
     }
 }
+
+/// The inbox's measures at the orchestrator's face of 12: a tab's count,
+/// the search field's widest and its clear button, and the sort menu's
+/// place under the bar, tabs and filters, and its width.
+const COUNT_TEXT: f32 = 11.;
+const SEARCH_WIDTH: f32 = 380.;
+const CLEAR: f32 = 20.;
+const SORT_TOP: f32 = 40. + 40. + 46. - 4.;
+const SORT_WIDTH: f32 = 200.;
 
 /// "synced now", "synced 4m ago": when a source last finished a sync.
 fn synced(at: chrono::DateTime<chrono::Utc>) -> String {
@@ -485,18 +433,18 @@ fn provider_name(provider: Provider) -> &'static str {
     }
 }
 
-pub(super) fn banner(look: &Look, hue: usize, icon: &'static str, text: String) -> Div {
+/// A notice over the list, in full: the dialogs' error box, or their
+/// warning box when `warning`.
+pub(super) fn banner(look: &Look, warning: bool, selector: String, text: String) -> Div {
+    let view = look.view();
+    let dialog = view.dialog();
     div()
         .flex_none()
-        .mx_4()
-        .mb_2()
-        .flex()
-        .items_center()
-        .gap_2()
-        .px_3()
-        .py_2()
-        .rounded(px(corners::CONTROL))
-        .bg(rgb(look.wash(hue)))
-        .child(look.icon(icon, 13., look.hue(hue)))
-        .child(div().flex_1().min_w_0().text_size(look.small()).child(text))
+        .mx(view.at(12.))
+        .mb(view.at(8.))
+        .child(if warning {
+            dialog.warning(selector, text)
+        } else {
+            dialog.error(selector, text)
+        })
 }

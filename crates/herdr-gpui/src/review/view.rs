@@ -653,31 +653,40 @@ impl HerdrWindow {
         self.show_flash(Flash::success("Notes copied"), cx);
     }
 
-    pub(crate) fn render_review(&self, id: TabId, cx: &mut Context<Self>) -> AnyElement {
-        let theme = self.theme.clone();
+    pub(crate) fn render_review(
+        &self,
+        id: TabId,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let look = self.view_look();
         let Some(review) = self.reviews.get(&id) else {
             return div().into_any_element();
         };
         let line_height = self.review_line_height();
         let body = match &review.state {
-            State::Loading => div()
-                .p_3()
-                .text_color(rgb(theme.muted))
-                .child("Reading changes\u{2026}")
+            State::Loading => look
+                .empty(
+                    "review-reading-changes",
+                    Some("icons/diff-unified.svg"),
+                    "Reading changes\u{2026}",
+                )
+                .flex_1()
                 .into_any_element(),
             State::Failed(error) => div()
-                .debug_selector(|| "review-error".into())
-                .p_3()
-                .text_color(crate::menu::danger(&theme))
-                .child(error.clone())
+                .p(look.at(14.))
+                .child(look.dialog().error("review-error".into(), error.clone()))
                 .into_any_element(),
-            State::Loaded(loaded) if loaded.diff.files.is_empty() => div()
-                .p_3()
-                .text_color(rgb(theme.muted))
-                .child(match loaded.scope {
-                    Scope::Uncommitted => "No uncommitted changes",
-                    Scope::Branch => "No changes on this branch",
-                })
+            State::Loaded(loaded) if loaded.diff.files.is_empty() => look
+                .empty(
+                    "review-empty",
+                    Some("icons/diff-unified.svg"),
+                    match loaded.scope {
+                        Scope::Uncommitted => "No uncommitted changes",
+                        Scope::Branch => "No changes on this branch",
+                    },
+                )
+                .flex_1()
                 .into_any_element(),
             State::Loaded(_) => div()
                 .flex_1()
@@ -686,7 +695,7 @@ impl HerdrWindow {
                 .flex_col()
                 .text_font(&self.config.terminal)
                 .text_size(px(self.config.terminal.size))
-                .children(self.render_review_search(id, review, cx))
+                .children(self.render_review_search(id, review, window, cx))
                 .child(
                     self.review_scroll_area(
                         id,
@@ -721,7 +730,7 @@ impl HerdrWindow {
                     .min_h_0()
                     .flex()
                     .when(has_files && review.shows(panels::Panel::Files), |row| {
-                        row.child(self.render_review_files(id, review, cx))
+                        row.child(self.render_review_files(id, review, window, cx))
                     })
                     .child(div().flex_1().min_w_0().flex().flex_col().child(body))
                     .when(review.shows(panels::Panel::Notes), |row| {

@@ -9,7 +9,8 @@ use super::{
     look::{BLUE, CYAN, GREEN, Look, MAGENTA, RED, YELLOW},
 };
 use crate::{
-    config::{corners, mix},
+    config::mix,
+    design::Tone,
     pr_actions::{self, Comment, CommentKind, Review},
     pull_request::State,
     release_notes::{self, Line},
@@ -23,7 +24,7 @@ use std::{
     time::Duration,
 };
 
-const AVATAR: f32 = 32.;
+const AVATAR: f32 = 24.;
 /// Avatars kept per view; a conversation holds at most a few dozen authors.
 const AVATAR_LIMIT: usize = 128;
 /// Parsed bodies kept per view before the cache starts over.
@@ -233,15 +234,16 @@ impl OrchestratorView {
 
     pub(super) fn render_conversation(&self, cx: &mut Context<Self>) -> AnyElement {
         let look = &self.look;
+        let view = look.view();
         let mut column = div()
             .id("orchestrator-conversation")
             .flex_1()
             .min_w_0()
             .overflow_y_scroll()
-            .p_4()
+            .p(view.at(16.))
             .flex()
             .flex_col()
-            .gap_3();
+            .gap(view.at(12.));
         if self.request.token.is_none() {
             column = column.child(look.muted("Sign in to GitHub to read the conversation."));
         } else if let Some(error) = self.pr.comments_error() {
@@ -278,10 +280,8 @@ impl OrchestratorView {
         }
         if let Some(error) = self.pr.error() {
             column = column.child(
-                div()
-                    .text_size(look.small())
-                    .text_color(rgb(look.hue(RED)))
-                    .child(error.to_owned()),
+                view.dialog()
+                    .error("orchestrator-conversation-error".into(), error.to_owned()),
             );
         }
         let open = self
@@ -306,21 +306,21 @@ impl OrchestratorView {
             (summary.open_threads, "open thread", "open threads", YELLOW),
             (summary.resolved_threads, "resolved", "resolved", BLUE),
         ];
-        div()
-            .flex()
+        let view = look.view();
+        view.settings()
+            .card("orchestrator-summary".into())
+            .flex_row()
             .flex_wrap()
             .items_center()
-            .gap_2()
-            .px_3()
-            .py_2()
-            .rounded(px(corners::CONTROL))
-            .bg(rgb(look.theme.surface))
+            .gap(view.at(6.))
+            .px(view.at(12.))
+            .py(view.at(8.))
             .text_size(look.small())
             .children(
                 badges
                     .into_iter()
                     .filter(|(count, ..)| *count > 0)
-                    .map(|(count, one, many, hue)| look.badge(plural(count, one, many), hue)),
+                    .map(|(count, one, many, hue)| look.badge(plural(count, one, many), tone(hue))),
             )
             .child(div().flex_1())
             .child(look.muted(format!(
@@ -336,26 +336,24 @@ impl OrchestratorView {
         comment: &Comment,
         now: chrono::DateTime<chrono::Utc>,
     ) -> AnyElement {
-        let look = &self.look;
-        let theme = &look.theme;
+        let view = self.look.view();
         div()
             .id(("orchestrator-comment", index))
             .flex()
-            .gap_3()
+            .gap(view.at(10.))
             .child(self.avatar(&comment.author, comment.avatar.as_deref()))
             .child(
-                div()
+                view.settings()
+                    .card(format!("orchestrator-comment-card-{index}"))
                     .flex_1()
                     .min_w_0()
-                    .rounded(px(corners::CONTROL))
-                    .border_1()
-                    .border_color(rgb(theme.active))
                     .overflow_hidden()
                     .child(
                         div()
-                            .px_3()
-                            .py(px(6.))
-                            .bg(rgb(theme.surface))
+                            .px(view.at(12.))
+                            .py(view.at(8.))
+                            .border_b_1()
+                            .border_color(view.line())
                             .child(self.header(comment, "commented", None, now)),
                     )
                     .child(self.body(comment)),
@@ -397,10 +395,11 @@ impl OrchestratorView {
         let tint = verdict.map_or(theme.active, |(_, hue)| {
             mix(theme.active, look.hue(hue), 45)
         });
+        let view = look.view();
         div()
             .id(("orchestrator-review", index))
             .flex()
-            .gap_3()
+            .gap(view.at(10.))
             .child(self.avatar(author, lead.and_then(|lead| lead.avatar.as_deref())))
             .child(
                 div()
@@ -409,12 +408,11 @@ impl OrchestratorView {
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(div().pt(px(6.)).child(header))
+                    .child(div().pt(view.at(4.)).child(header))
                     .when_some(body, |el, review| {
                         el.child(
-                            div()
-                                .rounded(px(corners::CONTROL))
-                                .border_1()
+                            view.settings()
+                                .card(format!("orchestrator-review-card-{index}"))
                                 .border_color(rgb(tint))
                                 .child(self.body(review)),
                         )
@@ -436,7 +434,6 @@ impl OrchestratorView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let look = &self.look;
-        let theme = &look.theme;
         let CommentKind::Thread {
             path,
             resolved,
@@ -460,19 +457,27 @@ impl OrchestratorView {
                 );
             }
             detail.push_str("Show");
-            return div()
+            let view = look.view();
+            let (good, _) = view.settings().tone(Tone::Good);
+            return view
+                .settings()
+                .card(format!("{id}-card"))
                 .id(id)
-                .flex()
+                .flex_row()
                 .items_center()
-                .gap_2()
-                .px_3()
-                .py_1()
-                .rounded(px(corners::CONTROL))
-                .bg(rgb(theme.surface))
+                .gap(view.at(8.))
+                .px(view.at(12.))
+                .py(view.at(6.))
                 .text_size(look.small())
                 .cursor_pointer()
-                .child(div().text_color(rgb(look.hue(GREEN))).child("\u{2713}"))
-                .child(div().text_color(rgb(theme.subtext())).child("Resolved"))
+                .child(
+                    svg()
+                        .path("icons/check.svg")
+                        .size(view.at(13.))
+                        .flex_none()
+                        .text_color(good),
+                )
+                .child(div().text_color(good).child("Resolved"))
                 .child(self.path(path))
                 .child(div().flex_1())
                 .child(look.muted(detail))
@@ -490,20 +495,20 @@ impl OrchestratorView {
         } else {
             ("open", YELLOW)
         };
-        div()
+        let view = look.view();
+        view.settings()
+            .card(format!("{id}-card"))
             .id(id)
-            .rounded(px(corners::CONTROL))
-            .border_1()
-            .border_color(rgb(theme.active))
             .overflow_hidden()
             .child(
                 div()
-                    .px_3()
-                    .py_1()
-                    .bg(rgb(theme.surface))
+                    .px(view.at(12.))
+                    .py(view.at(6.))
+                    .border_b_1()
+                    .border_color(view.line())
                     .flex()
                     .items_center()
-                    .gap_2()
+                    .gap(view.at(8.))
                     .child(self.path(path))
                     .child(div().flex_1())
                     .when(*replies > 0, |el| {
@@ -513,7 +518,7 @@ impl OrchestratorView {
                             "replies",
                         )))
                     })
-                    .child(look.badge(state, hue)),
+                    .child(look.badge(state, tone(hue))),
             )
             .child(self.body(comment))
             .into_any_element()
@@ -521,27 +526,23 @@ impl OrchestratorView {
 
     fn render_composer(&self, cx: &mut Context<Self>) -> Div {
         let look = &self.look;
+        let view = look.view();
         let busy = self.pr.running().map(pr_actions::Action::running_label);
         div()
             .flex()
             .items_center()
-            .gap_2()
-            .pt_2()
+            .gap(view.at(8.))
+            .pt(view.at(8.))
             .child(
-                div()
+                view.field("orchestrator-comment-field".into(), false, None)
                     .flex_1()
-                    .min_w_0()
-                    .px_2()
-                    .py(px(4.))
-                    .rounded(px(corners::CONTROL))
-                    .border_1()
-                    .border_color(rgb(look.theme.active))
-                    .child(self.comment.clone()),
+                    .flex_shrink(1.)
+                    .child(div().flex_1().min_w_0().child(self.comment.clone())),
             )
             .child(match busy {
                 Some(label) => look.muted(label).into_any_element(),
                 None => look
-                    .button("orchestrator-comment-send", "Comment", false)
+                    .button("orchestrator-comment-send", "Comment", true)
                     .on_click(cx.listener(|this, _, _, cx| this.post_comment(cx)))
                     .into_any_element(),
             })
@@ -556,32 +557,25 @@ impl OrchestratorView {
         now: chrono::DateTime<chrono::Utc>,
     ) -> Div {
         let look = &self.look;
+        let view = look.view();
         div()
             .flex()
             .items_center()
-            .gap_2()
+            .gap(view.at(8.))
             .min_w_0()
             .child(
                 div()
                     .flex_none()
+                    .text_size(px(view.scale().name))
                     .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(view.title())
                     .child(comment.author.clone()),
             )
-            .when(comment.bot, |el| {
-                el.child(
-                    div()
-                        .flex_none()
-                        .px(px(5.))
-                        .rounded(px(corners::SMALL))
-                        .border_1()
-                        .border_color(rgb(look.theme.active))
-                        .text_size(look.tiny())
-                        .text_color(rgb(look.theme.muted))
-                        .child("bot"),
-                )
-            })
+            .when(comment.bot, |el| el.child(look.chip("bot")))
             .child(look.muted(action.to_owned()).min_w_0().truncate())
-            .when_some(verdict, |el, (text, hue)| el.child(look.badge(text, hue)))
+            .when_some(verdict, |el, (text, hue)| {
+                el.child(look.badge(text, tone(hue)))
+            })
             .child(div().flex_1())
             .child(
                 look.muted(ago(&comment.created_at, now))
@@ -592,11 +586,14 @@ impl OrchestratorView {
 
     fn body(&self, comment: &Comment) -> Div {
         let look = &self.look;
+        let padding = look.view().at(12.);
         if comment.source.trim().is_empty() {
-            return div().p_3().child(look.muted("No description provided."));
+            return div()
+                .p(padding)
+                .child(look.muted("No description provided."));
         }
         let lines = self.bodies.lines(&comment.source);
-        div().p_3().min_w_0().child(release_notes::render(
+        div().p(padding).min_w_0().child(release_notes::render(
             "orchestrator-comment-body",
             &lines,
             &look.theme,
@@ -666,4 +663,16 @@ fn thread_key(comment: &Comment) -> String {
         _ => "",
     };
     format!("{}\u{0}{}\u{0}{}", comment.author, path, comment.created_at)
+}
+
+/// A palette colour's chip tone, for the conversation's coloured words.
+fn tone(hue: usize) -> Tone {
+    match hue {
+        GREEN => Tone::Good,
+        RED => Tone::Danger,
+        YELLOW => Tone::Warn,
+        MAGENTA => Tone::Merged,
+        BLUE => Tone::Accent,
+        _ => Tone::Neutral,
+    }
 }

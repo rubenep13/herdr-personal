@@ -8,11 +8,14 @@ use herdr_client::protocol::AgentStatus;
 
 mod clicks;
 mod conversation;
+mod detail_look;
 mod dialog;
 mod host_badges;
+mod look;
 mod markdown;
 mod rows;
 mod sessions;
+mod status_colours;
 
 fn at(value: &str) -> DateTime<Utc> {
     DateTime::parse_from_rfc3339(value)

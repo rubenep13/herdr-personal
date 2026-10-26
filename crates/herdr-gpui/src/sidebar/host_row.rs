@@ -20,24 +20,15 @@ fn origin_mark(
     id: String,
     size: f32,
     color: u32,
-    theme: &crate::config::Theme,
+    look: crate::design::MenuLook,
 ) -> Stateful<Div> {
-    let text = SharedString::from(origin.describe());
-    let (foreground, surface) = (theme.foreground, theme.surface);
     div()
         .id(SharedString::from(id.clone()))
         .debug_selector(move || id.clone())
         .size(px(size))
         .flex_none()
         .child(svg().path(origin.icon()).size_full().text_color(rgb(color)))
-        .tooltip(move |_, cx| {
-            cx.new(|_| crate::usage::Hint {
-                text: text.clone(),
-                foreground,
-                surface,
-            })
-            .into()
-        })
+        .tooltip(look.tooltip(origin.describe()))
 }
 
 impl HerdrWindow {
@@ -227,7 +218,7 @@ impl HerdrWindow {
                             } else {
                                 theme.muted
                             },
-                            theme,
+                            self.menu_look(),
                         ))
                     })
                     .when(removing, |row| {
@@ -266,7 +257,11 @@ impl HerdrWindow {
                                     )))
                                     .flex_none()
                                     .child(gauges)
-                                    .tooltip(crate::system_load::tooltip(reading, &host, theme)),
+                                    .tooltip(crate::system_load::tooltip(
+                                        reading,
+                                        &host,
+                                        self.menu_look(),
+                                    )),
                             )
                         },
                     )
@@ -300,7 +295,11 @@ impl HerdrWindow {
                             Some(super::metrics::glyph_width(font)),
                             crate::config::status_bar::Detail::Detailed,
                         ))
-                        .tooltip(crate::system_load::tooltip(reading, &host, theme)),
+                        .tooltip(crate::system_load::tooltip(
+                            reading,
+                            &host,
+                            self.menu_look(),
+                        )),
                 )
             })
             .on_click(cx.listener(move |this, _, window, cx| {

@@ -4,23 +4,45 @@
 //! the same pieces around its detail.
 
 use super::model::{Balance, Pace, Report, Section, Severity, Window as Limit, countdown};
-use crate::config::Theme;
+use crate::{config::Theme, design::ViewLook};
 use gpui::{prelude::*, *};
 use std::time::SystemTime;
 
+/// A limit's name, at `[ui] size = 12`.
+const LIMIT_NAME: f32 = 12.5;
+const BAR: f32 = 6.;
+
 pub(crate) struct Ui {
     pub theme: Theme,
-    pub font_size: f32,
+    pub look: ViewLook,
     pub now: SystemTime,
 }
 
 impl Ui {
     pub fn small(&self) -> Pixels {
-        px(self.font_size * 0.9)
+        px(self.look.scale().secondary)
     }
 
     pub fn muted(&self) -> Rgba {
-        rgb(self.theme.muted)
+        self.look.muted()
+    }
+
+    pub fn dialog(&self) -> crate::design::DialogLook {
+        self.look.dialog()
+    }
+
+    /// A group's quiet label, as Settings' and the menus' sections.
+    pub fn label(&self, text: impl Into<SharedString>) -> Div {
+        div()
+            .text_size(px(self.look.scale().detail))
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(self.look.muted())
+            .child(text.into())
+    }
+
+    /// Figures that line up from row to row.
+    fn figures(&self) -> Div {
+        div().font_features(FontFeatures(std::sync::Arc::new(vec![("tnum".into(), 1)])))
     }
 
     /// Windows, then balances, then sections, each group ruled off.
@@ -46,36 +68,56 @@ impl Ui {
     }
 
     pub fn rule(&self) -> Div {
-        div().h(px(1.)).my(px(6.)).bg(rgb(self.theme.active))
+        self.look.menu().separator()
     }
 
     pub fn heading(&self, title: impl Into<SharedString>) -> Div {
-        div().font_weight(FontWeight::SEMIBOLD).child(title.into())
+        div()
+            .text_size(self.look.at(LIMIT_NAME))
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(self.look.title())
+            .child(title.into())
     }
 
-    /// Padding every block shares, so custom blocks line up with standard ones.
+    /// Padding every block shares, so custom blocks line up with standard
+    /// ones and with the menu's rows.
     pub fn block(&self) -> Div {
-        div().px(px(8.)).py(px(6.)).flex().flex_col().gap(px(4.))
+        div()
+            .px(self.look.at(10.))
+            .py(self.look.at(6.))
+            .flex()
+            .flex_col()
+            .gap(self.look.at(5.))
     }
 
-    /// `Weekly 89% left`, its reset, a bar of what is left with a tick where
-    /// an even spend would be, and whether the rest lasts.
+    /// A limit's name, then how much is left and when it resets, quiet at
+    /// the right, a bar of what is left with a tick where an even spend
+    /// would be, and whether the rest lasts.
     pub fn limit(&self, limit: &Limit) -> AnyElement {
         let pace = limit.pace(self.now);
+        let left = match limit.resets_in(self.now) {
+            Some(resets) => format!(
+                "{}% left \u{b7} resets in {}",
+                limit.left(),
+                countdown(resets)
+            ),
+            None => format!("{}% left", limit.left()),
+        };
         self.block()
             .child(
                 div()
                     .flex()
+                    .items_center()
                     .justify_between()
-                    .gap(px(8.))
-                    .child(self.heading(format!("{} {}% left", limit.kind.title(), limit.left())))
-                    .children(limit.resets_in(self.now).map(|left| {
-                        div()
+                    .gap(self.look.at(8.))
+                    .child(self.heading(limit.kind.title()))
+                    .child(
+                        self.figures()
                             .flex_none()
                             .text_size(self.small())
                             .text_color(self.muted())
-                            .child(format!("Resets in {}", countdown(left)))
-                    })),
+                            .child(left),
+                    ),
             )
             .child(self.bar(100. - limit.used, limit.used, pace))
             .children(pace.map(|pace| {
@@ -94,11 +136,12 @@ impl Ui {
                 let row = div()
                     .flex()
                     .justify_between()
-                    .gap(px(8.))
+                    .gap(self.look.at(8.))
                     .child(div().text_color(self.muted()).child(balance.label.clone()))
                     .child(
-                        div()
-                            .font_weight(FontWeight::SEMIBOLD)
+                        self.figures()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(self.look.title())
                             .child(balance.text()),
                     );
                 match balance.total.filter(|total| *total > 0.) {
@@ -107,7 +150,7 @@ impl Ui {
                         div()
                             .flex()
                             .flex_col()
-                            .gap(px(4.))
+                            .gap(self.look.at(4.))
                             .child(row)
                             .child(self.bar(left, 100. - left, None))
                             .into_any_element()
@@ -120,31 +163,35 @@ impl Ui {
 
     pub fn facts(&self, title: &str, facts: &[(String, String)]) -> AnyElement {
         self.block()
-            .child(self.heading(title.to_owned()))
+            .child(self.label(title.to_owned()))
             .children(facts.iter().map(|(label, value)| {
                 div()
                     .flex()
                     .justify_between()
-                    .gap(px(8.))
+                    .gap(self.look.at(8.))
                     .text_size(self.small())
                     .child(div().text_color(self.muted()).child(label.clone()))
-                    .child(div().child(value.clone()))
+                    .child(
+                        self.figures()
+                            .text_color(self.look.title())
+                            .child(value.clone()),
+                    )
             }))
             .into_any_element()
     }
 
     pub fn shares(&self, title: &str, shares: &[(String, f32)]) -> AnyElement {
         self.block()
-            .child(self.heading(title.to_owned()))
+            .child(self.label(title.to_owned()))
             .children(shares.iter().map(|(label, share)| {
                 div()
                     .flex()
                     .items_center()
-                    .gap(px(8.))
+                    .gap(self.look.at(8.))
                     .text_size(self.small())
                     .child(
                         div()
-                            .w(px(96.))
+                            .w(self.look.at(96.))
                             .flex_none()
                             .truncate()
                             .text_color(self.muted())
@@ -152,8 +199,8 @@ impl Ui {
                     )
                     .child(div().flex_1().child(self.bar(*share, 0., None)))
                     .child(
-                        div()
-                            .w(px(36.))
+                        self.figures()
+                            .w(self.look.at(36.))
                             .flex_none()
                             .flex()
                             .justify_end()
@@ -182,7 +229,7 @@ impl Ui {
         };
         div()
             .relative()
-            .h(px(6.))
+            .h(self.look.at(BAR))
             .w_full()
             .rounded_full()
             .bg(rgb(theme.active))

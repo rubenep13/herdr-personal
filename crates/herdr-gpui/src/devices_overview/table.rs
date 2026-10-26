@@ -6,6 +6,7 @@ use super::{Device, Link, view::Look};
 use crate::{
     HerdrWindow,
     browser::{Slot, TabId},
+    design::Tone,
     system_load::{self, CPU_WARN, DISK_WARN, MEMORY_WARN, SystemLoad},
 };
 use gpui::{prelude::*, *};
@@ -24,7 +25,11 @@ const COLUMNS: [(&str, f32); 6] = [
 ];
 const METER_WIDTH: f32 = 64.;
 /// Where an open row's agents start: under the device's name, past its dot.
-const AGENT_INDENT: f32 = 31.;
+const AGENT_INDENT: f32 = 25.;
+/// The column headings line up with the rows' text: the list's inset and a
+/// row's padding.
+const HEADER_PADDING: f32 = 18.;
+const HEADER_HEIGHT: f32 = 28.;
 
 /// A row's cells: the device, its agents, then the load columns as one
 /// group, so a narrow tab wraps that group onto a line of its own, then wraps
@@ -79,6 +84,7 @@ pub(super) fn devices(
     cx: &mut Context<HerdrWindow>,
 ) -> Div {
     let theme = look.theme;
+    let view = look.view;
     let label = |index: usize| COLUMNS[index].0.into_any_element();
     let header = cells(
         "Device",
@@ -86,13 +92,12 @@ pub(super) fn devices(
         [label(1), label(2), label(3), label(4), label(5)],
         slot.selector("devices-load-header"),
     )
-    .px_3()
-    .py_2()
-    .border_b_1()
-    .border_color(rgb(theme.active))
-    .text_size(look.small())
-    .text_color(rgb(theme.subtext()));
-    let rows = shown.iter().enumerate().map(|(position, device)| {
+    .px(view.at(HEADER_PADDING))
+    .min_h(view.at(HEADER_HEIGHT))
+    .text_size(px(view.scale().detail))
+    .font_weight(FontWeight::MEDIUM)
+    .text_color(view.muted());
+    let rows = shown.iter().map(|device| {
         let reading = device
             .host
             .as_ref()
@@ -103,7 +108,8 @@ pub(super) fn devices(
         let open = expanded.contains(&device.id);
         let id = device.id.clone();
         let row_id = device.id.clone();
-        let row = cells(
+        let row_selector = slot.selector(&format!("devices-row-{row_id}"));
+        let cells = cells(
             name(look, device),
             agents(look, device),
             [
@@ -140,52 +146,63 @@ pub(super) fn devices(
                     .into_any_element(),
             ],
             slot.selector(&format!("devices-load-{}", device.id)),
-        )
-        .id(SharedString::from(
-            slot.selector(&format!("devices-row-{}", device.id)),
-        ))
-        .debug_selector(move || slot.selector(&format!("devices-row-{row_id}")))
-        .px_3()
-        .py_2()
-        .cursor_pointer()
-        .hover(|style| style.bg(rgb(theme.active)))
-        .on_click(cx.listener(move |this, _, _, cx| {
-            if let Some(page) = this.devices_overview.pages.get_mut(&tab) {
-                if !page.expanded.remove(&id) {
-                    page.expanded.insert(id.clone());
+        );
+        let row = view
+            .row(
+                SharedString::from(row_selector.clone()),
+                row_selector,
+                true,
+                false,
+            )
+            // Its columns wrap in a narrow tab, so it grows from its height.
+            .h_auto()
+            .min_h(px(view.row_height(true)))
+            .child(cells.flex_1().min_w_0())
+            .on_click(cx.listener(move |this, _, _, cx| {
+                if let Some(page) = this.devices_overview.pages.get_mut(&tab) {
+                    if !page.expanded.remove(&id) {
+                        page.expanded.insert(id.clone());
+                    }
+                    cx.notify();
                 }
-                cx.notify();
-            }
-        }));
+            }));
         div()
             .flex()
             .flex_col()
-            .when(position > 0, |unit| {
-                unit.border_t_1().border_color(rgb(theme.active))
-            })
             .child(row)
             .when(open, |unit| unit.child(agent_list(look, device, slot, cx)))
     });
-    look.panel()
-        .debug_selector(move || slot.selector("devices-table"))
-        .bg(rgb(theme.background))
-        .flex()
-        .flex_col()
+    view.settings()
+        .card(slot.selector("devices-table"))
+        .child(
+            view.card_header("devices-table-header", "Devices")
+                .child(view.settings().chip(
+                    slot.selector("devices-count"),
+                    shown.len().to_string(),
+                    Tone::Neutral,
+                )),
+        )
         .child(header)
-        .children(rows)
-        .when(shown.is_empty(), |table| {
-            table.child(
-                div()
-                    .p_4()
-                    .text_color(rgb(theme.muted))
-                    .child("No device, agent or workspace matches the search."),
-            )
-        })
+        .child(
+            view.list()
+                .pb(view.at(8.))
+                .children(rows)
+                .when(shown.is_empty(), |list| {
+                    list.child(
+                        div()
+                            .px(view.at(10.))
+                            .py(view.at(12.))
+                            .text_color(view.muted())
+                            .child("No device, agent or workspace matches the search."),
+                    )
+                }),
+        )
 }
 
 /// An open row's agents, working first; clicking one shows its pane.
 fn agent_list(look: &Look, device: &Device, slot: Slot, cx: &mut Context<HerdrWindow>) -> Div {
     let theme = look.theme;
+    let view = look.view;
     let list = div()
         .debug_selector({
             let id = device.id.clone();
@@ -193,14 +210,13 @@ fn agent_list(look: &Look, device: &Device, slot: Slot, cx: &mut Context<HerdrWi
         })
         .flex()
         .flex_col()
-        .pb_2()
-        .bg(rgb(theme.surface));
+        .pb(view.at(4.));
     if device.agents.is_empty() {
         return list.child(
             div()
-                .pl(px(AGENT_INDENT))
-                .pt_2()
-                .text_color(rgb(theme.muted))
+                .pl(view.at(AGENT_INDENT))
+                .py(view.at(6.))
+                .text_color(view.muted())
                 .child(match device.link {
                     Link::Online => "No agents on this device.",
                     _ => "Not connected, so its agents are unknown.",
@@ -210,23 +226,9 @@ fn agent_list(look: &Look, device: &Device, slot: Slot, cx: &mut Context<HerdrWi
     list.children(device.agents.iter().map(|agent| {
         let (endpoint, pane) = (device.id.clone(), agent.pane_id.clone());
         let (tab, workspace) = (agent.tab_id.clone(), agent.workspace_id.clone());
-        div()
-            .id(SharedString::from(slot.selector(&format!(
-                "devices-agent-{}-{}",
-                device.id, agent.pane_id
-            ))))
-            .debug_selector({
-                let id = format!("devices-agent-{}-{}", device.id, agent.pane_id);
-                move || slot.selector(&id)
-            })
-            .flex()
-            .items_center()
-            .gap_2()
-            .pl(px(AGENT_INDENT))
-            .pr_3()
-            .py_1()
-            .cursor_pointer()
-            .hover(|style| style.bg(rgb(theme.active)))
+        let selector = slot.selector(&format!("devices-agent-{}-{}", device.id, agent.pane_id));
+        view.row(SharedString::from(selector.clone()), selector, false, false)
+            .pl(view.at(AGENT_INDENT))
             .child(look.dot(agent.status))
             .child(
                 svg()
@@ -297,7 +299,6 @@ fn name(look: &Look, device: &Device) -> Div {
 
 /// A dot per agent, then `2/5 working`, then how many wait for input.
 fn agents(look: &Look, device: &Device) -> Div {
-    let theme = look.theme;
     let tally = device.tally;
     let text = match device.link {
         Link::Offline => "Offline".to_owned(),
@@ -307,6 +308,7 @@ fn agents(look: &Look, device: &Device) -> Div {
         Link::Online => format!("{}/{} working", tally.working, tally.total()),
     };
     let blocked = look.status(AgentStatus::Blocked);
+    let chip = format!("devices-blocked-{}", device.id);
     div()
         .flex()
         .items_center()
@@ -322,16 +324,11 @@ fn agents(look: &Look, device: &Device) -> Div {
         )
         .child(look.mono(text).min_w_0().truncate())
         .when(tally.blocked > 0, |row| {
-            row.child(
-                div()
-                    .flex_none()
-                    .px(px(5.))
-                    .rounded(px(crate::config::corners::SMALL))
-                    .bg(rgb(crate::config::mix(theme.background, blocked, 18)))
-                    .text_color(rgb(blocked))
-                    .text_size(look.small())
-                    .child(format!("{} blocked", tally.blocked)),
-            )
+            row.child(look.view.settings().chip(
+                chip,
+                format!("{} blocked", tally.blocked),
+                Tone::Status(blocked),
+            ))
         })
 }
 

@@ -46,17 +46,21 @@ const SHARED_PERCENT: u32 = 14;
 const LOCAL_PERCENT: u32 = 70;
 /// A status chip's wash of its own colour.
 const TONE_PERCENT: u32 = 13;
+/// A lit button's wash of the accent, as a lit pill's, and hovered.
+const LIT_PERCENT: u32 = 15;
+const LIT_HOVER_PERCENT: u32 = 22;
 /// A hovered button leans this far toward the text.
 const BUTTON_HOVER_PERCENT: u32 = 10;
 const PRIMARY_HOVER_PERCENT: u32 = 15;
 
-/// A button's weight: the page's plain action, the one it leads with, or
-/// one that destroys something.
+/// A button's weight: the page's plain action, the one it leads with, one
+/// that destroys something, or a plain one lit while what it toggles is on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ButtonKind {
     Normal,
     Primary,
     Danger,
+    Lit,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,19 +69,26 @@ pub(crate) enum ButtonSize {
     Small,
 }
 
-/// What a chip says by its colour: nothing, all is well, a warning, or where
-/// a setting is kept.
+/// What a chip says by its colour: nothing, all is well, a warning, a
+/// failure, something under way, a merge, where a setting is kept, or an
+/// agent's state in the colour [`crate::sidebar::Indicators`] gives it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Tone {
     Neutral,
     Good,
     Warn,
+    Danger,
+    Accent,
+    Merged,
     Shared,
     Local,
+    Status(u32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct SettingsLook {
+    /// The window's background, which a status chip's wash is mixed over.
+    background: u32,
     page: Rgba,
     nav: Rgba,
     nav_hover: Rgba,
@@ -92,17 +103,25 @@ pub(crate) struct SettingsLook {
     text: Rgba,
     muted: Rgba,
     accent: Rgba,
+    /// The accent as text on its own wash: lifted where the theme's own
+    /// would not read there.
+    accent_ink: Rgba,
     accent_hover: Rgba,
     on_accent: Rgba,
+    lit: Rgba,
+    lit_hover: Rgba,
     shared_fill: Rgba,
     local_fill: Rgba,
     danger: Rgba,
+    danger_fill: Rgba,
     danger_hover: Rgba,
     on_danger: Rgba,
     good: Rgba,
     good_fill: Rgba,
     warn: Rgba,
     warn_fill: Rgba,
+    merged: Rgba,
+    merged_fill: Rgba,
     /// The switch's colours off and on, as [`crate::toggles::colors`] gives
     /// them for the theme.
     switch: [(u32, u32); 2],
@@ -117,7 +136,9 @@ impl SettingsLook {
         let danger = crate::menu::danger_value(theme);
         // The theme has no orange: warnings take the ANSI yellow.
         let warn = theme.ink(theme.palette[3]);
+        let merged = theme.ink(theme.palette[5]);
         Self {
+            background: theme.background,
             page: rgb(theme.background),
             nav: rgb(theme.sidebar_background()),
             nav_hover: rgb(mix(
@@ -134,21 +155,27 @@ impl SettingsLook {
             text: rgb(theme.subtext()),
             muted: rgb(theme.muted),
             accent: rgb(theme.primary()),
+            accent_ink: rgb(theme.ink(theme.primary())),
             accent_hover: rgb(mix(
                 theme.primary(),
                 theme.foreground,
                 PRIMARY_HOVER_PERCENT,
             )),
             on_accent: rgb(crate::toggles::ink_on(theme, theme.primary())),
+            lit: rgb(mix(theme.background, theme.primary(), LIT_PERCENT)),
+            lit_hover: rgb(mix(theme.background, theme.primary(), LIT_HOVER_PERCENT)),
             shared_fill: rgb(mix(theme.background, theme.primary(), SHARED_PERCENT)),
             local_fill: rgb(mix(theme.background, theme.active, LOCAL_PERCENT)),
             danger: rgb(danger),
+            danger_fill: rgb(mix(theme.background, danger, TONE_PERCENT)),
             danger_hover: rgb(mix(danger, theme.foreground, PRIMARY_HOVER_PERCENT)),
             on_danger: rgb(crate::toggles::ink_on(theme, danger)),
             good: rgb(good),
             good_fill: rgb(mix(theme.background, good, TONE_PERCENT)),
             warn: rgb(warn),
             warn_fill: rgb(mix(theme.background, warn, TONE_PERCENT)),
+            merged: rgb(merged),
+            merged_fill: rgb(mix(theme.background, merged, TONE_PERCENT)),
             switch: [
                 crate::toggles::colors(theme, false),
                 crate::toggles::colors(theme, true),
@@ -332,9 +359,10 @@ impl SettingsLook {
             .text_color(ink)
             .text_size(px(text))
             .whitespace_nowrap()
-            .when(kind != ButtonKind::Normal, |button| {
-                button.font_weight(FontWeight::MEDIUM)
-            })
+            .when(
+                matches!(kind, ButtonKind::Primary | ButtonKind::Danger),
+                |button| button.font_weight(FontWeight::MEDIUM),
+            )
             .child(label)
             .when(enabled, |button| {
                 button
@@ -353,19 +381,31 @@ impl SettingsLook {
             ButtonKind::Normal => (self.line, self.button_hover, self.title),
             ButtonKind::Primary => (self.accent, self.accent_hover, self.on_accent),
             ButtonKind::Danger => (self.danger, self.danger_hover, self.on_danger),
+            ButtonKind::Lit => (self.lit, self.lit_hover, self.accent_ink),
+        }
+    }
+
+    /// A tone's text and the wash behind it.
+    pub(crate) fn tone(&self, tone: Tone) -> (Rgba, Rgba) {
+        match tone {
+            // The secondary text, not the quiet one, which reads below 3:1
+            // on the well in light themes.
+            Tone::Neutral => (self.text, self.well),
+            Tone::Good => (self.good, self.good_fill),
+            Tone::Warn => (self.warn, self.warn_fill),
+            Tone::Danger => (self.danger, self.danger_fill),
+            Tone::Accent => (self.accent_ink, self.shared_fill),
+            Tone::Shared => (self.accent, self.shared_fill),
+            Tone::Merged => (self.merged, self.merged_fill),
+            Tone::Local => (self.text, self.local_fill),
+            Tone::Status(colour) => (rgb(colour), rgb(mix(self.background, colour, TONE_PERCENT))),
         }
     }
 
     /// A small label in its tone's colours: a status, or where a setting is
     /// kept.
     pub(crate) fn chip(&self, selector: String, text: impl Into<SharedString>, tone: Tone) -> Div {
-        let (ink, fill) = match tone {
-            Tone::Neutral => (self.muted, self.well),
-            Tone::Good => (self.good, self.good_fill),
-            Tone::Warn => (self.warn, self.warn_fill),
-            Tone::Shared => (self.accent, self.shared_fill),
-            Tone::Local => (self.text, self.local_fill),
-        };
+        let (ink, fill) = self.tone(tone);
         div()
             .debug_selector(move || selector)
             .flex_none()

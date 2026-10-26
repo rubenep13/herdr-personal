@@ -8,7 +8,7 @@ use super::{
     rows::{RunRow, Runs, Tab},
 };
 use crate::{
-    config::corners,
+    design::Edge,
     orchestrator::{Access, Item},
     release_notes,
 };
@@ -17,11 +17,13 @@ use gpui::{prelude::*, *};
 /// How many lines of a description the preview draws; the item's page has
 /// the rest.
 const PREVIEW_LINES: usize = 40;
+/// The grabbable strip along the panel's left edge, at the face's size of 12.
+const HANDLE: f32 = 6.;
 
 impl OrchestratorView {
     pub(super) fn render_preview_pane(&self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let look = &self.look;
-        let theme = &look.theme;
+        let view = look.view();
         let body = match self.tab {
             Tab::Runs => self
                 .selected
@@ -34,43 +36,35 @@ impl OrchestratorView {
                 .and_then(|key| self.item(key))
                 .map(|item| self.render_item_preview(item, cx)),
         };
-        div()
-            .flex_none()
+        view.side_panel("orchestrator-preview-pane", Edge::Right)
+            .relative()
             .w(px(self.preview_width))
             .h_full()
-            .flex()
+            .child(
+                div()
+                    .id("orchestrator-preview-body")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .px(view.at(16.))
+                    .py(view.at(14.))
+                    .flex()
+                    .flex_col()
+                    .gap(view.at(10.))
+                    .children(body),
+            )
+            // Its left edge drags: a strip over the hairline, wide enough
+            // to grab.
             .child(
                 div()
                     .id("orchestrator-preview-handle")
-                    .flex_none()
-                    .w(px(6.))
-                    .h_full()
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .border_l_1()
-                    .border_color(rgb(theme.active))
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .left_0()
+                    .w(view.at(HANDLE))
                     .cursor(CursorStyle::ResizeLeftRight)
-                    .on_drag(PreviewDrag, |drag, _, _, cx| cx.new(|_| *drag))
-                    .child(
-                        div()
-                            .w(px(2.))
-                            .h(px(28.))
-                            .rounded_full()
-                            .bg(rgb(theme.active)),
-                    ),
-            )
-            .child(
-                div()
-                    .id("orchestrator-preview")
-                    .flex_1()
-                    .min_w_0()
-                    .overflow_y_scroll()
-                    .p_4()
-                    .flex()
-                    .flex_col()
-                    .gap_3()
-                    .children(body),
+                    .on_drag(PreviewDrag, |drag, _, _, cx| cx.new(|_| *drag)),
             )
             .into_any_element()
     }
@@ -120,9 +114,9 @@ impl OrchestratorView {
                         look.mono(item.identifier.clone())
                             .text_color(rgb(theme.muted)),
                     )
-                    .child(look.badge(item.state.replace('_', " "), look.state_hue(&item.state)))
+                    .child(look.badge(item.state.replace('_', " "), look.state_tone(&item.state)))
                     .when_some(item.priority, |el, priority| {
-                        el.child(look.badge(format!("P{priority}"), look.priority_hue(priority)))
+                        el.child(look.badge(format!("P{priority}"), look.priority_tone(priority)))
                     })
                     .children(
                         item.labels
@@ -133,8 +127,9 @@ impl OrchestratorView {
             )
             .child(
                 div()
-                    .text_size(px(look.ui.size + 3.))
+                    .text_size(px(look.view().scale().name + 1.))
                     .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(look.view().title())
                     .child(item.title.clone()),
             )
             .child(look.muted(meta))
@@ -178,7 +173,8 @@ impl OrchestratorView {
                 el.child(look.muted(format!("Blocked by {}", item.blocked_by.join(", "))))
             })
             .when_some(latest, |el, latest| {
-                el.child(self.run_card_small(&runs, latest, cx))
+                el.child(look.label("Latest run"))
+                    .child(self.run_card_small(&runs, latest, cx))
             })
             .when_some(lines, |el, lines| {
                 let shown = &lines[..lines.len().min(PREVIEW_LINES)];
@@ -241,8 +237,9 @@ impl OrchestratorView {
             .gap_3()
             .child(
                 div()
-                    .text_size(px(look.ui.size + 3.))
+                    .text_size(px(look.view().scale().name + 1.))
                     .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(look.view().title())
                     .child(item.map_or_else(|| found.item_key.clone(), |item| item.title.clone())),
             )
             .child(self.run_card_small(&runs, RunRow { run, status }, cx))
@@ -270,7 +267,6 @@ impl OrchestratorView {
         let theme = &look.theme;
         let run = &runs.runs[row.run];
         let live = runs.live(row.run);
-        let color = look.status_hue(row.status);
         let host = run
             .workspace
             .as_ref()
@@ -283,49 +279,43 @@ impl OrchestratorView {
             .unwrap_or_default();
         let title = live.and_then(|agent| agent.title.clone());
         let index = row.run;
-        div()
-            .p_3()
-            .flex()
-            .flex_col()
-            .gap_1()
-            .rounded(px(corners::CONTROL))
-            .bg(rgb(theme.surface))
+        let view = look.view();
+        view.settings()
+            .card(format!("orchestrator-run-card-{index}"))
+            .px(view.at(12.))
+            .py(view.at(10.))
+            .gap(view.at(4.))
             .child(
                 div()
                     .flex()
                     .items_center()
-                    .gap_2()
+                    .gap(view.at(10.))
                     .child(look.icon(agent_icon(&run.agent), 16., theme.foreground))
                     .child(
                         div()
                             .flex_1()
                             .min_w_0()
                             .truncate()
+                            .text_color(view.title())
                             .child(format!("{} on {host}", run.agent)),
                     )
-                    .child(look.dot(color, 7.))
-                    .child(
-                        div()
-                            .text_size(look.small())
-                            .text_color(rgb(color))
-                            .child(row.status.label()),
-                    ),
+                    .child(look.badge(row.status.label(), look.status_tone(row.status))),
             )
             .when(!branch.is_empty(), |el| {
-                el.child(look.mono(branch).text_color(rgb(theme.muted)).truncate())
+                el.child(look.mono(branch).text_color(view.muted()).truncate())
             })
             .when_some(title, |el, title| {
                 el.child(
                     div()
                         .text_size(look.small())
-                        .text_color(rgb(theme.subtext()))
+                        .text_color(view.text())
                         .truncate()
                         .child(title),
                 )
             })
             .when(live.is_some(), |el| {
                 el.child(
-                    div().pt_1().child(
+                    div().pt(view.at(4.)).child(
                         look.button(("orchestrator-open-run", index), "Open agent", true)
                             .on_click(cx.listener(move |this, _, _, cx| this.open_run(index, cx))),
                     ),

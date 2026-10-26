@@ -114,7 +114,7 @@ impl HerdrWindow {
         let look = layout::for_config(&self.config, self.fill());
         let font = &self.config.sidebar;
         let theme = &self.theme;
-        let hint = Hint::new(theme);
+        let hint = self.menu_look();
         let multi = self.endpoints.len() > 1;
         let split = self.sidebar_split.unwrap_or(0.5).clamp(0.1, 0.9);
         let mut spaces = div()
@@ -195,7 +195,7 @@ impl HerdrWindow {
                     .id(SharedString::from(format!("rail-host-{endpoint_id}")))
                     .debug_selector(|| format!("rail-host-{endpoint_id}"))
                     .cursor_pointer()
-                    .tooltip(hint.with(text))
+                    .tooltip(hint.tooltip(text))
                     .on_mouse_down(
                         MouseButton::Right,
                         cx.listener(move |this, event: &MouseDownEvent, window, cx| {
@@ -260,7 +260,7 @@ impl HerdrWindow {
                     .id(SharedString::from(key.clone()))
                     .debug_selector(|| key)
                     .cursor_pointer()
-                    .tooltip(hint.with(describe(
+                    .tooltip(hint.tooltip(describe(
                         host,
                         workspace_label(workspace, indented),
                         None,
@@ -360,7 +360,7 @@ impl HerdrWindow {
                 .id(SharedString::from(key.clone()))
                 .debug_selector(|| key)
                 .cursor_pointer()
-                .tooltip(hint.with(describe(
+                .tooltip(hint.tooltip(describe(
                     host,
                     agent_name(agent),
                     place.as_deref(),
@@ -428,7 +428,7 @@ impl HerdrWindow {
                 rail_button("rail-new-workspace", font, look, theme)
                     .text_color(rgb(theme.muted))
                     .hover(|s| s.text_color(rgb(theme.foreground)))
-                    .tooltip(hint.with("New workspace"))
+                    .tooltip(hint.tooltip("New workspace"))
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.command(Command::Workspace, window, cx);
                     }))
@@ -529,36 +529,6 @@ pub(super) fn describe(
         text.push(')');
     }
     text.into()
-}
-
-#[derive(Clone, Copy)]
-struct Hint {
-    foreground: u32,
-    surface: u32,
-}
-
-impl Hint {
-    fn new(theme: &Theme) -> Self {
-        Self {
-            foreground: theme.foreground,
-            surface: theme.surface,
-        }
-    }
-
-    fn with(
-        self,
-        text: impl Into<SharedString>,
-    ) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
-        let text = text.into();
-        move |_, cx| {
-            cx.new(|_| crate::usage::Hint {
-                text: text.clone(),
-                foreground: self.foreground,
-                surface: self.surface,
-            })
-            .into()
-        }
-    }
 }
 
 #[cfg(test)]

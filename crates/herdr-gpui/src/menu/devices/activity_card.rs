@@ -30,20 +30,17 @@ impl HerdrWindow {
                 .child(look.dot(status))
                 .child(text)
         };
-        div()
+        let settings = look.view.settings();
+        let ring = settings.raised();
+        // The overview's cards' frame, since the two share their look.
+        settings
+            .card("device-activity".into())
             .id("device-activity")
-            .debug_selector(|| "device-activity".into())
             .flex_none()
             .m(px(4.))
             .p(px(10.))
-            .rounded(px(crate::config::corners::CONTROL))
-            .border_1()
-            .border_color(rgb(theme.active))
-            .bg(rgb(theme.background))
             .cursor_pointer()
-            .hover(|style| style.border_color(rgb(theme.muted)))
-            .flex()
-            .flex_col()
+            .hover(move |style| style.border_color(ring))
             .gap(px(6.))
             .child(
                 div()
@@ -57,7 +54,7 @@ impl HerdrWindow {
                             .min_w_0()
                             .truncate()
                             .text_color(rgb(theme.muted))
-                            .child("AGENT ACTIVITY · 2 H"),
+                            .child("Agent activity · 2 h"),
                     )
                     .child(
                         div()
