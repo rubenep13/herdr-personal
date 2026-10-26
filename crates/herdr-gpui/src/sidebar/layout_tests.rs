@@ -476,6 +476,30 @@ pub(crate) fn full_draw(window: &mut Window, cx: &mut App) -> ArenaClearNeeded {
     window.draw(cx)
 }
 
+/// A footer's key hints: each is whole on the row's line, or wholly under
+/// it, where the row clips it; at least the first shows.
+#[cfg(test)]
+pub(crate) fn whole_or_gone(cx: &mut gpui::VisualTestContext, row: &str, hint: &str, count: usize) {
+    let leak = |name: String| -> &'static str { Box::leak(name.into_boxed_str()) };
+    let row: Bounds<Pixels> = cx
+        .debug_bounds(leak(row.to_owned()))
+        .unwrap_or_else(|| panic!("{row}"));
+    for index in 0..count {
+        let part = cx
+            .debug_bounds(leak(format!("{hint}-{index}")))
+            .unwrap_or_else(|| panic!("{hint}-{index}"));
+        let shown = part.left() >= row.left()
+            && part.right() <= row.right()
+            && part.top() >= row.top()
+            && part.bottom() <= row.bottom();
+        let gone = part.top() >= row.bottom();
+        assert!(shown || gone, "{hint}-{index}: {part:?} in {row:?}");
+        if index == 0 {
+            assert!(shown, "the first hint shows: {part:?} in {row:?}");
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) fn fixture_window(window: &mut Window, cx: &mut Context<HerdrWindow>) -> HerdrWindow {
     HerdrWindow {

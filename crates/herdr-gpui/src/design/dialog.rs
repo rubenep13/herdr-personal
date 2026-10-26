@@ -605,15 +605,11 @@ impl IntoElement for Footer {
                 .border_color(look.line)
                 .child(buttons);
         }
-        // The keys give way before the buttons: they shrink and clip, the
+        // The keys give way before the buttons, whole and from the last; the
         // buttons never do.
-        let hints = div()
-            .debug_selector(move || format!("{selector}-hints"))
-            .flex_1()
-            .min_w_0()
-            .overflow_hidden()
-            .flex()
-            .items_center()
+        let hints = look
+            .menu
+            .hint_row(format!("{selector}-hints"), look.menu.keycap_height())
             .gap(look.at(HINT_GAP))
             .text_size(px(look.scale.detail))
             .text_color(look.muted)

@@ -332,15 +332,19 @@ impl HerdrWindow {
         } else {
             hints::HINTS
         };
-        let mut footer = footer;
+        // A narrow footer drops hints whole, from the last.
+        let mut row = look
+            .hint_row("palette-hints".into(), look.keycap_height())
+            .gap(look.at(14.));
         let mut first = 0;
-        for hint in hints {
+        for (index, hint) in hints.iter().enumerate() {
             let keys =
                 hint.keys.iter().enumerate().map(|(offset, key)| {
                     look.keycap(format!("palette-key-{}", first + offset), *key)
                 });
-            footer = footer.child(
+            row = row.child(
                 div()
+                    .debug_selector(move || format!("palette-hint-{index}"))
                     .flex()
                     .flex_none()
                     .items_center()
@@ -350,7 +354,7 @@ impl HerdrWindow {
             );
             first += hint.keys.len();
         }
-        footer
+        footer.child(row)
     }
 
     /// Whether Go To shows its preview: it is toggled on, and the window has

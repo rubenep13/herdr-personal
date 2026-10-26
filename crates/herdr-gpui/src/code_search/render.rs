@@ -9,6 +9,18 @@ use std::time::SystemTime;
 /// height, at `[ui] size = 12`, as the palette's.
 const LIST_INSET: f32 = 6.;
 const FOOTER_HEIGHT: f32 = 36.;
+/// The footer's key hints, in order.
+const HINTS: [&str; 5] = [
+    "↑ / ↓ navigate",
+    "Tab symbols/files",
+    "Enter editor",
+    if cfg!(target_os = "macos") {
+        "⌘Enter viewer"
+    } else {
+        "Ctrl-Enter viewer"
+    },
+    "Esc cancel",
+];
 
 /// How long ago a change was last written, as `5m` or `3h`.
 fn age(modified: Option<SystemTime>) -> Option<String> {
@@ -307,11 +319,23 @@ impl HerdrWindow {
                     .bg(rgb(theme.surface))
                     .text_size(px(look.scale().detail))
                     .text_color(look.muted())
-                    .child(if cfg!(target_os = "macos") {
-                        "↑ / ↓ navigate · Tab symbols/files · Enter editor · ⌘Enter viewer · Esc cancel"
-                    } else {
-                        "↑ / ↓ navigate · Tab symbols/files · Enter editor · Ctrl-Enter viewer · Esc cancel"
-                    }),
+                    // A narrow footer drops hints whole, from the last; each
+                    // takes the dot before it along.
+                    .child(
+                        look.hint_row("code-search-hints".into(), look.keycap_height())
+                            .gap(look.at(4.))
+                            .children(HINTS.iter().enumerate().map(|(index, hint)| {
+                                div()
+                                    .debug_selector(move || format!("code-search-hint-{index}"))
+                                    .flex_none()
+                                    .whitespace_nowrap()
+                                    .child(if index == 0 {
+                                        (*hint).to_owned()
+                                    } else {
+                                        format!("\u{b7} {hint}")
+                                    })
+                            })),
+                    ),
             )
     }
 }
