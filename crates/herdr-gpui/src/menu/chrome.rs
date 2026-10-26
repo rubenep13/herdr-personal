@@ -440,6 +440,15 @@ impl HerdrWindow {
                             .max_w(room)
                             .max_h((viewport.height - px(24.)).max(px(0.)));
                     }
+                    // The tab strip's menu also takes its longest row, a
+                    // label and its shortcut, from a least width that grows
+                    // with the interface.
+                    if matches!(page, Page::Group | Page::MovePane) {
+                        return panel
+                            .min_w(px(240. * font.size / 12.).min(room))
+                            .max_w(room)
+                            .max_h((viewport.height - px(24.)).max(px(0.)));
+                    }
                     panel
                         .w(room.min(px(if forwards {
                             // Room for a forward's port, state, and actions.
@@ -447,8 +456,6 @@ impl HerdrWindow {
                         } else if page == Page::PaneProcesses {
                             // Name, command, pid, CPU and memory columns.
                             560.
-                        } else if matches!(page, Page::Group | Page::MovePane) {
-                            240.
                         } else {
                             360.
                         })))
