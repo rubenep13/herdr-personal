@@ -184,7 +184,7 @@ pub(crate) struct Review {
     files_shown: Option<bool>,
     notes_shown: Option<bool>,
     /// The review's width at its last layout, which decides that.
-    width: Rc<Cell<f32>>,
+    width: crate::design::Width,
     /// The checkout's status when the review last read it: a change reads
     /// the review again.
     seen: Option<crate::git::Status>,
@@ -722,7 +722,7 @@ impl HerdrWindow {
             .size_full()
             .flex()
             .flex_col()
-            .child(panels::measure(review.width.clone()))
+            .child(review.width.probe([panels::NARROW]))
             .child(self.render_review_header(id, review, cx))
             .child(
                 div()

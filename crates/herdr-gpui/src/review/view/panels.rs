@@ -5,7 +5,6 @@
 use super::Review;
 use crate::{HerdrWindow, browser::TabId};
 use gpui::{prelude::*, *};
-use std::{cell::Cell, rc::Rc};
 
 /// Below this width, in pixels, a review starts with both panels hidden.
 pub(super) const NARROW: f32 = 1000.;
@@ -35,23 +34,6 @@ impl Review {
             }
         }
     }
-}
-
-/// Records a review's width as it lays out, and draws again when that
-/// moves it across `NARROW`, so the panels follow on the next frame.
-pub(super) fn measure(width: Rc<Cell<f32>>) -> impl IntoElement {
-    canvas(
-        move |bounds, window, _| {
-            let now = f32::from(bounds.size.width);
-            let before = width.replace(now);
-            if (before >= NARROW) != (now >= NARROW) {
-                window.refresh();
-            }
-        },
-        |_, _, _, _| {},
-    )
-    .absolute()
-    .inset_0()
 }
 
 impl HerdrWindow {
