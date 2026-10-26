@@ -35,3 +35,33 @@ fn following_asks_for_a_frame_on_any_move() {
     assert!(width.record_any(503.));
     assert_eq!(width.get(), 503.);
 }
+
+struct Probed(Width);
+
+impl Render for Probed {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().size_full().child(self.0.probe([500.]))
+    }
+}
+
+/// A probe that crosses a cut while the window draws asks for the next
+/// frame, since a refresh during a draw is dropped.
+#[gpui::test]
+fn crossing_a_cut_asks_for_the_next_frame(cx: &mut TestAppContext) {
+    let (_view, cx) = cx.add_window_view(|_, _| Probed(Width::default()));
+    let draw = |cx: &mut VisualTestContext| {
+        cx.update(|window, cx| crate::sidebar::layout_tests::full_draw(window, cx).clear(cx));
+    };
+    let next = |cx: &mut VisualTestContext| cx.update(|window, cx| window.simulate_next_frame(cx));
+    cx.simulate_resize(size(px(400.), px(300.)));
+    draw(cx);
+    // The first layout always counts.
+    assert!(next(cx) > 0);
+    draw(cx);
+    cx.simulate_resize(size(px(450.), px(300.)));
+    draw(cx);
+    assert_eq!(next(cx), 0, "no cut crossed");
+    cx.simulate_resize(size(px(600.), px(300.)));
+    draw(cx);
+    assert!(next(cx) > 0, "500 crossed");
+}

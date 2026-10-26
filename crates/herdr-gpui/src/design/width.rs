@@ -32,8 +32,10 @@ impl Width {
         let width = self.clone();
         canvas(
             move |bounds, window, _| {
+                // A refresh while the window draws is dropped: ask for the
+                // next frame and refresh there.
                 if moved(&width, f32::from(bounds.size.width)) {
-                    window.refresh();
+                    window.on_next_frame(|window, _| window.refresh());
                 }
             },
             |_, _, _, _| {},
