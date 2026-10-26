@@ -86,7 +86,9 @@ impl HerdrWindow {
                     remember(cx);
                     self.dismiss_menu(window, cx);
                     if selected {
-                        self.navigate(target.as_deref(), cx);
+                        if self.navigate(target.as_deref(), cx) {
+                            self.ask_reveal(target.as_deref());
+                        }
                     } else {
                         self.navigate_endpoint(endpoint, target.as_deref(), cx);
                     }

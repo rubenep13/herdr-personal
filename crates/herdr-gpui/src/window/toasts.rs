@@ -150,6 +150,7 @@ impl HerdrWindow {
         if let Some(target) = target
             && self.navigate(target.as_deref(), cx)
         {
+            self.ask_reveal(target.as_deref());
             self.endpoints[self.selected_endpoint].toasts.dismiss(id);
         }
         cx.notify();

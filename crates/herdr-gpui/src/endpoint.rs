@@ -709,12 +709,23 @@ impl HerdrWindow {
         }
         self.pending_toast = None;
         self.pending_navigation = None;
+        self.ask_reveal(target.clone());
         if self.input_ready() {
             self.navigate(target, cx);
         } else {
             self.pending_navigation = Some((&target).into());
         }
         true
+    }
+
+    /// The user went to `target`: its terminal comes out from behind a page
+    /// once the daemon's focus gets there; see `reveal_terminal`. Going to a
+    /// workspace keeps what its group shows.
+    pub(crate) fn ask_reveal(&mut self, target: NavigationTarget<&str>) {
+        self.reveal = match target {
+            NavigationTarget::Workspace(_) => None,
+            target => Some((&target).into()),
+        };
     }
 
     pub(super) fn input_ready(&self) -> bool {

@@ -223,6 +223,7 @@ impl HerdrWindow {
             remote_browser: Vec::new(),
             removal: None,
             resize_mode: false,
+            reveal: None,
             review_files_width: crate::panel_resize::REVIEW_FILES,
             reviews: Default::default(),
             scrollbar_drag: None,

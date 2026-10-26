@@ -550,6 +550,40 @@ impl HerdrWindow {
         self.browser.new_tab_group.as_ref().map(|(_, group)| *group)
     }
 
+    /// Brings the terminal out from behind a page once the daemon's focus
+    /// reaches the agent the user went to (`ask_reveal`), whether or not it
+    /// moved to get there. The page stays in its group's strip. A navigation
+    /// that lands elsewhere, or is given up, forgets the agent, so a later
+    /// focus change from Herdr's CLI or another client leaves the page.
+    pub(crate) fn reveal_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(target), Some(snapshot)) = (&self.reveal, self.live.snapshot.as_deref()) else {
+            return;
+        };
+        let reached = match target {
+            NavigationTarget::Workspace(_) => true,
+            NavigationTarget::Tab(tab) => snapshot.focused_tab_id.as_ref() == Some(tab),
+            NavigationTarget::Pane(pane) => snapshot.focused_pane_id.as_ref() == Some(pane),
+        };
+        if !reached {
+            if self.pending_navigation.is_none() && !self.live.activation_pending() {
+                self.reveal = None;
+            }
+            return;
+        }
+        // A menu opened since keeps the keyboard; the terminal waits for it.
+        if self.menu.page.is_some() {
+            return;
+        }
+        let tab = snapshot.focused_tab_id.clone();
+        self.reveal = None;
+        let (Some(tab), Some(group)) = (tab, self.primary_group()) else {
+            return;
+        };
+        if matches!(self.group_pick(group), Some(Pick::Page(_))) {
+            self.choose_herdr_tab(group, &tab, window, cx);
+        }
+    }
+
     /// Follows the window's connection moving its focus, from a shortcut, an
     /// agent, a closed tab, or a group's "+". The tab's own group shows it
     /// and takes the connection; a new tab goes to the group whose "+" asked

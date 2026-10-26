@@ -672,6 +672,7 @@ pub(crate) fn fixture_window(window: &mut Window, cx: &mut Context<HerdrWindow>)
             .observe_global::<crate::sidebar::tree::storage::TreeState>(|_, cx| cx.notify()),
         prefix_armed: false,
         resize_mode: false,
+        reveal: None,
         server_keys: None,
         shift_taps: Default::default(),
         _prefix_interceptor: HerdrWindow::intercept_prefix(window, cx),

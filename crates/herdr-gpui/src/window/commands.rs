@@ -582,7 +582,9 @@ impl HerdrWindow {
             NavigationTarget::Workspace(id.as_str())
         };
         if host == selected {
-            self.navigate(target, cx);
+            if self.navigate(target.clone(), cx) {
+                self.ask_reveal(target);
+            }
         } else {
             let endpoint = self.endpoints[host].id.clone();
             self.navigate_endpoint(&endpoint, target, cx);
