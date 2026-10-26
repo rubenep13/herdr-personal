@@ -43,7 +43,10 @@ fn segments_stay_inside_their_card(cx: &mut TestAppContext) {
             segment.left() >= strip.left() && segment.right() <= strip.right(),
             "{segment:?} in {strip:?}"
         );
-        assert!(segment.bottom() <= strip.bottom(), "{segment:?} in {strip:?}");
+        assert!(
+            segment.bottom() <= strip.bottom(),
+            "{segment:?} in {strip:?}"
+        );
     }
 }
 

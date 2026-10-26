@@ -145,5 +145,6 @@ fn copy_mode_explains_an_old_daemon(cx: &mut TestAppContext) {
     });
 }
 
+mod badge_inside;
 mod padding;
 mod search;

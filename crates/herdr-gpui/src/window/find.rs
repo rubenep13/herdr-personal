@@ -397,24 +397,26 @@ impl HerdrWindow {
                 look.muted()
             })
             .child(label);
+        // Its right edge keeps to the pane's. A pane narrower than the bar's
+        // least width lets it reach left, though never past the terminals.
+        let margin = f32::from(look.at(MARGIN));
+        let pane_left = f32::from(pane.rect.x) * self.cell_width;
+        let pane_width = f32::from(pane.rect.width) * self.cell_width;
+        let width = (pane_width - 2. * margin)
+            .clamp(f32::from(look.at(BAR_MIN)), f32::from(look.at(BAR_WIDTH)));
+        let left = (pane_left + pane_width - margin - width).max(0.);
         Some(
             div()
                 .absolute()
-                .left(px(f32::from(pane.rect.x) * self.cell_width))
-                .top(px(f32::from(pane.rect.y) * cell_height))
-                .w(px(f32::from(pane.rect.width) * self.cell_width))
-                .flex()
-                .justify_end()
-                .p(px(6.))
+                .left(px(left))
+                .top(px(f32::from(pane.rect.y) * cell_height + margin))
                 .child(
                     look.menu()
                         .panel(div())
                         .id("find-bar")
                         .debug_selector(|| "find-bar".into())
                         .occlude()
-                        .min_w_0()
-                        .w(px(BAR_WIDTH))
-                        .flex_shrink(1.)
+                        .w(px(width))
                         .flex()
                         .items_center()
                         .gap(look.at(2.))
@@ -428,6 +430,8 @@ impl HerdrWindow {
                             look.field("find-field".into(), false, Some("icons/search.svg"))
                                 .flex_1()
                                 .flex_shrink(1.)
+                                // The count never runs under the arrows.
+                                .overflow_hidden()
                                 .child(div().flex_1().min_w_0().child(bar.input.clone()))
                                 .child(count),
                         )
@@ -447,8 +451,11 @@ impl HerdrWindow {
     }
 }
 
-/// The find bar's width, and the small panels' corners at `[ui] size = 12`.
+/// The find bar's width and its least width over a narrow pane, its margin
+/// from the pane's edges, and the small panels' corners at `[ui] size = 12`.
 const BAR_WIDTH: f32 = 320.;
+const BAR_MIN: f32 = 260.;
+pub(super) const MARGIN: f32 = 6.;
 pub(super) const SMALL_PANEL_RADIUS: f32 = 10.;
 
 fn pane_of<'a>(surface: &'a PaneSurfaceFrame, pane_id: &str) -> Option<&'a PaneSurfacePane> {

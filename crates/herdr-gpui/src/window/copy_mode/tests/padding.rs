@@ -42,6 +42,6 @@ fn copy_mode_badge_sits_over_the_cells_inside_the_terminal_padding(cx: &mut Test
         )
     });
     assert!((badge.right() - (right - px(6.))).abs() < px(0.5));
-    assert!(badge.bottom() <= bottom);
-    assert!(badge.top() >= bottom - px(32.5));
+    // The same margin below as on the right.
+    assert!((badge.bottom() - (bottom - px(6.))).abs() < px(0.5));
 }
