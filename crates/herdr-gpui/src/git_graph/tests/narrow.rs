@@ -132,3 +132,21 @@ fn the_column_gear_covers_no_title(cx: &mut TestAppContext) {
     let refs = bounds(cx, "graph-col-refs");
     assert!(refs.right() <= titles.right(), "{refs:?} in {titles:?}");
 }
+
+#[gpui::test]
+fn the_time_marker_keeps_off_the_columns(cx: &mut TestAppContext) {
+    let now = chrono::Utc::now().timestamp();
+    let mut commits = line(2);
+    commits[0].authored = now;
+    commits[1].authored = now - 3 * 24 * 3600;
+    let (_view, cx) = shown(cx, History::new(&commits, &[], None, None, false), 560.);
+    cx.update(|_, cx| GraphPrefsStore::update(cx, |prefs| prefs.author = true));
+    draw(cx);
+    draw(cx);
+    let marker = bounds(cx, "graph-when-1");
+    let author = bounds(cx, "graph-col-author");
+    assert!(
+        marker.right() <= author.left(),
+        "{marker:?} before {author:?}"
+    );
+}

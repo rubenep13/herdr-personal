@@ -82,7 +82,7 @@ impl GitGraphView {
             .checked_sub(1)
             .and_then(|previous| history.commits.get(previous))
             .filter(|previous| !when.is_empty() && relative_time(previous.authored, now) != when)
-            .map(|_| self.render_marker(&when, commit.authored));
+            .map(|_| self.render_marker(row, &when, commit.authored));
         div()
             .id(("graph-row", row))
             .debug_selector(move || format!("graph-row-{row}"))
@@ -288,7 +288,7 @@ impl GitGraphView {
     }
 
     /// A pill on the top edge of the first row of a time bucket.
-    fn render_marker(&self, when: &str, at: i64) -> AnyElement {
+    fn render_marker(&self, row: usize, when: &str, at: i64) -> AnyElement {
         let theme = &self.look.theme;
         let scaled = |measure: f32| px(self.look.at(measure));
         let tail: f32 = self
@@ -298,9 +298,11 @@ impl GitGraphView {
             .sum();
         div()
             .id(SharedString::from(format!("graph-when-{at}")))
+            .debug_selector(move || format!("graph-when-{row}"))
             .absolute()
             .top(scaled(-9.))
-            .right(px(tail) + scaled(8.))
+            // Past the optional columns and the headings' gear place.
+            .right(px(tail + self.gear_place()) + scaled(8.))
             .h(scaled(18.))
             .px(scaled(7.))
             .rounded(scaled(3.))
