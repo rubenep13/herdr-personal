@@ -22,6 +22,7 @@ mod save_now;
 mod scrollbars;
 mod search;
 mod section_order;
+mod segments_wrap;
 mod sidebar_drafts;
 mod tab_options;
 mod theme_drafts;
