@@ -38,6 +38,9 @@ pub(crate) struct Page {
     pub(crate) lanes: bool,
     /// The devices whose rows are open on their agents, by endpoint id.
     pub(crate) expanded: std::collections::HashSet<String>,
+    /// The tab's width at its last layout: a narrow one puts the totals two
+    /// by two and the chart under its figure.
+    pub(crate) width: crate::design::Width,
     _changed: Subscription,
 }
 
@@ -125,6 +128,7 @@ impl HerdrWindow {
                 scroll: ScrollHandle::new(),
                 lanes: false,
                 expanded: Default::default(),
+                width: Default::default(),
                 _changed: changed,
             },
         );

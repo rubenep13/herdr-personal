@@ -102,9 +102,10 @@ fn a_narrow_tab_wraps_the_load_columns_instead_of_cutting_them(cx: &mut gpui::Te
     assert!(load.right() <= tab.right(), "{load:?} inside {tab:?}");
     assert!(row.size.height > wide_row.size.height, "the load wrapped");
     let totals = cx.debug_bounds("devices-totals").unwrap();
-    assert_eq!(
-        totals.size.height, wide_totals.size.height,
-        "the four totals keep one row"
+    // Under 150 px a card, the totals go two by two.
+    assert!(
+        totals.size.height > wide_totals.size.height,
+        "the totals go two by two"
     );
     assert!(
         (header.left() - load.left()).abs() < gpui::px(1.),
