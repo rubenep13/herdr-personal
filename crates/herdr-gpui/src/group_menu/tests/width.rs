@@ -28,7 +28,10 @@ fn the_tab_menu_fits_its_longest_row(cx: &mut TestAppContext) {
             .shape_line(text.into(), size, &[run], None)
             .width
     });
-    assert!(label.size.width >= whole - px(0.5), "{label:?} vs {whole:?}");
+    assert!(
+        label.size.width >= whole - px(0.5),
+        "{label:?} vs {whole:?}"
+    );
     assert!(label.right() <= keys.left(), "{label:?} before {keys:?}");
     let panel = cx.debug_bounds("menu-panel").unwrap();
     assert!(panel.right() <= px(1200.), "{panel:?}");
