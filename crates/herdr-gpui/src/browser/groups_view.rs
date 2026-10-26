@@ -745,9 +745,11 @@ impl HerdrWindow {
         let group = group.unwrap_or_else(|| layout.owner(&Pick::Page(id)));
         layout.choose(group, Pick::Page(id));
         // A page chosen in the primary group replaces its pending terminal
-        // choice. Pages in other groups leave that navigation alone.
+        // choice, and an agent's terminal asked for before it. Pages in
+        // other groups leave that navigation alone.
         if self.primary_group() == Some(group) {
             self.pending_navigation = None;
+            self.reveal = None;
         }
         if tab.place.is_code() {
             // The VS Code tab's page waits for its server, and carries its

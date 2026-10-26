@@ -245,3 +245,52 @@ fn a_notification_brings_its_agent_out(cx: &mut gpui::TestAppContext) {
         });
     });
 }
+
+#[gpui::test]
+fn an_agent_on_its_way_stays_asked(cx: &mut gpui::TestAppContext) {
+    let (view, _server, cx) = page_in_front(cx, "w1:p1");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.navigate_endpoint("reveal", NavigationTarget::Pane("w1:p2"), cx));
+            // A tick while the focus is in flight keeps the request.
+            view.reveal_terminal(window, cx);
+            assert_eq!(view.reveal, Some(NavigationTarget::Pane("w1:p2".into())));
+            assert!(matches!(shown(view, cx), Shown::Page(_)));
+            arrive(view, "w1:p2", window, cx);
+            assert_eq!(shown(view, cx), Shown::Terminal);
+        });
+    });
+}
+
+#[gpui::test]
+fn another_host_forgets_the_agent(cx: &mut gpui::TestAppContext) {
+    let (view, _server, cx) = page_in_front(cx, "w1:p1");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.navigate_endpoint("reveal", NavigationTarget::Pane("w1:p2"), cx));
+            // Switching hosts starts the selected connection over; a pane
+            // there may have the same ID.
+            view.reset_selected(cx);
+            assert_eq!(view.reveal, None);
+            arrive(view, "w1:p2", window, cx);
+            assert!(matches!(shown(view, cx), Shown::Page(_)));
+        });
+    });
+}
+
+#[gpui::test]
+fn a_page_chosen_meanwhile_keeps_its_place(cx: &mut gpui::TestAppContext) {
+    let (view, _server, cx) = page_in_front(cx, "w1:p1");
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let (scope, workspace) = view.browser_key().unwrap();
+            let other =
+                Store::update(cx, |store| store.open(scope, &workspace, None, None)).unwrap();
+            assert!(view.navigate_endpoint("reveal", NavigationTarget::Pane("w1:p2"), cx));
+            view.show_browser_tab(other, window, cx);
+            assert_eq!(view.reveal, None);
+            arrive(view, "w1:p2", window, cx);
+            assert_eq!(shown(view, cx), Shown::Page(other));
+        });
+    });
+}

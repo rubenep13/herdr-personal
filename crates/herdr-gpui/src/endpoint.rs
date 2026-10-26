@@ -516,6 +516,9 @@ impl HerdrWindow {
             .then(|| Instant::now() + ACTIVATION_TIMEOUT);
         self.pending_navigation = None;
         self.pending_toast = None;
+        // Pane IDs repeat across hosts: an agent asked for on the last one
+        // is not this one's.
+        self.reveal = None;
     }
 
     pub(super) fn select_endpoint(&mut self, id: &str, cx: &mut Context<Self>) -> bool {
