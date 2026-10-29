@@ -1,3 +1,8 @@
+> [!WARNING]
+> **This project is abandoned (October 2026).** [Herdr](https://herdr.dev) now
+> ships its own GUI, which covers most of what justified this fork, so the fork
+> is no longer used or maintained. The code stays here for reference only.
+
 > **Herdr Personal Dev** is a personal development fork of
 > [penso/herdr-gpui](https://github.com/penso/herdr-gpui), based on
 > `4223e9896b6b9a52a678e66269b08b1e0125dfb0`. It is not affiliated with the
