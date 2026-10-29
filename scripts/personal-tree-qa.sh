@@ -21,6 +21,11 @@
 # connects through HERDR_SOCKET_PATH rather than --socket, so views that
 # need a scriptable host (orchestrator, Git graph) open on both hosts.
 #
+# The local daemon listens at the GUI's standard session socket, under the
+# GUI's own XDG_CONFIG_HOME, so the app trusts it as this machine's daemon,
+# and Review gets a Herdr worktree to open on: a workspace that merely sits
+# in a repository has no worktree metadata for it.
+#
 # A newline on stdin quits the app, stops the daemons, and removes the sandbox.
 set -euo pipefail
 
@@ -35,6 +40,11 @@ client=$(realpath "$client")
 sandbox=$(mktemp -d "${TMPDIR:-/tmp}/hq.XXXXXX")
 chmod 700 "$sandbox"
 remote="$sandbox/r"
+# Where the GUI looks for this machine's daemon; it must be this user's and
+# not writable by others for the app to trust it.
+sockets="$sandbox/gui/config/herdr"
+mkdir -p "$sockets"
+chmod 700 "$sandbox/gui" "$sandbox/gui/config" "$sockets"
 daemon_pid=
 remote_pid=
 gui_pid=
@@ -45,8 +55,8 @@ isolated=(
   PATH=/usr/bin:/bin HOME="$sandbox" XDG_CONFIG_HOME="$sandbox/config"
   XDG_STATE_HOME="$sandbox/state" XDG_DATA_HOME="$sandbox/data"
   XDG_CACHE_HOME="$sandbox/cache" XDG_RUNTIME_DIR="$sandbox" TMPDIR="$sandbox"
-  HERDR_CONFIG_PATH="$sandbox/config.toml" HERDR_SOCKET_PATH="$sandbox/a.sock"
-  HERDR_CLIENT_SOCKET_PATH="$sandbox/a-client.sock" SHELL=/bin/sh TERM=xterm-256color
+  HERDR_CONFIG_PATH="$sandbox/config.toml" HERDR_SOCKET_PATH="$sockets/herdr.sock"
+  HERDR_CLIENT_SOCKET_PATH="$sockets/herdr-client.sock" SHELL=/bin/sh TERM=xterm-256color
 )
 remote_env=(
   PATH=/usr/bin:/bin HOME="$remote" XDG_CONFIG_HOME="$remote/config"
@@ -60,11 +70,11 @@ gui=(
   XDG_DATA_HOME="$sandbox/gui/data" XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-}"
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-}" DISPLAY="${DISPLAY:-}"
 )
-gui_args=(--socket "$sandbox/a-client.sock")
+gui_args=(--socket "$sockets/herdr-client.sock")
 if [ "$two_hosts" = 1 ]; then
   # Local is the first daemon through HERDR_SOCKET_PATH; saved hosts come from
   # the sandbox's state directory; the login shell puts the fake ssh first.
-  gui+=(PATH="$sandbox/bin:/usr/bin:/bin" SHELL=/bin/sh HERDR_SOCKET_PATH="$sandbox/a.sock")
+  gui+=(PATH="$sandbox/bin:/usr/bin:/bin" SHELL=/bin/sh HERDR_SOCKET_PATH="$sockets/herdr.sock")
   gui_args=()
 fi
 
@@ -170,8 +180,8 @@ fi
 
 here() { env -i "${isolated[@]}" "$herdr" "$@" >/dev/null; }
 there() { env -i "${remote_env[@]}" "$herdr" "$@" >/dev/null; }
-for _ in $(seq 1 100); do [ -S "$sandbox/a-client.sock" ] && break; sleep 0.1; done
-[ -S "$sandbox/a-client.sock" ] || { echo "daemon did not start" >&2; exit 1; }
+for _ in $(seq 1 100); do [ -S "$sockets/herdr-client.sock" ] && break; sleep 0.1; done
+[ -S "$sockets/herdr-client.sock" ] || { echo "daemon did not start" >&2; exit 1; }
 
 here workspace create --cwd "$sandbox/repo" --label API --no-focus
 here workspace create --cwd "$sandbox/repo" --label Tools --no-focus
@@ -185,6 +195,7 @@ here pane report-agent --source qa --agent claude --state working w2:p1
 here pane report-metadata w1:p1 --source qa --agent claude --token model=opus-4.7
 here pane report-metadata w1:p2 --source qa --agent codex --token model=gpt-5.5
 here tab create --workspace w2 --cwd "$sandbox/repo" --label shell
+here worktree create --workspace w1 --branch qa/review --path "$sandbox/review" --label Review
 
 if [ "$two_hosts" = 1 ]; then
   for _ in $(seq 1 100); do there workspace list 2>/dev/null && break; sleep 0.1; done

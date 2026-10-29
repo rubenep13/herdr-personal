@@ -391,6 +391,27 @@ impl MenuLook {
             .child(key.into())
     }
 
+    /// How tall [`Self::keycap`] is: a hint row's line.
+    pub(crate) fn keycap_height(&self) -> Pixels {
+        self.at(KEYCAP)
+    }
+
+    /// A footer's key hints, one line `line` tall. The caller adds each hint
+    /// as a child that does not shrink: one that does not fit wraps to a
+    /// second line, which the row clips, so hints drop out whole from the
+    /// last rather than being cut.
+    pub(crate) fn hint_row(&self, selector: String, line: Pixels) -> Div {
+        div()
+            .debug_selector(move || selector)
+            .flex_1()
+            .min_w_0()
+            .h(line)
+            .overflow_hidden()
+            .flex()
+            .flex_wrap()
+            .items_center()
+    }
+
     /// A shortcut's keys as chips: the row named `selector`, each key
     /// `{selector}-key-{n}`.
     pub(crate) fn keys(&self, selector: &str, shortcut: &str) -> Div {

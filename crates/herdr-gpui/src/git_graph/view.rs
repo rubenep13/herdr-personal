@@ -37,9 +37,7 @@ use crate::{
 use gpui::{prelude::*, *};
 use header::ColumnDrag;
 use std::{
-    cell::Cell,
     collections::{HashMap, HashSet},
-    rc::Rc,
     sync::Arc,
     time::Instant,
 };
@@ -89,6 +87,18 @@ impl GraphLook {
     pub(crate) fn view(&self) -> crate::design::ViewLook {
         self.view
     }
+
+    /// How much the history grows with the chrome: 1 at the face of 12.
+    pub(crate) fn scale(&self) -> f32 {
+        f32::from(self.view.at(1.))
+    }
+
+    /// `measure`, given at the face of 12, at the chrome's face. Rows,
+    /// lanes, nodes, labels and column widths all go through it, the same
+    /// for painting and for the pointer.
+    pub(crate) fn at(&self, measure: f32) -> f32 {
+        measure * self.scale()
+    }
 }
 
 pub(crate) struct GitGraphView {
@@ -125,8 +135,9 @@ pub(crate) struct GitGraphView {
     panel: Option<detail::Panel>,
     /// A commit being looked for page by page, and the pages left to read.
     jump: Option<(String, usize)>,
-    /// The tab's width at the last frame, for the panel's bounds.
-    width: Rc<Cell<f32>>,
+    /// The tab's width at the last frame, for the panel's bounds and
+    /// whether it goes under the graph.
+    width: crate::design::Width,
     search_input: Entity<SearchInput>,
     /// The search, while its field is open.
     search: Option<search::Search>,
@@ -246,7 +257,7 @@ impl GitGraphView {
             hovered_chip: None,
             panel: None,
             jump: None,
-            width: Rc::default(),
+            width: Default::default(),
             search_input,
             search: None,
             matches: HashSet::new(),
@@ -588,7 +599,8 @@ impl GitGraphView {
         {
             return;
         }
-        if look.ui.family != self.look.ui.family {
+        // Labels shape at the chrome's size too.
+        if look.ui.family != self.look.ui.family || look.view() != self.look.view() {
             self.chip_widths.clear();
         }
         self.search_input.update(cx, |input, cx| {
@@ -604,7 +616,8 @@ impl GitGraphView {
             .history
             .as_ref()
             .map_or(1, |history| history.layout.lane_count);
-        self.prefs.graph_width.unwrap_or_else(|| graph_width(lanes))
+        self.look
+            .at(self.prefs.graph_width.unwrap_or_else(|| graph_width(lanes)))
     }
 
     /// Which of `row`'s labels fit in the label column.
@@ -740,13 +753,9 @@ impl Render for GitGraphView {
         let panel = self.render_panel(cx);
         let results = self.render_results(f32::from(view.at(header::BAR_H)), cx);
         let help = self.render_help(cx);
-        let width = self.width.clone();
-        let measure = canvas(
-            move |bounds, _, _| width.set(f32::from(bounds.size.width)),
-            |_, (), _, _| {},
-        )
-        .absolute()
-        .size_full();
+        // Any move counts: the label column narrows smoothly with it.
+        let measure = self.width.follow();
+        let stacked = self.detail_stacked();
         div()
             .id("git-graph")
             .key_context("GitGraph")
@@ -757,7 +766,7 @@ impl Render for GitGraphView {
                     let x = f32::from(event.event.position.x - event.bounds.origin.x);
                     match *event.drag(cx) {
                         ColumnDrag::Panel => {
-                            Self::drag_panel(x, f32::from(event.bounds.size.width), cx)
+                            this.drag_panel(x, f32::from(event.bounds.size.width), cx)
                         }
                         drag => this.drag_column(drag, x, cx),
                     }
@@ -771,12 +780,20 @@ impl Render for GitGraphView {
             .text_color(rgb(theme.foreground))
             .text_font(&self.look.ui)
             .text_size(px(self.look.ui.size))
-            .line_height(px(ROW_H))
+            .line_height(px(self.look.at(ROW_H)))
             .relative()
             .child(measure)
             .child(bar)
             .children(results)
             .children(help)
-            .child(div().flex_1().min_h_0().flex().child(body).children(panel))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .when(stacked, |area| area.flex_col())
+                    .child(body)
+                    .children(panel),
+            )
     }
 }

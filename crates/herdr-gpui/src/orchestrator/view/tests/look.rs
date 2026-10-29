@@ -7,7 +7,7 @@ use crate::orchestrator::{
 use gpui::{Modifiers, TestAppContext, px, size};
 use std::sync::Arc;
 
-fn issues(count: usize) -> Vec<Item> {
+pub(super) fn issues(count: usize) -> Vec<Item> {
     (0..count)
         .map(|index| {
             item(
@@ -21,7 +21,7 @@ fn issues(count: usize) -> Vec<Item> {
 }
 
 /// An inbox listing `items`, its first selected, in a window 1200 wide.
-fn inbox(
+pub(super) fn inbox(
     cx: &mut TestAppContext,
     items: Vec<Item>,
 ) -> (
@@ -63,7 +63,10 @@ fn inbox(
     (dir, view, cx)
 }
 
-fn bounds(cx: &mut gpui::VisualTestContext, selector: &'static str) -> gpui::Bounds<gpui::Pixels> {
+pub(super) fn bounds(
+    cx: &mut gpui::VisualTestContext,
+    selector: &'static str,
+) -> gpui::Bounds<gpui::Pixels> {
     cx.debug_bounds(selector)
         .unwrap_or_else(|| panic!("{selector}"))
 }

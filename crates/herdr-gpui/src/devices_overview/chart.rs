@@ -12,7 +12,7 @@ use crate::{
     HerdrWindow,
     browser::{Slot, TabId},
     config::mix,
-    design::ButtonKind,
+    design::{ButtonKind, ViewLook},
 };
 use gpui::{prelude::*, *};
 use herdr_client::protocol::AgentStatus;
@@ -28,6 +28,55 @@ const LABEL_WIDTH: f32 = 150.;
 const NOW_WIDTH: f32 = 72.;
 /// Space between two steps, when the chart is wide enough for it.
 const STEP_GAP: f32 = 1.;
+/// The gap between a row's columns (`gap_3`).
+const COLUMN_GAP: f32 = 12.;
+/// The card's narrowest with the figure beside the bars, and the bars'
+/// narrowest with the axis's middle label, at `[ui] size = 12`.
+const CHART_SIDE_MIN: f32 = 520.;
+const AXIS_MIDDLE_MIN: f32 = 260.;
+
+/// How the activity card lays out at its width.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Shape {
+    /// The figure and the counts beside the bars, or over them.
+    beside: bool,
+    /// Whether the axis has room for "1 h ago" between its ends.
+    middle: bool,
+}
+
+impl Shape {
+    /// The card's shape at `card` wide, or wide before its first layout.
+    pub(super) fn of(view: ViewLook, card: Option<f32>) -> Self {
+        let Some(card) = card else {
+            return Self {
+                beside: true,
+                middle: true,
+            };
+        };
+        let beside = card >= f32::from(view.at(CHART_SIDE_MIN));
+        let inner = card - card_chrome(view);
+        let bars = if beside { inner - BESIDE } else { inner };
+        Self {
+            beside,
+            middle: bars >= f32::from(view.at(AXIS_MIDDLE_MIN)),
+        }
+    }
+
+    /// The card widths at which [`Self::of`] changes: the figure goes
+    /// beside, and the middle label shows beside and under.
+    pub(super) fn cuts(view: ViewLook) -> [f32; 3] {
+        let middle = f32::from(view.at(AXIS_MIDDLE_MIN)) + card_chrome(view);
+        [f32::from(view.at(CHART_SIDE_MIN)), middle + BESIDE, middle]
+    }
+}
+
+/// The room the figure's and the counts' columns take beside the bars.
+const BESIDE: f32 = LABEL_WIDTH + NOW_WIDTH + 2. * COLUMN_GAP;
+
+/// The card's padding and its border, on both sides.
+fn card_chrome(view: ViewLook) -> f32 {
+    f32::from(view.at(CARD_PADDING)) * 2. + 2.
+}
 
 /// The full two hours, oldest first: steps the window has not seen yet are
 /// None on the left, so the axis means the same from the first minute.
@@ -57,6 +106,7 @@ pub(super) fn activity(
     history: &History,
     shown: &[&Device],
     now: Tally,
+    shape: Shape,
     lanes: bool,
     slot: Slot,
     id: TabId,
@@ -71,16 +121,35 @@ pub(super) fn activity(
         .unwrap_or(0);
     let working = look.status(AgentStatus::Working);
     let blocked = look.status(AgentStatus::Blocked);
+    let view = look.view;
+    // Beside: a label, the bars and a count share a row. Narrow: the label
+    // and the count share a line, and the bars get the card's width under.
     let row = |left: Div, middle: AnyElement, right: Option<Div>| {
+        if shape.beside {
+            return div()
+                .flex()
+                .items_center()
+                .gap(px(COLUMN_GAP))
+                .child(div().flex_none().w(px(LABEL_WIDTH)).min_w_0().child(left))
+                .child(div().flex_1().min_w_0().child(middle))
+                .child(div().flex_none().w(px(NOW_WIDTH)).children(right));
+        }
         div()
             .flex()
-            .items_center()
-            .gap_3()
-            .child(div().flex_none().w(px(LABEL_WIDTH)).min_w_0().child(left))
-            .child(div().flex_1().min_w_0().child(middle))
-            .child(div().flex_none().w(px(NOW_WIDTH)).children(right))
+            .flex_col()
+            .gap(view.at(6.))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(COLUMN_GAP))
+                    .child(div().flex_1().min_w_0().child(left))
+                    .children(right.map(|right| div().flex_none().child(right))),
+            )
+            .child(middle)
     };
     let summary = div()
+        .debug_selector(|| "devices-summary".into())
         .flex()
         .flex_col()
         .child(
@@ -101,7 +170,6 @@ pub(super) fn activity(
                 .text_color(rgb(theme.muted))
                 .child(format!("peak {peak} in 2 h")),
         );
-    let view = look.view;
     let toggle = view
         .button(
             SharedString::from(slot.selector("devices-lanes-toggle")),
@@ -121,10 +189,17 @@ pub(super) fn activity(
                 cx.notify();
             }
         }));
-    let axis = div()
-        .flex()
-        .justify_between()
-        .children(["2 h ago", "1 h ago", "now"].map(|label| look.mono(label)));
+    // Its ends always; the middle only where it fits whole between them.
+    let axis = div().w_full().flex().justify_between().children(
+        ["2 h ago", "1 h ago", "now"]
+            .into_iter()
+            .enumerate()
+            .filter(|(index, _)| *index != 1 || shape.middle)
+            .map(|(index, label)| {
+                look.mono(label)
+                    .debug_selector(move || format!("devices-axis-{index}"))
+            }),
+    );
     let body = div()
         .px(view.at(CARD_PADDING))
         .pb(view.at(CARD_PADDING))
@@ -133,7 +208,17 @@ pub(super) fn activity(
         .gap(view.at(8.))
         .child(row(
             summary,
-            bars(padded(totals), peak, [working, blocked], theme, BARS_HEIGHT),
+            div()
+                .debug_selector(|| "devices-bars".into())
+                .w_full()
+                .child(bars(
+                    padded(totals),
+                    peak,
+                    [working, blocked],
+                    theme,
+                    BARS_HEIGHT,
+                ))
+                .into_any_element(),
             None,
         ))
         .when(lanes, |body| {
@@ -165,7 +250,14 @@ pub(super) fn activity(
                     )
                 }))
         })
-        .child(row(div(), axis.into_any_element(), None));
+        .map(|body| {
+            // The axis lines up with the bars.
+            if shape.beside {
+                body.child(row(div(), axis.into_any_element(), None))
+            } else {
+                body.child(axis)
+            }
+        });
     view.settings()
         .card(slot.selector("devices-activity"))
         .child(

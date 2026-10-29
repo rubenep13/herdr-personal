@@ -9,6 +9,7 @@
 mod conversation;
 mod detail;
 mod dispatch;
+mod filters;
 mod hosts;
 mod inbox;
 mod list;
@@ -29,7 +30,10 @@ use super::{Item, Notice, Request, Service, Snapshot};
 use crate::search_input::{self, SearchInput};
 use gpui::{prelude::*, *};
 use rows::{Filters, ItemRow, RunLine, Runs, Sort, Tab};
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 /// What the view asks its host to do.
 #[derive(Clone, Debug)]
@@ -70,6 +74,11 @@ impl EventEmitter<Event> for OrchestratorView {}
 const PREVIEW_MIN: f32 = 280.;
 const PREVIEW_DEFAULT: f32 = 380.;
 const PREVIEW_MAX_SHARE: f32 = 0.6;
+/// The narrowest the list gets beside the preview, at `[ui]` 12; narrower,
+/// the preview goes under it.
+const LIST_MIN: f32 = 400.;
+/// The preview's share of the inbox's height when under the list.
+const STACKED_PREVIEW_SHARE: f32 = 0.45;
 
 /// The detail page of one item.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -144,6 +153,10 @@ pub(crate) struct OrchestratorView {
     sort: Sort,
     sort_open: bool,
     filters: Filters,
+    /// Whether the Filters menu is open, when a narrow row folds them.
+    filters_open: bool,
+    /// The filter row's labels shaped at the look's size; see `filters`.
+    label_widths: HashMap<&'static str, f32>,
     mine: bool,
     active_runs: bool,
     collapsed: HashSet<String>,
@@ -154,6 +167,9 @@ pub(crate) struct OrchestratorView {
     detail: Option<Detail>,
     preview_open: bool,
     preview_width: f32,
+    /// The inbox's width at its last layout, which puts the preview beside
+    /// the list or under it.
+    width: crate::design::Width,
     focus: FocusHandle,
     scroll: UniformListScrollHandle,
     issue_rows: Vec<ItemRow>,
@@ -238,6 +254,8 @@ impl OrchestratorView {
             tab: Tab::default(),
             sort: Sort::default(),
             sort_open: false,
+            filters_open: false,
+            label_widths: HashMap::new(),
             filters: Filters::default(),
             mine: false,
             active_runs: false,
@@ -248,6 +266,7 @@ impl OrchestratorView {
             detail: None,
             preview_open: true,
             preview_width: PREVIEW_DEFAULT,
+            width: Default::default(),
             focus: cx.focus_handle(),
             scroll: UniformListScrollHandle::new(),
             issue_rows: Vec::new(),
@@ -400,6 +419,7 @@ impl OrchestratorView {
             });
         }
         self.look = look;
+        self.label_widths.clear();
         cx.notify();
     }
 
@@ -568,6 +588,7 @@ impl OrchestratorView {
         self.tab = tab;
         self.selected = None;
         self.sort_open = false;
+        self.filters_open = false;
         self.refresh_rows();
         cx.notify();
     }
@@ -736,8 +757,9 @@ impl OrchestratorView {
                 cx.notify();
                 true
             }
-            ("escape", None) if self.sort_open => {
+            ("escape", None) if self.sort_open || self.filters_open => {
                 self.sort_open = false;
+                self.filters_open = false;
                 cx.notify();
                 true
             }

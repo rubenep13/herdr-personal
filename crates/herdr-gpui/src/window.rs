@@ -257,6 +257,9 @@ pub(crate) struct HerdrWindow {
     /// Herdr's resize mode: direction keys resize the focused pane until
     /// Escape, Enter, or the mode's own shortcut ends it.
     pub(crate) resize_mode: bool,
+    /// An agent the user went to, whose terminal comes out from behind a
+    /// page once the daemon's focus reaches it; see `reveal_terminal`.
+    pub(crate) reveal: Option<OwnedNavigationTarget>,
     /// The review's list of changed files.
     pub(crate) review_files_width: crate::panel_resize::PanelWidth,
     /// Each review tab's state, by its tab.
@@ -524,6 +527,7 @@ impl HerdrWindow {
         {
             self.terminal_focus_moved(&tab, old_workspace != workspace, cx);
         }
+        self.reveal_terminal(window, cx);
         // After the focus check: a swap replaces `live` with another
         // connection's, which is not a move of this one's focus.
         if self.poll_group_terminals() {

@@ -516,6 +516,9 @@ impl HerdrWindow {
             .then(|| Instant::now() + ACTIVATION_TIMEOUT);
         self.pending_navigation = None;
         self.pending_toast = None;
+        // Pane IDs repeat across hosts: an agent asked for on the last one
+        // is not this one's.
+        self.reveal = None;
     }
 
     pub(super) fn select_endpoint(&mut self, id: &str, cx: &mut Context<Self>) -> bool {
@@ -709,12 +712,23 @@ impl HerdrWindow {
         }
         self.pending_toast = None;
         self.pending_navigation = None;
+        self.ask_reveal(target.clone());
         if self.input_ready() {
             self.navigate(target, cx);
         } else {
             self.pending_navigation = Some((&target).into());
         }
         true
+    }
+
+    /// The user went to `target`: its terminal comes out from behind a page
+    /// once the daemon's focus gets there; see `reveal_terminal`. Going to a
+    /// workspace keeps what its group shows.
+    pub(crate) fn ask_reveal(&mut self, target: NavigationTarget<&str>) {
+        self.reveal = match target {
+            NavigationTarget::Workspace(_) => None,
+            target => Some((&target).into()),
+        };
     }
 
     pub(super) fn input_ready(&self) -> bool {

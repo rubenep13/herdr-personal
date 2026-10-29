@@ -476,14 +476,24 @@ impl HerdrWindow {
         let cell_height = self.config.terminal.line_height();
         let rect = pane.rect;
         let look = self.view_look();
-        let bottom = f32::from(rect.y.saturating_add(rect.height)) * cell_height;
+        // Over the whole pane, so the badge keeps inside it: a pane too short
+        // for the badge and its margin gives up the margin first, keeping the
+        // badge on its bottom edge.
         let corner = div()
             .absolute()
             .left(px(f32::from(rect.x) * self.cell_width))
+            .top(px(f32::from(rect.y) * cell_height))
             .w(px(f32::from(rect.width) * self.cell_width))
+            .h(px(f32::from(rect.height) * cell_height))
             .flex()
+            .flex_col()
             .justify_end()
-            .px(px(6.));
+            .items_end()
+            .px(look.at(super::find::MARGIN));
+        let gap = div()
+            .flex_shrink(1.)
+            .min_h_0()
+            .h(look.at(super::find::MARGIN));
         // Both are the menus' panel in small, as the find bar is.
         let small_panel = || {
             look.menu()
@@ -498,26 +508,29 @@ impl HerdrWindow {
                 SearchDirection::Backward => "?",
             };
             return Some(
-                corner.top(px(bottom - 44.)).child(
-                    small_panel()
-                        .id("copy-search")
-                        .debug_selector(|| "copy-search".into())
-                        .occlude()
-                        .min_w_0()
-                        .w(px(280.))
-                        .flex_shrink(1.)
-                        .flex()
-                        .items_center()
-                        .p(look.at(4.))
-                        .on_key_down(cx.listener(Self::copy_search_key_down))
-                        .child(
-                            look.field("copy-search-field".into(), false, None)
-                                .flex_1()
-                                .flex_shrink(1.)
-                                .child(div().flex_none().text_color(look.muted()).child(marker))
-                                .child(div().flex_1().min_w_0().child(prompt.input.clone())),
-                        ),
-                ),
+                corner
+                    .child(
+                        small_panel()
+                            .id("copy-search")
+                            .debug_selector(|| "copy-search".into())
+                            .occlude()
+                            .flex_none()
+                            .min_w_0()
+                            .w(look.at(280.))
+                            .max_w_full()
+                            .flex()
+                            .items_center()
+                            .p(look.at(4.))
+                            .on_key_down(cx.listener(Self::copy_search_key_down))
+                            .child(
+                                look.field("copy-search-field".into(), false, None)
+                                    .flex_1()
+                                    .flex_shrink(1.)
+                                    .child(div().flex_none().text_color(look.muted()).child(marker))
+                                    .child(div().flex_1().min_w_0().child(prompt.input.clone())),
+                            ),
+                    )
+                    .child(gap),
             );
         }
         let label = state.mode.search_label().map_or_else(
@@ -525,17 +538,21 @@ impl HerdrWindow {
             |search| format!("Copy mode  {search}"),
         );
         Some(
-            corner.top(px(bottom - 32.)).child(
-                small_panel()
-                    .debug_selector(|| "copy-mode".into())
-                    .min_w_0()
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .text_ellipsis()
-                    .px(look.at(10.))
-                    .py(look.at(3.))
-                    .child(label),
-            ),
+            corner
+                .child(
+                    small_panel()
+                        .debug_selector(|| "copy-mode".into())
+                        .flex_none()
+                        .min_w_0()
+                        .max_w_full()
+                        .overflow_hidden()
+                        .whitespace_nowrap()
+                        .text_ellipsis()
+                        .px(look.at(10.))
+                        .py(look.at(3.))
+                        .child(label),
+                )
+                .child(gap),
         )
     }
 }

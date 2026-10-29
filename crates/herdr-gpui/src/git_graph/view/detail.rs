@@ -1,6 +1,7 @@
-//! The panel beside the graph: the selected commit's message, author, date,
-//! parents and labels, the files it changed, and the diff of the one chosen,
-//! as hgg's details panel shows them. It resizes by its left edge.
+//! The panel beside the graph, or under it in a narrow tab: the selected
+//! commit's message, author, date, parents and labels, the files it
+//! changed, and the diff of the one chosen, as hgg's details panel shows
+//! them. Beside the graph it resizes by its left edge.
 
 use super::{GitGraphView, header::ColumnDrag};
 use crate::{
@@ -26,6 +27,9 @@ use std::sync::Arc;
 const JUMP_PAGES: usize = 10;
 /// The share of the tab the panel may take.
 const PANEL_SHARE: f32 = 0.75;
+/// The narrowest the graph gets beside the panel, at the face of 12;
+/// narrower, the panel goes under it.
+const GRAPH_SIDE_MIN: f32 = 400.;
 const DIFF_LINE_H: f32 = 18.;
 /// The panel's measures at the graph's `[ui]`-sized face of 12: its resize
 /// edge, padding and line height, the captions' column, the subject's size
@@ -319,20 +323,36 @@ impl GitGraphView {
 
     /// The panel's width in a tab `tab` wide: chosen, within 320 px and
     /// three quarters of the tab.
-    fn panel_width(&self) -> f32 {
+    pub(super) fn panel_width(&self) -> f32 {
         let tab = self.width.get();
+        let least = self.look.at(PANEL_MIN);
         let most = if tab > 0. {
-            (tab * PANEL_SHARE).max(PANEL_MIN)
+            (tab * PANEL_SHARE).max(least)
         } else {
             f32::MAX
         };
-        self.prefs.panel_width.clamp(PANEL_MIN, most)
+        self.look.at(self.prefs.panel_width).clamp(least, most)
+    }
+
+    /// Whether the panel goes under the graph: beside it, at the width it
+    /// was given, the graph would get narrower than `GRAPH_SIDE_MIN`.
+    /// Unknown before the first frame.
+    pub(super) fn detail_stacked(&self) -> bool {
+        let tab = self.width.get();
+        self.panel.is_some()
+            && tab > 0.
+            && tab - self.look.at(self.prefs.panel_width.max(PANEL_MIN))
+                < f32::from(self.look.view().at(GRAPH_SIDE_MIN))
     }
 
     /// Follows the panel's dragged edge: `x` from the tab's left, in a tab
-    /// `tab` wide.
-    pub(super) fn drag_panel(x: f32, tab: f32, cx: &mut App) {
-        let width = (tab - x).clamp(PANEL_MIN, (tab * PANEL_SHARE).max(PANEL_MIN));
+    /// `tab` wide. The graph keeps `GRAPH_SIDE_MIN` beside it.
+    pub(super) fn drag_panel(&self, x: f32, tab: f32, cx: &mut App) {
+        let graph = f32::from(self.look.view().at(GRAPH_SIDE_MIN));
+        let least = self.look.at(PANEL_MIN);
+        let most = (tab * PANEL_SHARE).min(tab - graph).max(least);
+        // Saved as at the face of 12, as the columns are.
+        let width = (tab - x).clamp(least, most) / self.look.scale();
         crate::git_graph::prefs::GraphPrefsStore::update(cx, |prefs| prefs.panel_width = width);
     }
 
@@ -393,19 +413,27 @@ impl GitGraphView {
             )),
             (None, None) => self.panel_note("Loading commit\u{2026}"),
         };
+        // Under the graph it takes half the height and keeps the width it
+        // was given for when there is room beside.
+        let stacked = self.detail_stacked();
         Some(
             view.side_panel("graph-detail", Edge::Right)
                 .id("graph-detail")
                 .relative()
-                .w(px(self.panel_width()))
-                .h_full()
+                .map(|panel| {
+                    if stacked {
+                        panel.border_l_0().border_t_1().w_full().h(relative(0.5))
+                    } else {
+                        panel.w(px(self.panel_width())).h_full()
+                    }
+                })
                 .line_height(view.at(LINE))
                 .child(
                     view.side_header("graph-detail-header", title, None)
                         .child(close),
                 )
                 .child(body)
-                .child(edge)
+                .when(!stacked, |panel| panel.child(edge))
                 .into_any_element(),
         )
     }
@@ -746,16 +774,18 @@ impl GitGraphView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = &self.look.theme;
+        // The diff grows with the history, as its rows do.
+        let at = |measure: f32| px(self.look.at(measure));
         let path = match diff.section {
             Some(section) => format!("{} \u{00b7} {}", section.title(), diff.path),
             None => diff.path.clone(),
         };
         let title = div()
             .flex_none()
-            .px_4()
-            .py_1()
+            .px(at(16.))
+            .py(at(4.))
             .text_font(&self.look.mono)
-            .text_size(px(12.))
+            .text_size(at(12.))
             .text_color(rgb(theme.subtext()))
             .truncate()
             .child(path);
@@ -805,9 +835,9 @@ impl GitGraphView {
                     div()
                         .debug_selector(|| "graph-diff-truncated".to_owned())
                         .flex_none()
-                        .px_4()
-                        .py_1()
-                        .text_size(px(12.))
+                        .px(at(16.))
+                        .py(at(4.))
+                        .text_size(at(12.))
                         .text_color(rgb(theme.muted))
                         .child(format!(
                             "Diff cut at {} lines.",
@@ -820,15 +850,16 @@ impl GitGraphView {
 
     fn render_diff_line(&self, lines: &Lines, spans: &[Vec<Span>], index: usize) -> AnyElement {
         let theme = &self.look.theme;
+        let at = |measure: f32| px(self.look.at(measure));
         let Some(line) = lines.get(index) else {
-            return div().h(px(DIFF_LINE_H)).into_any_element();
+            return div().h(at(DIFF_LINE_H)).into_any_element();
         };
         let tint = diff_tint(theme, line.kind);
         let number = |value: Option<u32>| {
             div()
                 .flex_none()
-                .w(px(42.))
-                .pr(px(6.))
+                .w(at(42.))
+                .pr(at(6.))
                 .flex()
                 .justify_end()
                 .text_color(rgb(theme.muted))
@@ -860,19 +891,19 @@ impl GitGraphView {
         });
         div()
             .debug_selector(move || format!("graph-diff-line-{index}"))
-            .h(px(DIFF_LINE_H))
+            .h(at(DIFF_LINE_H))
             .flex()
             .whitespace_nowrap()
             .text_font(&self.look.mono)
-            .text_size(px(12.))
-            .line_height(px(DIFF_LINE_H))
+            .text_size(at(12.))
+            .line_height(at(DIFF_LINE_H))
             .when_some(background, |el, wash| el.bg(wash))
             .when(line.kind == Kind::Hunk, |el| {
                 el.text_color(rgb(theme.ink(theme.palette[4])))
             })
             .child(number(line.old))
             .child(number(line.new))
-            .child(div().pl_1().pr_2().child(sign))
+            .child(div().pl(at(4.)).pr(at(8.)).child(sign))
             .child(code)
             .into_any_element()
     }

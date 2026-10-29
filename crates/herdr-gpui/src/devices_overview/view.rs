@@ -28,8 +28,12 @@ pub(crate) struct Look<'a> {
 const PAGE_PADDING_X: f32 = 22.;
 const PAGE_PADDING_Y: f32 = 18.;
 const BLOCK_GAP: f32 = 14.;
-/// The search field's width when the bar has room for it.
+/// The search field's width when the bar has room for it, and its narrowest:
+/// the bar's context gives way first.
 const SEARCH_WIDTH: f32 = 240.;
+const SEARCH_MIN: f32 = 140.;
+/// The totals' narrowest in one row of four; narrower, they go two by two.
+const CARD_MIN: f32 = 150.;
 const TOTAL_PADDING: f32 = 14.;
 const TOTAL_GAP: f32 = 4.;
 /// A total's figure, this much over the `[ui]` size.
@@ -137,9 +141,18 @@ impl HerdrWindow {
             .collect();
         let focus = page.focus.clone();
         let search_focus = page.search.read(cx).focus.clone();
+        // The page's own width, not the window's: a split group is narrower.
+        let width = page.width.get();
+        let padding = f32::from(look.view.at(PAGE_PADDING_X)) * 2.;
+        let row_of_four = f32::from(look.view.at(CARD_MIN)) * 4.
+            + f32::from(look.view.at(BLOCK_GAP)) * 3.
+            + padding;
+        let card = (width > 0.).then_some(width - padding);
+        let [beside, middle_beside, middle_under] = chart::Shape::cuts(look.view);
         div()
             .id(SharedString::from(slot.selector("devices-tab")))
             .debug_selector(move || slot.selector("devices-tab"))
+            .relative()
             .size_full()
             .min_w_0()
             .flex()
@@ -159,6 +172,12 @@ impl HerdrWindow {
                     }
                 }),
             )
+            .child(page.width.probe([
+                row_of_four,
+                beside + padding,
+                middle_beside + padding,
+                middle_under + padding,
+            ]))
             .child(self.overview_bar(
                 &look,
                 &devices,
@@ -180,12 +199,13 @@ impl HerdrWindow {
                             .flex()
                             .flex_col()
                             .gap(look.view.at(BLOCK_GAP))
-                            .child(totals(&look, &devices))
+                            .child(totals(&look, &devices, width <= 0. || width >= row_of_four))
                             .child(chart::activity(
                                 &look,
                                 &self.devices_overview.history,
                                 &shown,
                                 Tally::sum(&devices),
+                                chart::Shape::of(look.view, card),
                                 page.lanes,
                                 slot,
                                 id,
@@ -245,6 +265,7 @@ impl HerdrWindow {
                     Some("icons/search.svg"),
                 )
                 .w(view.at(SEARCH_WIDTH))
+                .min_w(view.at(SEARCH_MIN))
                 .flex_shrink(1.)
                 .child(div().flex_1().min_w_0().child(page.search.clone())),
             )
@@ -275,8 +296,8 @@ fn search_focus_now(page: &super::Page, window: &Window, cx: &App) -> bool {
 }
 
 /// Working, blocked, and idle agents on every device, and how many devices
-/// are online.
-fn totals(look: &Look, devices: &[Device]) -> Div {
+/// are online: in one row, or two by two when `in_row` is false.
+fn totals(look: &Look, devices: &[Device], in_row: bool) -> Div {
     let theme = look.theme;
     let tally = Tally::sum(devices);
     let online = devices
@@ -319,51 +340,59 @@ fn totals(look: &Look, devices: &[Device]) -> Div {
     ];
     let view = look.view;
     let scale = view.scale();
-    div()
-        .debug_selector(|| "devices-totals".into())
+    let mut cards: Vec<Div> = cells
+        .into_iter()
+        .enumerate()
+        .map(|(index, (title, value, detail, status))| {
+            view.settings()
+                .card(format!("devices-total-{index}"))
+                // A card's detail line truncates before the row goes two by
+                // two.
+                .flex_1()
+                .min_w_0()
+                .p(view.at(TOTAL_PADDING))
+                .gap(view.at(TOTAL_GAP))
+                .child(
+                    div()
+                        .truncate()
+                        .text_size(px(scale.secondary))
+                        .text_color(rgb(theme.subtext()))
+                        .child(title),
+                )
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(view.at(8.))
+                        .when_some(status, |row, status| row.child(look.dot(status)))
+                        .child(
+                            div()
+                                .text_size(px(look.ui.size + FIGURE_OVER))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(view.title())
+                                .child(value),
+                        ),
+                )
+                .child(
+                    div()
+                        .truncate()
+                        .text_size(px(scale.detail))
+                        .text_color(view.muted())
+                        .child(detail),
+                )
+        })
+        .collect();
+    let gap = view.at(BLOCK_GAP);
+    let totals = div().debug_selector(|| "devices-totals".into());
+    if in_row {
+        return totals.flex().gap(gap).children(cards);
+    }
+    let second = cards.split_off(2);
+    let row = |cards: Vec<Div>| div().flex().gap(gap).children(cards);
+    totals
         .flex()
-        .gap(view.at(BLOCK_GAP))
-        .children(
-            cells
-                .into_iter()
-                .enumerate()
-                .map(|(index, (title, value, detail, status))| {
-                    view.settings()
-                        .card(format!("devices-total-{index}"))
-                        // All four share a row in a narrow tab; the detail
-                        // line truncates first.
-                        .flex_1()
-                        .min_w_0()
-                        .p(view.at(TOTAL_PADDING))
-                        .gap(view.at(TOTAL_GAP))
-                        .child(
-                            div()
-                                .truncate()
-                                .text_size(px(scale.secondary))
-                                .text_color(rgb(theme.subtext()))
-                                .child(title),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap(view.at(8.))
-                                .when_some(status, |row, status| row.child(look.dot(status)))
-                                .child(
-                                    div()
-                                        .text_size(px(look.ui.size + FIGURE_OVER))
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(view.title())
-                                        .child(value),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .truncate()
-                                .text_size(px(scale.detail))
-                                .text_color(view.muted())
-                                .child(detail),
-                        )
-                }),
-        )
+        .flex_col()
+        .gap(gap)
+        .child(row(cards))
+        .child(row(second))
 }

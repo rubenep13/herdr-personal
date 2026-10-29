@@ -5,6 +5,7 @@ mod clock;
 mod history;
 mod look;
 mod model;
+mod narrow_cards;
 mod narrow_layout;
 mod page;
 

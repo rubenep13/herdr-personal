@@ -25,11 +25,13 @@ mod keys;
 mod layout;
 mod live;
 mod look;
+mod narrow;
 mod prefs;
 #[cfg(unix)]
 mod readonly;
 mod remote;
 mod rows;
+mod scale;
 mod search;
 mod tab;
 mod text;

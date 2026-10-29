@@ -467,7 +467,11 @@ pub(in crate::settings_window) fn segmented_elements<T: Copy + PartialEq + 'stat
     div()
         .debug_selector(move || format!("{id}-segments"))
         .flex()
-        .flex_none()
+        // Too wide for its row, the strip wraps its segments to a second
+        // row inside the box rather than leaving the card.
+        .flex_wrap()
+        .min_w_0()
+        .max_w_full()
         .items_center()
         // The 2 px around the segments include the box's 1 px ring.
         .p(look.at(2.) - px(1.))

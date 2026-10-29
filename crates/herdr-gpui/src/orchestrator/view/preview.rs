@@ -1,8 +1,9 @@
-//! The preview beside the list: the selected item or run at a glance, with
-//! the actions it offers. Its left edge drags to resize it, or shut.
+//! The preview beside the list, or under it in a narrow inbox: the selected
+//! item or run at a glance, with the actions it offers. Beside the list, its
+//! left edge drags to resize it, or shut.
 
 use super::{
-    Event, OrchestratorView, PreviewDrag,
+    Event, OrchestratorView, PreviewDrag, STACKED_PREVIEW_SHARE,
     list::{diff_squares, source_mark},
     look::{GREEN, RED, age, agent_icon},
     rows::{RunRow, Runs, Tab},
@@ -36,10 +37,20 @@ impl OrchestratorView {
                 .and_then(|key| self.item(key))
                 .map(|item| self.render_item_preview(item, cx)),
         };
+        let stacked = self.preview_stacked();
         view.side_panel("orchestrator-preview-pane", Edge::Right)
             .relative()
-            .w(px(self.preview_width))
-            .h_full()
+            .map(|panel| {
+                if stacked {
+                    panel
+                        .border_l_0()
+                        .border_t_1()
+                        .w_full()
+                        .h(relative(STACKED_PREVIEW_SHARE))
+                } else {
+                    panel.w(px(self.preview_width)).h_full()
+                }
+            })
             .child(
                 div()
                     .id("orchestrator-preview-body")
@@ -54,18 +65,20 @@ impl OrchestratorView {
                     .children(body),
             )
             // Its left edge drags: a strip over the hairline, wide enough
-            // to grab.
-            .child(
-                div()
-                    .id("orchestrator-preview-handle")
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .left_0()
-                    .w(view.at(HANDLE))
-                    .cursor(CursorStyle::ResizeLeftRight)
-                    .on_drag(PreviewDrag, |drag, _, _, cx| cx.new(|_| *drag)),
-            )
+            // to grab. Under the list it keeps the width it was given.
+            .when(!stacked, |panel| {
+                panel.child(
+                    div()
+                        .id("orchestrator-preview-handle")
+                        .absolute()
+                        .top_0()
+                        .bottom_0()
+                        .left_0()
+                        .w(view.at(HANDLE))
+                        .cursor(CursorStyle::ResizeLeftRight)
+                        .on_drag(PreviewDrag, |drag, _, _, cx| cx.new(|_| *drag)),
+                )
+            })
             .into_any_element()
     }
 

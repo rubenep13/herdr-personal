@@ -26,13 +26,7 @@ fn tree_host_shows_name_kind_dot_and_load(cx: &mut gpui::TestAppContext) {
     let (view, cx) = tree_window(cx, true);
     seed_load(&view, cx, Host::Local);
     let row = cx.debug_bounds("host-local").unwrap();
-    let parts = [
-        "host-label-local",
-        "host-kind-local",
-        "host-dot-local",
-        "host-load-local",
-    ]
-    .map(|selector| {
+    let parts = ["host-label-local", "host-kind-local", "host-dot-local"].map(|selector| {
         cx.debug_bounds(selector)
             .unwrap_or_else(|| panic!("{selector}"))
     });
@@ -42,10 +36,18 @@ fn tree_host_shows_name_kind_dot_and_load(cx: &mut gpui::TestAppContext) {
             "{part:?} follows {pair:?}"
         );
     }
-    for part in parts {
+    // The load has a line of its own under the name.
+    let load = cx.debug_bounds("host-load-local").unwrap();
+    assert!(
+        load.top() >= parts[0].bottom(),
+        "{load:?} under {:?}",
+        parts[0]
+    );
+    for part in parts.into_iter().chain([load]) {
         assert!(part.right() <= row.right() && part.top() >= row.top());
+        assert!(part.bottom() <= row.bottom());
     }
-    assert_eq!(row.size.height, px(crate::design::ROW_HEIGHT));
+    assert_eq!(row.size.height, px(crate::design::ROW_HEIGHT + 14.));
     let texts = drawn_texts(cx);
     for text in ["Local", "12% CPU", "50% mem"] {
         assert!(texts.iter().any(|drawn| drawn == text), "{text}: {texts:?}");

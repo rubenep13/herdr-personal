@@ -23,6 +23,10 @@ const REFS_INSET: f32 = 16.;
 /// The gear's button, the menu's least width and the room it keeps from
 /// the heading's edge.
 const GEAR: f32 = 22.;
+/// The room each side of the gear in its own place at the headings' end.
+const GEAR_MARGIN: f32 = 4.;
+/// The narrowest the label column gets when the other columns need room.
+const REFS_MIN: f32 = 80.;
 const MENU_WIDTH: f32 = 180.;
 const MENU_OFFSET: f32 = 6.;
 const CHECKBOX: f32 = 16.;
@@ -164,10 +168,38 @@ impl GitGraphView {
             .into_any_element()
     }
 
+    /// The gear's own place at the headings' end, which every row keeps
+    /// empty so the columns line up.
+    pub(super) fn gear_place(&self) -> f32 {
+        f32::from(self.look.view().at(GEAR + 2. * GEAR_MARGIN))
+    }
+
+    /// The label column's width: the one chosen, narrowed down to
+    /// `REFS_MIN` when the graph's side of the tab has no room for the
+    /// other columns, its labels then fitting fewer.
+    pub(super) fn refs_width(&self) -> f32 {
+        let chosen = self.look.at(self.prefs.refs_width);
+        let tab = self.width.get();
+        if tab <= 0. {
+            return chosen;
+        }
+        let side = if self.panel.is_some() && !self.detail_stacked() {
+            tab - self.panel_width()
+        } else {
+            tab
+        };
+        let optional: f32 = self
+            .optional_columns()
+            .iter()
+            .map(|(_, _, width)| width)
+            .sum();
+        let others = self.graph_width() + self.look.at(MESSAGE_MIN) + optional + self.gear_place();
+        (side - others).clamp(self.look.at(REFS_MIN).min(chosen), chosen)
+    }
+
     pub(super) fn render_columns(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = &self.look.theme;
         let view = self.look.view();
-        let prefs = self.prefs;
         let column = |key: &'static str, label: &'static str| {
             div()
                 .debug_selector(move || format!("graph-col-{key}"))
@@ -204,19 +236,19 @@ impl GitGraphView {
                 .on_drag(drag, |_, _, _, cx| cx.new(|_| EmptyView))
         };
         // The columns keep their widths, which the rows share; the headings
-        // wear the lists' column style.
-        view.columns("graph-cols")
-            .relative()
-            .w_full()
-            .px_0()
-            .gap_0()
-            .bg(view.background())
-            .border_b_1()
-            .border_color(view.line())
+        // wear the lists' column style. The gear has its own place at the
+        // end, so a heading that runs out of room ends under nothing.
+        let titles = div()
+            .debug_selector(|| "graph-col-titles".to_owned())
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .flex()
+            .overflow_hidden()
             .child(
                 column("refs", "Branch / tag")
                     .flex_none()
-                    .w(px(prefs.refs_width))
+                    .w(px(self.refs_width()))
                     .pl(view.at(REFS_INSET))
                     .child(edge(ColumnDrag::Refs, "graph-col-refs-resize")),
             )
@@ -231,7 +263,7 @@ impl GitGraphView {
             .child(
                 column("msg", "Commit message")
                     .flex_1()
-                    .min_w(px(MESSAGE_MIN))
+                    .min_w(px(self.look.at(MESSAGE_MIN)))
                     .border_l_1()
                     .border_color(rgb(theme.active)),
             )
@@ -245,15 +277,24 @@ impl GitGraphView {
                             .border_l_1()
                             .border_color(rgb(theme.active))
                     }),
-            )
+            );
+        view.columns("graph-cols")
+            .relative()
+            .w_full()
+            .px_0()
+            .gap_0()
+            .bg(view.background())
+            .border_b_1()
+            .border_color(view.line())
+            .child(titles)
             .child(
                 div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .right(view.at(4.))
+                    .flex_none()
+                    .w(px(self.gear_place()))
+                    .h_full()
                     .flex()
                     .items_center()
+                    .justify_center()
                     .child(
                         view.icon_button(
                             "graph-col-gear",
@@ -317,12 +358,15 @@ impl GitGraphView {
         .into_any_element()
     }
 
-    /// Follows a dragged column edge: `x` is the pointer, from the view's left.
+    /// Follows a dragged column edge: `x` is the pointer, from the view's
+    /// left. Widths are saved as at the face of 12, so every size shares
+    /// them.
     pub(super) fn drag_column(&self, drag: ColumnDrag, x: f32, cx: &mut App) {
-        let refs = self.prefs.refs_width;
+        let refs = self.refs_width();
+        let scale = self.look.scale();
         GraphPrefsStore::update(cx, |prefs| match drag {
-            ColumnDrag::Refs => prefs.refs_width = x,
-            ColumnDrag::Graph => prefs.graph_width = Some(x - refs),
+            ColumnDrag::Refs => prefs.refs_width = x / scale,
+            ColumnDrag::Graph => prefs.graph_width = Some((x - refs) / scale),
             ColumnDrag::Panel => {}
         });
     }
